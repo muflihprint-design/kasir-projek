@@ -260,7 +260,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwmJ3l_Z8u_6jBjT7s4gfSUycJSsEX4GGC8ux0s6jYiXmWc9AVQup_UyKotBXB-uTL8Pg/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbygMwYD5uRDJiEnEcJnzoCqWwrxO3RRZspx4HnA1O_7YckBV-PVgye6_gwa5wUwhlqLjg/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -276,7 +276,104 @@ display: block !important;
       refreshData();
     };
 
-   function showLoading(show) {
+
+function isEditable(transactionWaktu) {
+  // Asumsi format waktu: "YYYY-MM-DD HH:mm:ss"
+  const tTime = new Date(transactionWaktu.replace(/-/g, "/")).getTime();
+  const now = new Date().getTime();
+  const diffMinutes = (now - tTime) / (1000 * 60);
+  return diffMinutes <= 10;
+}
+
+function editLastTransaction(id) {
+  // Gunakan pencarian yang lebih fleksibel (handle string/number ID)
+  const t = allTransactions.find(item => item.id.toString() === id.toString());
+  if (!t) return;
+
+  // 1. Simpan ID ke variabel global untuk mode edit
+  window.editingTransactionId = t.id;
+
+  // 2. Pindah ke tab penjualan & tutup modal detail
+  changeTab('penjualan');
+  if (typeof closeModal === 'function') closeModal();
+
+  // 3. Gunakan setTimeout agar DOM tab penjualan sudah ter-render sepenuhnya
+  setTimeout(() => {
+    // Isi data header pelanggan & keuangan
+    const custInput = document.getElementById('p_cust');
+    const discInput = document.getElementById('p_disc');
+    const metSelect = document.getElementById('p_metode');
+    const dpInput = document.getElementById('p_dp');
+
+    if (custInput) custInput.value = t.sub !== '-' ? t.sub : '';
+    if (metSelect) metSelect.value = t.metode || 'Cash';
+    
+    // Gunakan maskNominal secara manual agar format Rupiah muncul saat data dimuat
+    if (discInput) {
+      discInput.value = formatRupiah(t.diskon || 0).replace("Rp ", "");
+      maskNominal(discInput);
+    }
+    if (dpInput) {
+      // Pada penjualan, uang masuk biasanya adalah DP/Bayar
+      dpInput.value = formatRupiah(t.masuk || 0).replace("Rp ", "");
+      maskNominal(dpInput);
+    }
+
+    // 4. Kosongkan keranjang dan isi dengan item dari JSON
+    const container = document.getElementById('itemContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    let items = [];
+    try {
+      items = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail;
+    } catch (e) { 
+      console.error("Gagal parse detail items:", e);
+      items = []; 
+    }
+
+    if (Array.isArray(items)) {
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = "p-3 bg-white border-b flex flex-col gap-2 item-row";
+        div.innerHTML = `
+          <input type="text" value="${item.nama}" class="w-full font-bold text-sm outline-none bg-transparent" readonly>
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-3">
+              <input type="number" value="${item.qty}" 
+                     oninput="calcTotal()" 
+                     class="w-12 p-1 bg-slate-100 rounded text-center font-bold">
+              <span class="text-xs text-slate-400">x</span>
+              <input type="text" value="${formatRupiah(item.harga || 0).replace("Rp ", "")}" 
+                     oninput="maskNominal(this); calcTotal()" 
+                     class="w-24 p-1 bg-slate-100 rounded accounting font-bold">
+            </div>
+            <button onclick="this.parentElement.parentElement.remove(); calcTotal()" class="text-red-500 active:scale-90 transition-transform">
+              <i data-lucide="trash-2" class="w-4"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // 5. Finalisasi: Render icon, hitung total, dan beri notifikasi visual
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    // Jalankan perhitungan total setelah sedikit jeda agar semua maskNominal selesai
+    setTimeout(() => {
+      calcTotal();
+    }, 100);
+
+    // Feedback visual sederhana (opsional: ganti alert dengan toast jika ada)
+    console.log("Mode Edit Aktif untuk ID:", t.id);
+  }, 600); 
+}
+
+
+
+
+function showLoading(show) {
       document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
     }
 
@@ -624,7 +721,7 @@ content.style.opacity = "0";
         </table>
       </div>`;
   }
-
+const canEdit = t.kat === 'Penjualan' && isEditable(t.waktu);
   const diskon = parseFloat(t.diskon) || 0;
   const totalSetelahDiskon = calculatedSubtotal - diskon;
 
@@ -697,15 +794,23 @@ content.style.opacity = "0";
     
     ${detailHtml}
     
-    <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
-       <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
-         Tutup
-       </button>
-       ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
-         <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-            <i data-lucide="share-2" class="w-4 h-4"></i> Bagikan Nota (JPG)
+    <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-1' : 'grid-cols-1'} gap-3">
+       ${canEdit ? `
+         <button onclick="editLastTransaction('${t.id}')" class="py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition flex items-center justify-center gap-2">
+            <i data-lucide="edit-3" class="w-4 h-4"></i> Edit Transaksi (Batas 10 Menit)
           </button>
-        ` : ''}
+       ` : ''}
+       
+       <div class="grid grid-cols-2 gap-3">
+         <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+           Tutup
+         </button>
+         ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
+           <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+              <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+            </button>
+          ` : ''}
+       </div>
     </div>
   `;
  // LANGKAH 4: Tampilkan modal
@@ -954,7 +1059,9 @@ function addItem(autoOpen = true) {
   const id = Date.now();
   const div = document.createElement('div');
   div.id = `item-${id}`;
-  div.className = "bg-white p-3 rounded-xl border border-slate-200 mb-3 shadow-sm animate-in slide-in-from-left duration-300";
+  // Tambahkan class 'item-row' untuk mempermudah selector saat perhitungan
+  div.className = "bg-white p-3 rounded-xl border border-slate-200 mb-3 shadow-sm animate-in slide-in-from-left duration-300 item-row";
+  
   div.innerHTML = `
     <div class="flex gap-2 mb-2">
       <div class="relative flex-1">
@@ -969,28 +1076,37 @@ function addItem(autoOpen = true) {
     </div>
     <div class="flex gap-2 items-center">
       <div class="w-24 shrink-0">
-  <input type="number" 
-         placeholder="Qty" 
-         oninput="calcTotal()" 
-         value="1"
-         onfocus="this.select()" 
-         class="w-full p-2 border-2 border-slate-200 rounded-lg text-sm font-black text-center h-10 outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all qty-input">
-</div>
+        <label class="text-[9px] font-bold text-slate-400 block mb-0.5 ml-1">JUMLAH (QTY)</label>
+        <input type="number" 
+               placeholder="Qty" 
+               oninput="calcTotal()" 
+               value="1"
+               onfocus="this.select()" 
+               class="w-full p-2 border-2 border-slate-200 rounded-lg text-sm font-black text-center h-10 outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all qty-input">
+      </div>
       <div class="flex-1 min-w-0">
+        <label class="text-[9px] font-bold text-slate-400 block mb-0.5 ml-1 text-right">HARGA SATUAN (Rp)</label>
         <input type="text" inputmode="numeric" placeholder="Harga" 
                oninput="maskNominal(this); calcTotal()" 
                class="w-full p-2 border rounded-lg text-lg font-bold accounting h-10 text-right outline-none focus:ring-2 focus:ring-blue-100 item-price">
       </div>
     </div>
   `;
+  
   document.getElementById('itemContainer').appendChild(div);
-  lucide.createIcons();
+  
+  // Refresh icon Lucide untuk baris baru
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  // Trigger perhitungan awal
+  calcTotal();
 
   if (autoOpen) {
     openProductModal(`input-${id}`);
   }
 }
-    async function openProductModal(inputId) {
+
+async function openProductModal(inputId) {
       currentTargetInputId = inputId;
       document.getElementById('product-modal').style.display = 'flex';
       if (productMaster.length === 0) {
@@ -1133,13 +1249,12 @@ function addItem(autoOpen = true) {
       return itemsData;
     }
 
-   async function runScript(actionName, payload, stayInTab) {
+  async function runScript(actionName, payload, stayInTab) {
   const btn = document.querySelector('button[onclick*="save"]');
   if (btn) btn.disabled = true;
   showLoading(true);
 
   try {
-    // HAPUS mode: "no-cors" agar bisa membaca respon JSON
     const response = await fetch(WEB_APP_URL, {
       method: "POST",
       body: JSON.stringify(payload)
@@ -1148,25 +1263,37 @@ function addItem(autoOpen = true) {
     const result = await response.json();
 
     if (result.status === 'success') {
-      // Masukkan data baru ke memori agar riwayat langsung terupdate
+      // PENTING: Jika berhasil simpan/edit, reset ID edit agar kembali ke mode transaksi baru
+      window.editingTransactionId = null;
+
+      // Update memori lokal jika data baru dikembalikan
       if (result.data && typeof allTransactions !== 'undefined') {
+        // Jika ini hasil edit, kita hapus dulu data lama di array lokal agar tidak double
+        if (payload.oldId) {
+          allTransactions = allTransactions.filter(t => t.id !== payload.oldId);
+        }
         allTransactions.unshift(result.data);
       }
 
-      // Reset flag agar fetch selanjutnya mengambil data terbaru
+      // Reset flag agar fetch selanjutnya mengambil data terbaru dari server
       isDataLoaded = false;
       isFullDataLoaded = false;
 
-      // Berikan feedback instan tanpa menunggu 1.2 detik penuh
       showLoading(false);
       if (btn) btn.disabled = false;
       
-      // Pindah ke tab riwayat agar user melihat datanya sudah masuk
+      // Berikan notifikasi singkat jika ada fungsi toast/alert (opsional)
+      // alert(payload.oldId ? "Data berhasil diperbarui!" : "Data berhasil disimpan!");
+
       changeTab('riwayat');
       
       // Refresh background data
       refreshData();
       fetchMasterStock();
+      
+      // Bersihkan form input setelah sukses
+      if (typeof resetFormPenjualan === 'function') resetFormPenjualan();
+
     } else {
       throw new Error(result.message || "Gagal menyimpan");
     }
@@ -1174,29 +1301,33 @@ function addItem(autoOpen = true) {
   } catch (err) {
     showLoading(false);
     if (btn) btn.disabled = false;
-    // Jika masih gagal baca JSON karena CORS, minimal kita paksa refresh setelah jeda
     console.error("Fetch error:", err);
-    setTimeout(() => {
-       location.reload(); 
-    }, 1000);
+    
+    // Jika error karena masalah koneksi/CORS, coba refresh otomatis
+    // alert("Terjadi kesalahan koneksi. Aplikasi akan memuat ulang.");
+    // location.reload(); 
   }
 }
 
-    function savePenjualan() {
-      const items = collectItems();
-      if(items.length === 0) return alert("Pilih barang terlebih dahulu!");
-      const payload = {
-        action: 'processTransaction',
-        type: 'PENJUALAN',
-        pelanggan: (document.getElementById('p_cust').value || 'UMUM').toUpperCase(),
-        items: items,
-        diskon: unmask(document.getElementById('p_disc').value),
-        dp: unmask(document.getElementById('p_dp').value),
-        metode: document.getElementById('p_metode').value
-      };
-      payload.total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
-      runScript('processTransaction', payload, 'penjualan');
-    }
+function savePenjualan() {
+  const items = collectItems();
+  if (items.length === 0) return alert("Pilih barang terlebih dahulu!");
+  
+  const payload = {
+    action: 'processTransaction',
+    type: 'PENJUALAN',
+    // Jika sedang edit, kirimkan ID lamanya agar di Apps Script baris lama dihapus/diganti
+    oldId: window.editingTransactionId || "", 
+    pelanggan: (document.getElementById('p_cust').value || 'UMUM').toUpperCase(),
+    items: items,
+    diskon: unmask(document.getElementById('p_disc').value),
+    dp: unmask(document.getElementById('p_dp').value),
+    metode: document.getElementById('p_metode').value
+  };
+  
+  payload.total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
+  runScript('processTransaction', payload, 'penjualan');
+}
 
     function savePembelian() {
       const items = collectItems();
