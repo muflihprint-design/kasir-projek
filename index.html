@@ -212,24 +212,22 @@ display: block !important;
   </div>
 </div>
   
-  
-
-  <header class="bg-white border-b sticky top-0 z-50 p-4 shadow-sm">
-    <div class="mx-auto flex justify-between items-center">
-      <div>
-        <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Saldo Kas</p>
-        <h1 id="total-balance" class="text-xl font-bold text-slate-800">Rp 0</h1>
-      </div>
-      <div class="flex gap-2">
-        <button class="bg-slate-50 p-2 rounded-lg active:scale-95 transition-transform" onclick="fetchMasterStock()">
-          <i data-lucide="package-search" class="text-slate-600 w-5 h-5"></i>
-        </button>
-        <button class="bg-blue-50 p-2 rounded-lg active:scale-95 transition-transform" onclick="refreshData()">
-          <i data-lucide="refresh-cw" class="text-blue-600 w-5 h-5"></i>
-        </button>
+<header class="bg-white border-b sticky top-0 z-50 p-4 shadow-sm">
+  <div class="mx-auto flex justify-between items-start">
+    <div>
+      <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Saldo Kas</p>
+      <div id="balance-container">
+        <div class="animate-pulse flex items-end gap-4 mt-1">
+          <div class="h-8 bg-slate-200 rounded-md w-32"></div>
+          <div class="flex gap-2 mb-1">
+            <div class="h-3 bg-slate-100 rounded w-16"></div>
+            <div class="h-3 bg-slate-100 rounded w-16"></div>
+          </div>
+        </div>
       </div>
     </div>
-  </header>
+  </div>
+</header>
 
   <main id="main-content" class="mx-auto p-4">
   <div id="menu-container" class="page-transition space-y-4"></div>
@@ -260,7 +258,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbygMwYD5uRDJiEnEcJnzoCqWwrxO3RRZspx4HnA1O_7YckBV-PVgye6_gwa5wUwhlqLjg/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyEDnlFzSv48n8Gyep_fMUTWSfpDCO6PZo63_mzMjNniVe1btG1DPq-1fXuW-F6pFkBwQ/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -271,114 +269,147 @@ display: block !important;
     let productMaster = [];
 
     // Inisialisasi
-    window.onload = () => {
-      changeTab('penjualan');
-      refreshData();
-    };
+   
+   async function refreshData() {
+  showBalanceLoading(true);
+  
+  try {
+    const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
+    const data = await res.json();
 
+    // Hentikan loading - ini akan menulis ulang struktur HTML ke kondisi default (Rp 0)
+    showBalanceLoading(false);
 
-function isEditable(transactionWaktu) {
-  // Asumsi format waktu: "YYYY-MM-DD HH:mm:ss"
-  const tTime = new Date(transactionWaktu.replace(/-/g, "/")).getTime();
-  const now = new Date().getTime();
-  const diffMinutes = (now - tTime) / (1000 * 60);
-  return diffMinutes <= 10;
+    // LANGSUNG isi dengan data asli agar tidak terlihat teks "Rp 0"
+    const totalBalanceEl = document.getElementById('total-balance');
+    const saldoCashEl = document.getElementById('saldo-cash');
+    const saldoRekeningEl = document.getElementById('saldo-rekening');
+
+    if (totalBalanceEl) totalBalanceEl.innerText = formatRupiah(data.cash + data.bank);
+    if (saldoCashEl) saldoCashEl.innerText = formatRupiah(data.cash);
+    if (saldoRekeningEl) saldoRekeningEl.innerText = formatRupiah(data.bank);
+
+  } catch (e) {
+    console.error("Gagal refresh data:", e);
+    showBalanceLoading(false);
+    
+    // Opsional: Jika gagal, coba hitung dari memori lokal (allTransactions) sebagai cadangan
+    if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
+  }
 }
 
-function editLastTransaction(id) {
-  // 1. Cari data transaksi di memori
-  const t = allTransactions.find(item => item.id.toString() === id.toString());
-  if (!t) return;
+function showBalanceLoading(isLoading) {
+  const container = document.getElementById('balance-container');
+  if (!container) return;
 
-  // 2. Tandai ID transaksi yang sedang diedit
-  window.editingTransactionId = t.id;
-
-  // 3. Pindah ke tab penjualan
-  changeTab('penjualan');
-  if (typeof closeModal === 'function') closeModal();
-
-  // 4. Isi data ke form setelah jeda render tab
-  setTimeout(() => {
-    // Isi data header
-    const custInput = document.getElementById('p_cust');
-    const discInput = document.getElementById('p_disc');
-    const metSelect = document.getElementById('p_metode');
-    const dpInput = document.getElementById('p_dp');
-
-    if (custInput) custInput.value = t.sub !== '-' ? t.sub : '';
-    if (metSelect) metSelect.value = t.metode || 'Cash';
-    
-    if (discInput) {
-      discInput.value = formatRupiah(t.diskon || 0).replace("Rp ", "");
-      maskNominal(discInput);
-    }
-    if (dpInput) {
-      dpInput.value = formatRupiah(t.masuk || 0).replace("Rp ", "");
-      maskNominal(dpInput);
-    }
-
-    // 5. Kosongkan keranjang dan isi dengan data lama
-    const container = document.getElementById('itemContainer');
-    if (!container) return;
-    container.innerHTML = '';
-    
-    let items = [];
-    try {
-      items = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail;
-    } catch (e) { items = []; }
-
-    if (Array.isArray(items)) {
-      items.forEach((item, index) => {
-        // PENTING: ID harus diawali dengan "item-" agar terbaca oleh calcTotal()
-        const uniqueId = `item-edit-${Date.now()}-${index}`;
-        const div = document.createElement('div');
-        div.id = uniqueId; 
-        div.className = "bg-white p-3 rounded-xl border border-slate-200 mb-3 shadow-sm animate-in slide-in-from-left";
+  if (isLoading) {
+    // Tampilan Skeleton Loading Horizontal
+    container.innerHTML = `
+      <div class="animate-pulse flex items-end gap-4 mt-1">
+        <div class="h-8 bg-slate-200 rounded-md w-32"></div>
+        <div class="flex gap-2 mb-1">
+          <div class="h-3 bg-slate-100 rounded w-16"></div>
+          <div class="h-3 bg-slate-100 rounded w-16"></div>
+        </div>
+      </div>
+    `;
+  } else {
+    // Tampilan Saldo dengan Rincian di Samping
+    container.innerHTML = `
+      <div class="flex items-end gap-3 mt-1">
+        <h1 id="total-balance" class="text-xl font-black text-slate-800 leading-none">Rp 0</h1>
         
-        div.innerHTML = `
-          <div class="flex gap-2 mb-2">
-            <div class="relative flex-1">
-              <input type="text" value="${item.nama}" readonly
-                     class="w-full p-2.5 border rounded-lg text-sm font-semibold bg-slate-50 item-name">
-            </div>
-            <button onclick="document.getElementById('${uniqueId}').remove(); calcTotal()" 
-                    class="w-10 h-10 shrink-0 bg-red-50 text-red-500 border border-red-100 rounded-lg flex items-center justify-center">
-              <i data-lucide="trash-2" class="w-4"></i>
-            </button>
+        <div class="flex gap-3 mb-0.5 border-l border-slate-100 pl-3">
+          <div class="flex flex-col">
+            <span class="text-[8px] uppercase font-bold text-slate-400 leading-none mb-1">Cash</span>
+            <span id="saldo-cash" class="text-[11px] font-bold text-emerald-600 leading-none">Rp 0</span>
           </div>
-          <div class="flex gap-2 items-center">
-            <div class="w-24 shrink-0">
-              <label class="text-[9px] font-bold text-slate-400 block mb-0.5 ml-1">QTY</label>
-              <input type="number" value="${item.qty}" 
-                     oninput="calcTotal()" 
-                     class="w-full p-2 border-2 border-slate-200 rounded-lg text-sm font-black text-center h-10 qty-input">
-            </div>
-            <div class="flex-1">
-              <label class="text-[9px] font-bold text-slate-400 block mb-0.5 ml-1 text-right">HARGA</label>
-              <input type="text" value="${formatRupiah(item.harga).replace("Rp ", "")}" 
-                     oninput="maskNominal(this); calcTotal()" 
-                     class="w-full p-2 border rounded-lg text-lg font-bold h-10 text-right item-price">
-            </div>
+          <div class="flex flex-col border-l border-slate-50 pl-3">
+            <span class="text-[8px] uppercase font-bold text-slate-400 leading-none mb-1">Rekening</span>
+            <span id="saldo-rekening" class="text-[11px] font-bold text-blue-600 leading-none">Rp 0</span>
           </div>
-        `;
-        container.appendChild(div);
-      });
+        </div>
+      </div>
+    `;
+  }
+}
+
+async function refreshData() {
+  showBalanceLoading(true);
+  
+  try {
+    const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
+    const data = await res.json();
+
+    // Matikan loading (menulis ulang struktur HTML)
+    showBalanceLoading(false);
+
+    // Ambil elemen setelah HTML ditulis ulang oleh showBalanceLoading(false)
+    const elTotal = document.getElementById('total-balance');
+    const elCash = document.getElementById('saldo-cash');
+    const elRekening = document.getElementById('saldo-rekening');
+
+    // Isi data dengan fallback 0 jika data dari server kosong
+    const cashValue = data.cash || 0;
+    const bankValue = data.bank || 0;
+
+    if (elTotal) {
+      elTotal.innerText = formatRupiah(cashValue + bankValue);
+    }
+    
+    if (elCash) {
+      elCash.innerText = formatRupiah(cashValue);
     }
 
-    // 6. Refresh icon dan PAKSA hitung total
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-    
-    // Jeda 100ms memastikan DOM sudah stabil sebelum dihitung
-    setTimeout(() => {
-      calcTotal();
-    }, 100);
+    if (elRekening) {
+      elRekening.innerText = formatRupiah(bankValue);
+    }
 
-  }, 600); 
+  } catch (e) {
+    console.error("Gagal refresh data:", e);
+    showBalanceLoading(false);
+    
+    // Jika gagal fetch, tampilkan angka 0 atau hitung dari memori lokal jika ada
+    if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
+  }
+}
+
+
+function updateBalanceDisplay() {
+  let total = 0;
+  let cash = 0;
+  let rekening = 0;
+
+  // Pastikan allTransactions sudah terisi data
+  if (typeof allTransactions !== 'undefined') {
+    allTransactions.forEach(t => {
+      const nominal = (parseFloat(t.masuk) || 0) - (parseFloat(t.keluar) || 0);
+      total += nominal;
+
+      // Filter berdasarkan metode (pastikan teks sesuai dengan data di database)
+      if (t.metode && t.metode.toLowerCase() === 'cash') {
+        cash += nominal;
+      } else if (t.metode && t.metode.toLowerCase() === 'rekening') {
+        rekening += nominal;
+      }
+    });
+  }
+
+  // Render ke HTML
+  document.getElementById('total-balance').innerText = formatRupiah(total);
+  document.getElementById('saldo-cash').innerText = formatRupiah(cash);
+  document.getElementById('saldo-rekening').innerText = formatRupiah(rekening);
 }
 
 
 
-function showLoading(show) {
+window.addEventListener('DOMContentLoaded', () => {
+  lucide.createIcons();
+  changeTab('penjualan');
+  refreshData();
+  fetchMasterStock();
+});
+   function showLoading(show) {
       document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
     }
 
@@ -492,7 +523,6 @@ async function fetchTransactions() {
 
   function renderTransactions() {
   const container = document.getElementById('listContainer');
-  // Pastikan elemen input ada sebelum mengambil value untuk menghindari error
   const searchInput = document.getElementById('searchInput');
   const dateStartInput = document.getElementById('f-date-start');
   const dateEndInput = document.getElementById('f-date-end');
@@ -504,22 +534,37 @@ async function fetchTransactions() {
   container.innerHTML = '';
 
   const filtered = allTransactions.filter(t => {
-    // 1. Filter Tab Metode (Semua, Tunai, Transfer, dll)
+    // 1. Filter Tab Metode
     if (currentView !== 'Semua' && t.metode !== currentView) return false;
     
-    // 2. Filter Kategori (Masuk, Keluar)
+    // 2. Filter Kategori
     if (currentCategory !== 'SEMUA' && t.tipe !== currentCategory) return false;
     
     // 3. Filter Rentang Tanggal
-    const tDate = t.waktu.split(' ')[0]; // Mengambil bagian YYYY-MM-DD
+    const tDate = t.waktu.split(' ')[0];
     if (ds && tDate < ds) return false;
     if (de && tDate > de) return false;
 
-    // 4. Filter Pencarian (ID, Keterangan, atau Pelanggan/Sub)
+    // 4. Ambil data nama produk dari detail (JSON)
+    let productNames = "";
+    try {
+      if (t.detail) {
+        // Jika t.detail string, parsing dulu. Jika sudah objek/array, gunakan langsung.
+        const items = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail;
+        if (Array.isArray(items)) {
+          productNames = items.map(item => (item.nama || "").toLowerCase()).join(" ");
+        }
+      }
+    } catch (e) {
+      console.warn("Gagal parse detail pada ID: " + t.id, e);
+    }
+
+    // 5. Eksekusi Pencarian
     const matchesSearch = 
       t.id.toLowerCase().includes(searchTerm) || 
       t.ket.toLowerCase().includes(searchTerm) || 
-      (t.sub && t.sub.toLowerCase().includes(searchTerm));
+      (t.sub && t.sub.toLowerCase().includes(searchTerm)) ||
+      productNames.includes(searchTerm); 
     
     return matchesSearch;
   });
@@ -726,7 +771,7 @@ content.style.opacity = "0";
         </table>
       </div>`;
   }
-const canEdit = t.kat === 'Penjualan' && isEditable(t.waktu);
+
   const diskon = parseFloat(t.diskon) || 0;
   const totalSetelahDiskon = calculatedSubtotal - diskon;
 
@@ -799,23 +844,15 @@ const canEdit = t.kat === 'Penjualan' && isEditable(t.waktu);
     
     ${detailHtml}
     
-    <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-1' : 'grid-cols-1'} gap-3">
-       ${canEdit ? `
-         <button onclick="editLastTransaction('${t.id}')" class="py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition flex items-center justify-center gap-2">
-            <i data-lucide="edit-3" class="w-4 h-4"></i> Edit Transaksi (Batas 10 Menit)
+    <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
+       <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+         Tutup
+       </button>
+       ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
+         <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+            <i data-lucide="share-2" class="w-4 h-4"></i> Bagikan Nota (JPG)
           </button>
-       ` : ''}
-       
-       <div class="grid grid-cols-2 gap-3">
-         <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
-           Tutup
-         </button>
-         ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
-           <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-              <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
-            </button>
-          ` : ''}
-       </div>
+        ` : ''}
     </div>
   `;
  // LANGKAH 4: Tampilkan modal
@@ -829,15 +866,7 @@ const canEdit = t.kat === 'Penjualan' && isEditable(t.waktu);
     content.scrollTo(0, 0);
   if (window.lucide) lucide.createIcons();
 }
-    
-    async function refreshData() {
-      showLoading(true);
-      try {
-        const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
-        const data = await res.json();
-        document.getElementById('total-balance').innerText = formatRupiah(data.cash + data.bank);
-      } catch (e) {} finally { showLoading(false); }
-    }
+ 
 
     function downloadExcel() { alert("Fitur Excel akan segera hadir."); }
 
@@ -851,15 +880,27 @@ const canEdit = t.kat === 'Penjualan' && isEditable(t.waktu);
       `;
     }
     
-    async function fetchMasterStock() {
-      try {
-        const response = await fetch(`${WEB_APP_URL}?action=getStockNames&_=${Date.now()}`);
-        const data = await response.json();
-        productMaster = data.map(name => ({ nama: name.toUpperCase(), harga: 0 })); 
-      } catch (e) {
-        console.error("Gagal ambil master stok:", e);
-      }
+   async function fetchMasterStock() {
+  try {
+    // Menggunakan URL yang sudah Anda definisikan di atas
+    const response = await fetch(`${WEB_APP_URL}?action=getStockNames`);
+    const data = await response.json();
+
+    if (data && Array.isArray(data)) {
+      // Pastikan data dipetakan dengan benar sesuai format objek dari Apps Script
+      productMaster = data.map(item => ({
+        nama: String(item.nama || '').toUpperCase(),
+        kategori: String(item.kategori || 'UMUM').toUpperCase(),
+        harga_umum: parseFloat(item.hargaUmum) || 0,
+        harga_reseller: parseFloat(item.hargaReseller) || 0
+      }));
+      
+      console.log("Master stok berhasil dimuat via Web API:", productMaster.length, "barang");
     }
+  } catch (err) {
+    console.error("Gagal ambil master stok. Pastikan Deployment di Set ke 'Anyone':", err);
+  }
+}
 
    function changeTab(tab) {
   activeTab = tab;
@@ -893,35 +934,44 @@ const canEdit = t.kat === 'Penjualan' && isEditable(t.waktu);
     menuContainer.classList.remove('hidden');
     
     // Render form sesuai tab
-    if (tab === 'penjualan') {
+  if (tab === 'penjualan') {
     menuContainer.innerHTML = `
       <div class="space-y-4 page-transition">
-        <h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="shopping-cart" class="w-5 text-blue-600"></i> Penjualan Baru</h2>
+        <h2 class="text-xl font-bold flex items-center gap-2">
+          <i data-lucide="shopping-cart" class="w-5 text-blue-600"></i> Penjualan Baru
+        </h2>
+        
         <div class="grid grid-cols-1 gap-2">
-                    <input id="p_cust" type="text" placeholder="NAMA PELANGGAN" 
-                 oninput="this.value = this.value.toUpperCase()"
-                 class="w-full p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium">
+          <input id="p_cust" type="text" placeholder="NAMA PELANGGAN" 
+            oninput="this.value = this.value.toUpperCase()"
+            class="w-full p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium">
         </div>
+
         <div class="bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-300">
-          <p class="text-[10px] font-bold mb-3 text-slate-500 uppercase tracking-widest">Keranjang Barang</p>
+          <p class="text-[10px] font-bold mb-3 text-slate-500 uppercase tracking-widest text-center">Keranjang Barang</p>
+          
           <div id="itemContainer" class="space-y-0"></div>
+          
           <button onclick="addItem(true)" class="w-full mt-2 p-3 bg-white border border-blue-100 text-blue-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform">
             <i data-lucide="plus-circle" class="w-4 h-4"></i> TAMBAH BARANG
           </button>
         </div>
+
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-[10px] font-bold text-gray-400 uppercase">Diskon (Rp)</label>
-            <input id="p_disc" type="text" inputmode="numeric" oninput="maskNominal(this); calcTotal()" placeholder="0" class="w-full p-3 bg-slate-50 border-none rounded-xl accounting outline-none focus:ring-2 focus:ring-blue-500 font-bold">
+            <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Diskon (Rp)</label>
+            <input id="p_disc" type="text" inputmode="numeric" oninput="maskNominal(this); calcTotal()" placeholder="0" 
+              class="w-full p-3 bg-slate-50 border-none rounded-xl accounting outline-none focus:ring-2 focus:ring-blue-500 font-bold">
           </div>
           <div>
-            <label class="text-[10px] font-bold text-gray-400 uppercase">Metode</label>
+            <label class="text-[10px] font-bold text-gray-400 uppercase ml-1">Metode</label>
             <select id="p_metode" class="w-full p-3 bg-slate-50 border-none rounded-xl bg-white font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
               <option value="Cash">Cash</option>
               <option value="Rekening">Rekening</option>
             </select>
           </div>
         </div>
+
         <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100">
           <div class="flex justify-between items-center mb-1">
             <span class="text-xs font-medium text-blue-800">Total Tagihan:</span>
@@ -932,17 +982,22 @@ const canEdit = t.kat === 'Penjualan' && isEditable(t.waktu);
             <span id="p_final" class="text-lg font-black tracking-tight">Rp 0</span>
           </div>
         </div>
+
         <div class="pt-1">
-          <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">DP / Pembayaran Sekarang</label>
-          <input id="p_dp" type="text" inputmode="numeric" oninput="maskNominal(this); calcTotal()" placeholder="Masukkan nominal" class="w-full p-4 bg-green-50 border-2 border-green-200 rounded-2xl text-xl font-extrabold text-green-700 focus:ring-4 focus:ring-green-100 outline-none accounting">
-          <p id="p_status_piutang" class="text-[10px] mt-1 text-slate-500 italic"></p>
+          <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1 ml-1">DP / Pembayaran Sekarang</label>
+          <input id="p_dp" type="text" inputmode="numeric" oninput="maskNominal(this); calcTotal()" placeholder="0" 
+            class="w-full p-4 bg-green-50 border-2 border-green-200 rounded-2xl text-xl font-extrabold text-green-700 focus:ring-4 focus:ring-green-100 outline-none accounting">
+          <p id="p_status_piutang" class="text-[10px] mt-1 text-slate-500 italic px-1"></p>
         </div>
+
         <button onclick="savePenjualan()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-extrabold shadow-lg shadow-blue-100 active:scale-95 transition-transform flex items-center justify-center gap-2">
            <i data-lucide="check-circle" class="w-5"></i> PROSES TRANSAKSI
         </button>
       </div>
     `;
-    addItem(false); // Tambah baris pertama tanpa buka modal otomatis
+    
+    lucide.createIcons(); // Inisialisasi icon Lucide untuk elemen baru
+    addItem(false); // Tambah baris pertama secara default
     } 
   else if (tab === 'pembelian') {
     menuContainer.innerHTML = `
@@ -1064,9 +1119,7 @@ function addItem(autoOpen = true) {
   const id = Date.now();
   const div = document.createElement('div');
   div.id = `item-${id}`;
-  // Tambahkan class 'item-row' untuk mempermudah selector saat perhitungan
-  div.className = "bg-white p-3 rounded-xl border border-slate-200 mb-3 shadow-sm animate-in slide-in-from-left duration-300 item-row";
-  
+  div.className = "bg-white p-3 rounded-xl border border-slate-200 mb-3 shadow-sm animate-in slide-in-from-left duration-300";
   div.innerHTML = `
     <div class="flex gap-2 mb-2">
       <div class="relative flex-1">
@@ -1079,50 +1132,32 @@ function addItem(autoOpen = true) {
         <i data-lucide="trash-2" class="w-4 h-4"></i>
       </button>
     </div>
-    <div class="flex gap-2 items-center">
-      <div class="w-24 shrink-0">
-        <label class="text-[9px] font-bold text-slate-400 block mb-0.5 ml-1">JUMLAH (QTY)</label>
-        <input type="number" 
-               placeholder="Qty" 
-               oninput="calcTotal()" 
-               value="1"
-               onfocus="this.select()" 
-               class="w-full p-2 border-2 border-slate-200 rounded-lg text-sm font-black text-center h-10 outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all qty-input">
+    <div class="grid grid-cols-12 gap-2 items-center">
+      <div class="col-span-5">
+        <input type="text" id="kat-${id}" placeholder="Kategori" 
+               oninput="this.value = this.value.toUpperCase()"
+               class="w-full p-2 border-2 border-slate-100 bg-white rounded-lg text-[10px] font-bold uppercase text-blue-600 h-10 outline-none focus:ring-2 focus:ring-blue-400 item-category">
       </div>
-      <div class="flex-1 min-w-0">
-        <label class="text-[9px] font-bold text-slate-400 block mb-0.5 ml-1 text-right">HARGA SATUAN (Rp)</label>
+      <div class="col-span-3">
+        <input type="number" placeholder="Qty" oninput="calcTotal()" value="1" onfocus="this.select()" 
+               class="w-full p-2 border-2 border-slate-200 rounded-lg text-sm font-black text-center h-10 outline-none focus:ring-2 focus:ring-blue-400 qty-input">
+      </div>
+      <div class="col-span-4">
         <input type="text" inputmode="numeric" placeholder="Harga" 
                oninput="maskNominal(this); calcTotal()" 
-               class="w-full p-2 border rounded-lg text-lg font-bold accounting h-10 text-right outline-none focus:ring-2 focus:ring-blue-100 item-price">
+               class="w-full p-2 border rounded-lg text-base font-bold accounting h-10 text-right outline-none focus:ring-2 focus:ring-blue-100 item-price">
       </div>
     </div>
   `;
-  
   document.getElementById('itemContainer').appendChild(div);
-  
-  // Refresh icon Lucide untuk baris baru
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-
-  // Trigger perhitungan awal
-  calcTotal();
+  lucide.createIcons();
 
   if (autoOpen) {
     openProductModal(`input-${id}`);
   }
 }
 
-async function openProductModal(inputId) {
-      currentTargetInputId = inputId;
-      document.getElementById('product-modal').style.display = 'flex';
-      if (productMaster.length === 0) {
-        showLoading(true);
-        await fetchMasterStock();
-        showLoading(false);
-      }
-      document.getElementById('modal-search').value = '';
-      document.getElementById('modal-search').focus();
-      filterProducts();
-    }
+
 
     function closeProductModal(e) {
       if (!e || e.target.id === 'product-modal') {
@@ -1130,53 +1165,148 @@ async function openProductModal(inputId) {
       }
     }
 
-    function filterProducts() {
-      const query = document.getElementById('modal-search').value.toUpperCase().trim();
-      const list = document.getElementById('product-list');
-      const btnManual = document.getElementById('btn-manual-add');
-      const manualText = document.getElementById('manual-text');
-      list.innerHTML = '';
-      const filtered = productMaster.filter(p => p.nama.toUpperCase().includes(query));
-      if (filtered.length > 0) {
-        filtered.forEach(p => {
-          const div = document.createElement('div');
-          div.className = "p-4 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center active:bg-blue-50 transition-colors cursor-pointer hover:border-blue-200";
-          div.onclick = () => selectProduct(p.nama.toUpperCase(), p.harga);
-          div.innerHTML = `
-            <div class="flex items-center gap-3">
-               <div class="bg-blue-100 p-2 rounded-lg"><i data-lucide="package" class="w-4 h-4 text-blue-600"></i></div>
-               <span class="font-semibold text-slate-700 uppercase">${p.nama}</span>
-            </div>
-            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>
-          `;
-          list.appendChild(div);
-        });
-        btnManual.classList.add('hidden');
-      } else {
-        const empty = document.createElement('div');
-        empty.className = "flex flex-col items-center justify-center p-10 text-center text-slate-400";
-        empty.innerHTML = `<div class="bg-slate-100 p-4 rounded-full mb-3"><i data-lucide="search-x" class="w-8 h-8"></i></div><p class="text-sm">Barang tidak ada di database stok.</p>`;
-        list.appendChild(empty);
-        if (query.length > 0) {
-          btnManual.classList.remove('hidden');
-          manualText.innerText = query;
-        } else {
-          btnManual.classList.add('hidden');
-        }
-      }
-      lucide.createIcons();
-    }
+ function filterProducts() {
+  const searchInput = document.getElementById('modal-search');
+  const query = (searchInput.value || "").toUpperCase().trim();
+  const list = document.getElementById('product-list');
+  const btnManual = document.getElementById('btn-manual-add');
+  const manualText = document.getElementById('manual-text');
+  
+  list.innerHTML = '';
+  
+  // Filter dengan proteksi terhadap data null/undefined
+  const filtered = productMaster.filter(p => {
+    const namaProduk = String(p.nama || "").toUpperCase();
+    return namaProduk.includes(query);
+  });
 
-    function selectProduct(nama, harga) {
-      const input = document.getElementById(currentTargetInputId);
-      const parent = input.closest('[id^="item-"]');
-      const priceInput = parent.querySelector('.item-price');
-      input.value = nama.toUpperCase();
-      if (harga > 0) priceInput.value = harga.toLocaleString('id-ID');
-      closeProductModal();
-      calcTotal();
-      parent.querySelector('.qty-input').focus();
+  if (filtered.length > 0) {
+    filtered.forEach(p => {
+      const div = document.createElement('div');
+      div.className = "p-4 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center active:bg-blue-50 transition-colors cursor-pointer hover:border-blue-200 mb-2";
+      
+      // Pastikan data yang dikirim ke selectProduct sudah aman
+      const namaSafe = String(p.nama || "").toUpperCase();
+      const katSafe = String(p.kategori || "UMUM").toUpperCase();
+      const hargaU = parseFloat(p.harga_umum || p.hargaUmum) || 0;
+      const hargaR = parseFloat(p.harga_reseller || p.hargaReseller) || 0;
+
+      div.onclick = () => selectProduct(namaSafe, katSafe, hargaU, hargaR);
+      
+      div.innerHTML = `
+        <div class="flex items-center gap-3">
+           <div class="bg-blue-100 p-2 rounded-lg">
+             <i data-lucide="package" class="w-4 h-4 text-blue-600"></i>
+           </div>
+           <div class="flex flex-col">
+             <span class="font-bold text-slate-700 uppercase text-xs leading-none mb-1">${namaSafe}</span>
+             <span class="text-[9px] text-slate-400 font-medium uppercase tracking-tighter italic bg-white px-1.5 py-0.5 rounded border border-slate-100 w-fit">
+               ${katSafe}
+             </span>
+           </div>
+        </div>
+        <div class="text-right flex flex-col items-end gap-1">
+           <span class="text-[9px] font-bold text-blue-600">Rp ${hargaU.toLocaleString('id-ID')}</span>
+           <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>
+        </div>
+      `;
+      list.appendChild(div);
+    });
+    if (btnManual) btnManual.classList.add('hidden');
+  } else {
+    const empty = document.createElement('div');
+    empty.className = "flex flex-col items-center justify-center p-10 text-center text-slate-400";
+    empty.innerHTML = `
+      <div class="bg-slate-100 p-4 rounded-full mb-3">
+        <i data-lucide="search-x" class="w-8 h-8"></i>
+      </div>
+      <p class="text-sm font-medium">Barang tidak ditemukan</p>
+    `;
+    list.appendChild(empty);
+    
+    if (query.length > 0 && btnManual) {
+      btnManual.classList.remove('hidden');
+      if (manualText) manualText.innerText = query;
+    } else if (btnManual) {
+      btnManual.classList.add('hidden');
     }
+  }
+  
+  // Render ulang icon Lucide agar muncul di elemen baru
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+}
+
+
+
+ function selectProduct(name, category, priceUmum, priceReseller) {
+  const rowId = currentTargetInputId.split('-')[1];
+  const inputNama = document.getElementById(currentTargetInputId);
+  const inputKat = document.getElementById(`kat-${rowId}`);
+  const inputHarga = document.querySelector(`#item-${rowId} .item-price`);
+
+  // 1. Set Nama dan Kategori
+  inputNama.value = name;
+  if (inputKat) inputKat.value = category || "-";
+
+    // --- TAMBAHAN: Simpan data lengkap ke dataset ---
+  inputNama.dataset.kategori = category || "-";
+
+  // 2. Jika harga tersedia (bukan barang manual/baru), minta konfirmasi
+  if (priceUmum || priceReseller) {
+    const isReseller = confirm(
+      `Pilih Tipe Harga untuk ${name}:\n\n` +
+      `OK : Harga Reseller (Rp ${Number(priceReseller).toLocaleString('id-ID')})\n` +
+      `Cancel : Harga Umum (Rp ${Number(priceUmum).toLocaleString('id-ID')})`
+    );
+    
+    const selectedPrice = isReseller ? priceReseller : priceUmum;
+    const tipeHarga = isReseller ? "RESELLER" : "UMUM";
+    inputHarga.value = selectedPrice.toLocaleString('id-ID').replace(/,/g, '.');
+
+    // SIMPAN METADATA (PENTING untuk update spesifik di Backend)
+    // Data ini tidak terlihat di layar tapi akan diambil saat klik "Simpan"
+    inputNama.dataset.tipeHarga = tipeHarga;
+    inputNama.dataset.hargaTerpilih = selectedPrice;
+    
+    // Simpan juga harga cadangan agar jika di masa depan butuh perbandingan
+    inputNama.dataset.hargaUmum = priceUmum;
+    inputNama.dataset.hargaReseller = priceReseller;
+  } else {
+    // Jika barang manual (tidak ada di list), hapus metadata lama
+    delete inputNama.dataset.tipeHarga;
+    delete inputNama.dataset.hargaTerpilih;
+  }
+
+  closeProductModal();
+  calcTotal();
+}
+
+// Letakkan di bagian paling atas script atau di luar listener apa pun
+async function openProductModal(inputId) {
+    currentTargetInputId = inputId;
+    const modal = document.getElementById('product-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        if (productMaster.length === 0) {
+            showLoading(true);
+            await fetchMasterStock();
+            showLoading(false);
+        }
+        const searchInput = document.getElementById('modal-search');
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.focus();
+        }
+        filterProducts();
+    }
+}
+
+// Ekspos ke window agar bisa dipanggil oleh onclick di HTML
+window.openProductModal = openProductModal;
+window.selectProduct = selectProduct;
+
 
     function selectManual() {
       const query = document.getElementById('modal-search').value.toUpperCase();
@@ -1236,30 +1366,53 @@ async function openProductModal(inputId) {
       if (elFinalPembelian) elFinalPembelian.innerText = "Rp " + new Intl.NumberFormat('id-ID').format(subtotal);
     }
 
-    function collectItems() {
-      const itemsData = [];
-      document.querySelectorAll('[id^="item-"]').forEach(el => {
-        const inputNama = el.querySelector('.item-name');
-        if (!inputNama) return;
-        const nama = inputNama.value.toUpperCase();
-        const harga = unmask(el.querySelector('.item-price').value);
-        if (nama && nama !== "PILIH BARANG STOK...") {
-          itemsData.push({
-            nama: nama,
-            qty: parseFloat(el.querySelector('.qty-input').value) || 1,
-            harga: harga
-          });
-        }
-      });
-      return itemsData;
+   function collectItems() {
+  const itemsData = [];
+  
+  // Mengambil semua baris item di dalam form penjualan
+  document.querySelectorAll('[id^="item-"]').forEach(el => {
+    const inputNama = el.querySelector('.item-name');
+    if (!inputNama) return;
+
+    const nama = inputNama.value.trim().toUpperCase();
+    const hargaAktif = unmask(el.querySelector('.item-price').value);
+    const qtyInput = el.querySelector('.qty-input').value;
+    
+    // Ambil metadata dari dataset (hasil dari fungsi selectProduct)
+    let tipeHarga = inputNama.dataset.tipeHarga; // "UMUM" atau "RESELLER"
+    let hargaTerpilih = parseFloat(inputNama.dataset.hargaTerpilih);
+    const kategori = inputNama.dataset.kategori || "-";
+
+    // LOGIKA BARU: Jika barang diketik manual (tidak melalui modal/selectProduct)
+    // maka tipeHarga akan kosong. Kita set default ke "UMUM".
+    if (!tipeHarga && nama && nama !== "PILIH BARANG STOK...") {
+      tipeHarga = "UMUM";
+      hargaTerpilih = hargaAktif;
     }
 
-  async function runScript(actionName, payload, stayInTab) {
+    // Pastikan hanya baris yang berisi nama valid yang dikirim
+    if (nama && nama !== "PILIH BARANG STOK...") {
+      itemsData.push({
+        nama: nama,
+        qty: parseFloat(qtyInput) || 1,
+        harga: hargaAktif,      // Harga yang tercatat di nota saat ini
+        kategori: kategori,     // Kategori barang
+        tipeHarga: tipeHarga,   // Penanda kolom mana yang akan diupdate (G atau H)
+        hargaTerpilih: hargaTerpilih // Nilai harga master yang akan dikirim ke backend
+      });
+    }
+  });
+  
+  return itemsData;
+}
+    
+   async function runScript(actionName, payload, stayInTab) {
   const btn = document.querySelector('button[onclick*="save"]');
   if (btn) btn.disabled = true;
   showLoading(true);
 
   try {
+    // HAPUS mode: "no-cors" agar bisa membaca respon JSON
     const response = await fetch(WEB_APP_URL, {
       method: "POST",
       body: JSON.stringify(payload)
@@ -1268,37 +1421,25 @@ async function openProductModal(inputId) {
     const result = await response.json();
 
     if (result.status === 'success') {
-      // 1. Reset ID edit agar kembali ke mode transaksi baru
-      const isEditMode = !!window.editingTransactionId;
-      window.editingTransactionId = null;
-
-      // 2. Update memori lokal dengan data terbaru dari server
+      // Masukkan data baru ke memori agar riwayat langsung terupdate
       if (result.data && typeof allTransactions !== 'undefined') {
-        // Jika mode edit, hapus data lama dari array agar tidak duplikat
-        if (payload.oldId) {
-          allTransactions = allTransactions.filter(t => t.id !== payload.oldId);
-        }
-        
-        // Tambahkan data hasil olahan server (yang sudah ada properti 'ket', 'waktu', dll)
         allTransactions.unshift(result.data);
       }
 
-      // 3. Paksa render ulang riwayat agar tombol edit di data lain dihitung ulang (isEditable)
-      if (typeof renderTransactions === 'function') {
-        renderTransactions(); 
-      }
+      // Reset flag agar fetch selanjutnya mengambil data terbaru
+      isDataLoaded = false;
+      isFullDataLoaded = false;
 
+      // Berikan feedback instan tanpa menunggu 1.2 detik penuh
       showLoading(false);
       if (btn) btn.disabled = false;
-
-      // Pindah ke riwayat untuk melihat perubahan
+      
+      // Pindah ke tab riwayat agar user melihat datanya sudah masuk
       changeTab('riwayat');
       
-      // Refresh background data untuk sinkronisasi total
+      // Refresh background data
       refreshData();
-      if (typeof fetchMasterStock === 'function') fetchMasterStock();
-      if (typeof resetFormPenjualan === 'function') resetFormPenjualan();
-
+      fetchMasterStock();
     } else {
       throw new Error(result.message || "Gagal menyimpan");
     }
@@ -1306,24 +1447,27 @@ async function openProductModal(inputId) {
   } catch (err) {
     showLoading(false);
     if (btn) btn.disabled = false;
+    // Jika masih gagal baca JSON karena CORS, minimal kita paksa refresh setelah jeda
     console.error("Fetch error:", err);
-    
-    // Jika error karena masalah koneksi/CORS, coba refresh otomatis
-    // alert("Terjadi kesalahan koneksi. Aplikasi akan memuat ulang.");
-    // location.reload(); 
+    setTimeout(() => {
+       location.reload(); 
+    }, 1000);
   }
 }
 
-function savePenjualan() {
+ function savePenjualan() {
   const items = collectItems();
-  if (items.length === 0) return alert("Pilih barang terlebih dahulu!");
+  if(items.length === 0) return alert("Pilih barang terlebih dahulu!");
+  
+  // Ambil keterangan dari input (pastikan ID ini ada di HTML Anda)
+  // atau buat keterangan otomatis berdasarkan pelanggan
+  const pelanggan = (document.getElementById('p_cust').value || 'UMUM').toUpperCase();
   
   const payload = {
     action: 'processTransaction',
     type: 'PENJUALAN',
-    // Jika sedang edit, kirimkan ID lamanya agar di Apps Script baris lama dihapus/diganti
-    oldId: window.editingTransactionId || "", 
-    pelanggan: (document.getElementById('p_cust').value || 'UMUM').toUpperCase(),
+    pelanggan: pelanggan,
+    ket: `PENJUALAN KEPADA ${pelanggan}`, // <-- Tambahkan field ket di sini
     items: items,
     diskon: unmask(document.getElementById('p_disc').value),
     dp: unmask(document.getElementById('p_dp').value),
@@ -1334,21 +1478,27 @@ function savePenjualan() {
   runScript('processTransaction', payload, 'penjualan');
 }
 
-    function savePembelian() {
-      const items = collectItems();
-      if(items.length === 0) return alert("Daftar belanja kosong!");
-      const total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
-      const payload = {
-        action: 'processTransaction',
-        type: 'PEMBELIAN',
-        supplier: (document.getElementById('b_supp').value || '-').toUpperCase(),
-        items: items,
-        total: total,
-        dp: unmask(document.getElementById('b_dp').value),
-        metode: document.getElementById('b_metode').value
-      };
-      runScript('processTransaction', payload, 'pembelian');
-    }
+  function savePembelian() {
+  const items = collectItems();
+  if(items.length === 0) return alert("Daftar belanja kosong!");
+  
+  const supplier = (document.getElementById('b_supp').value || '-').toUpperCase();
+  const total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
+  
+  const payload = {
+    action: 'processTransaction',
+    type: 'PEMBELIAN',
+    supplier: supplier,
+    // Tambahkan keterangan di sini agar terbaca oleh sistem riwayat
+    ket: `PEMBELIAN DARI ${supplier}`, 
+    items: items,
+    total: total,
+    dp: unmask(document.getElementById('b_dp').value),
+    metode: document.getElementById('b_metode').value
+  };
+  
+  runScript('processTransaction', payload, 'pembelian');
+}
 
     async function saveOperasional() {
       const elNom = document.getElementById('op_nom');
@@ -1363,7 +1513,7 @@ function savePenjualan() {
         action: "saveOperasional", 
         type: isRefund ? "PENGEMBALIAN_DANA" : "OPERASIONAL",
         nominal: nominal,
-        keterangan: isRefund ? "[REFUND] " + keterangan : keterangan,
+        ket: isRefund ? "[REFUND] " + keterangan : keterangan,
         metode: document.getElementById('op_metode').value
       };
       runScript('saveOperasional', payload, 'operasional');
@@ -1415,6 +1565,63 @@ function savePenjualan() {
 function openModal() {
   const modal = document.getElementById('general-modal');
   modal.classList.remove('hidden');
+}
+
+async function saveBayarPiutang(id, sisa) {
+  const namaPelanggan = document.querySelector('.bg-slate-900 p.text-purple-300')?.innerText || 'PELANGGAN';
+  const metodePilihan = document.getElementById('pi_metode').value;
+
+  const payload = { 
+    action: 'processTransaction', 
+    type: 'BAYAR_PIUTANG', 
+    idPiutang: id, 
+    nominal: sisa, 
+    metode: metodePilihan 
+  };
+  
+  // Tutup modal sebelum menjalankan script
+  closeModal(); 
+  
+  // Panggil runScript
+  // Parameter ketiga 'riwayat' memastikan setelah sukses, tab berpindah ke riwayat
+  await runScript('processTransaction', payload, 'riwayat');
+  
+
+}
+
+async function eksekusiPelunasanUtang(id, nominal) {
+  const metodeSelect = document.getElementById('pay_utang_metode');
+  const metode = metodeSelect ? metodeSelect.value : 'Cash';
+  
+  // Pastikan pengambilan namaSupplier dilakukan sebelum payload dibuat
+  const elSupplier = document.querySelector('.modal-supplier-name');
+  const namaSupplier = elSupplier ? elSupplier.innerText : 'Supplier';
+
+  // DEFINISIKAN payload terlebih dahulu
+  const payload = {
+    action: 'processTransaction',
+    type: 'BAYAR_UTANG',
+    idUtang: id,
+    nominal: nominal,
+    metode: metode,
+    ket: `Pelunasan Utang: ${namaSupplier}` 
+  };
+  
+  // Sembunyikan modal
+  closeModal(); 
+  
+  // Jalankan runScript menggunakan payload yang sudah didefinisikan di atas
+  try {
+    // Pastikan fungsi runScript sudah tersedia di scope global
+    await runScript('processTransaction', payload, 'riwayat');
+    
+    // Refresh list utang jika fungsi tersedia
+    if (typeof fetchUtangList === 'function') {
+      fetchUtangList();
+    }
+  } catch (error) {
+    console.error("Gagal eksekusi utang:", error);
+  }
 }
 
 
@@ -1560,56 +1767,9 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier) {
   }
 }
 
-async function eksekusiPelunasanUtang(id, nominal) {
-  const metodeSelect = document.getElementById('pay_utang_metode');
-  const metode = metodeSelect ? metodeSelect.value : 'Cash';
 
-  const payload = {
-    action: 'processTransaction',
-    type: 'BAYAR_UTANG',
-    idUtang: id,
-    nominal: nominal,
-    metode: metode
-  };
-  
-  closeModal(); // Menutup modal pelunasan
-  showLoading(true);
-  
-  try {
-    const response = await fetch(WEB_APP_URL, { 
-      method: "POST", 
-      body: JSON.stringify(payload) 
-    });
-    const result = await response.json();
 
-    if (result.status === "success") {
-      // 1. Reset state agar aplikasi tahu data sudah berubah
-      isDataLoaded = false; 
-      allTransactions = []; 
 
-      // 2. Refresh data saldo dan data transaksi
-      await refreshData(); 
-      
-      // 3. Jika sedang di tab beli/utang, render ulang daftar utangnya
-      if (typeof fetchUtangList === 'function') {
-        await fetchUtangList();
-        // PENTING: Panggil kembali ikon agar tombol di list baru bisa diklik
-        if (window.lucide) lucide.createIcons();
-      }
-      
-      // 4. Jika sedang di tab riwayat, render ulang riwayatnya
-      if (activeTab === 'riwayat') renderTransactions();
-
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      showLoading(false);
-    }
-  } catch (e) {
-    showLoading(false);
-    console.error(e);
-    alert("Koneksi bermasalah. Data akan direfresh.");
-    refreshData();
-  }
-}
     
     // --- LOGIKA PIUTANG ---
 async function fetchPiutangList() {
@@ -1756,58 +1916,8 @@ async function bayarPiutang(id, sisa, nama) {
   }
 }
 
-async function saveBayarPiutang(id, sisa) {
-  const payload = { 
-    action: 'processTransaction', 
-    type: 'BAYAR_PIUTANG', 
-    idPiutang: id, 
-    nominal: sisa, 
-    metode: document.getElementById('pi_metode').value 
-  };
-  
-  closeModal(); 
-  showLoading(true);
-  
-  try { 
-    const response = await fetch(WEB_APP_URL, { 
-      method: "POST", 
-      body: JSON.stringify(payload) 
-    }); 
-    const result = await response.json();
 
-    if (result.status === "success") {
-      // 1. Reset state memori agar data benar-benar segar
-      isDataLoaded = false;
-      allTransactions = []; 
 
-      // 2. Jalankan refresh data saldo & history
-      await refreshData(); 
-
-      // 3. Perbarui daftar piutang aktif
-      if (typeof fetchPiutangList === 'function') {
-        await fetchPiutangList();
-        // PENTING: Inisialisasi ulang ikon Lucide agar tombol bisa diklik lagi
-        if (window.lucide) {
-          lucide.createIcons();
-        }
-      }
-      
-      // 4. Update UI Riwayat jika sedang terbuka
-      if (activeTab === 'riwayat') {
-        renderTransactions();
-      }
-      
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      showLoading(false);
-    }
-  } 
-  catch(e) { 
-    showLoading(false);
-    console.error("Error:", e);
-    alert("Gagal memproses. Data akan di-refresh otomatis."); 
-    refreshData();
-  } 
-}
 
 // --- LOGIKA TRANSFER KAS ---
 function showTransferForm() {
@@ -2038,16 +2148,7 @@ isFullDataLoaded = false;
   }
 }
     
-    async function refreshData() {
-      try {
-        const response = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
-        const data = await response.json();
-        if (data) {
-          const total = (data.cash || 0) + (data.bank || 0);
-          document.getElementById('total-balance').innerText = "Rp " + total.toLocaleString('id-ID');
-        }
-      } catch (e) { console.error(e); }
-    }
+    
 
 async function shareNotaJPG(id, event) {
  // 1. Pastikan mencari di variabel yang benar (allTransactions atau currentTransactions)
