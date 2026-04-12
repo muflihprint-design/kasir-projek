@@ -119,6 +119,7 @@
   
   /* Memastikan momentum scroll di iOS tetap enak */
   -webkit-overflow-scrolling: touch; 
+  
 }
 
 /* Animasi baru agar modal muncul dari atas */
@@ -218,8 +219,13 @@ display: block !important;
   
   <div class="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-200">
     
-    <div id="modalContent" class="p-6 overflow-y-auto">
-       </div>
+   <div id="modalContent" class="p-6 overflow-y-auto" onscroll="handleModalScroll()">
+  </div>
+   <div id="scroll-indicator" class="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-300 opacity-0 scale-75">
+    <div class="bg-blue-600/90 text-white p-2 rounded-full shadow-lg animate-bounce backdrop-blur-sm">
+        <i data-lucide="chevrons-down" class="w-5 h-5"></i>
+    </div>
+</div>
 
   </div>
 </div>
@@ -310,6 +316,25 @@ display: block !important;
   }
 }
 
+function handleModalScroll() {
+  const content = document.getElementById('modalContent');
+  const indicator = document.getElementById('scroll-indicator');
+  
+  if (!content || !indicator) return;
+
+  // Rumus: Total tinggi konten - Jarak yang sudah discroll - Tinggi kotak yang terlihat
+  const scrollRemaining = content.scrollHeight - content.scrollTop - content.clientHeight;
+
+  // Jika sisa konten di bawah lebih dari 20px, tampilkan ikon
+  if (scrollRemaining > 20) {
+    indicator.classList.remove('opacity-0', 'scale-75');
+    indicator.classList.add('opacity-100', 'scale-100');
+  } else {
+    indicator.classList.remove('opacity-100', 'scale-100');
+    indicator.classList.add('opacity-0', 'scale-75');
+  }
+}
+    
 function showBalanceLoading(isLoading) {
   const container = document.getElementById('balance-container');
   if (!container) return;
@@ -894,6 +919,10 @@ content.style.opacity = "0";
     // Reset sekali lagi untuk memastikan (instan karena scroll-behavior: auto)
     content.scrollTo(0, 0);
      document.body.style.overflow = 'hidden';
+     setTimeout(() => {
+        const content = document.getElementById('modalContent');
+        handleModalScroll(content);
+    }, 100);
   if (window.lucide) lucide.createIcons();
 }
  
