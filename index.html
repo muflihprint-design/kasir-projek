@@ -483,9 +483,13 @@ window.addEventListener('click', function(event) {
             </div>
             <div class="flex gap-2 items-center">
               <div class="relative flex-1">
-                <span class="absolute inset-y-0 left-3 flex items-center text-gray-400"><i data-lucide="search" class="w-4 h-4"></i></span>
-                <input type="text" id="searchInput" oninput="renderTransactions()" placeholder="Cari ID, Keterangan, Produk" class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-100">
-              </div>
+  <span class="absolute inset-y-0 left-3 flex items-center text-gray-400">
+    <i data-lucide="search" class="w-3.5 h-3.5"></i>
+  </span>
+  <input type="text" id="searchInput" oninput="renderTransactions()" 
+    placeholder="ID, Keterangan, Produk" 
+    class="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-medium outline-none focus:ring-2 focus:ring-blue-100 h-8">
+</div>
               <button onclick="downloadExcel()" class="px-4 py-2 bg-green-600 text-white rounded-lg flex items-center gap-2 h-[40px]"><i data-lucide="download" class="w-4 h-4"></i></button>
             </div>
           </div>
