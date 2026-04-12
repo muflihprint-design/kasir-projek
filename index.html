@@ -185,6 +185,38 @@ display: block !important;
   </style>
 </head>
 <body class="pb-safe">
+<div id="shop-selector" class="fixed inset-0 z-[9999] bg-slate-900 flex items-center justify-center p-6">
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-8">
+      <div class="w-20 h-20 bg-blue-600 rounded-3xl mx-auto mb-4 flex items-center justify-center shadow-lg shadow-blue-500/30">
+        <i data-lucide="printer" class="w-10 h-10 text-white"></i>
+      </div>
+      <h1 class="text-2xl font-black text-white tracking-tight">Pilih Identitas Toko</h1>
+      <p class="text-slate-400 text-sm mt-2">Pilih toko untuk menyesuaikan nama & alamat pada nota</p>
+    </div>
+
+    <div class="space-y-4">
+      <button onclick="selectShop('Muflih Print', 'Jl. Barawaja No. 19, Makassar')" 
+              class="w-full p-5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-3xl flex items-center gap-4 transition-all group active:scale-95">
+        <div class="w-12 h-12 bg-orange-500 rounded-2xl flex items-center justify-center font-bold text-white text-xl">M</div>
+        <div class="text-left">
+          <p class="font-bold text-white group-hover:text-blue-400 transition">Muflih Print</p>
+          <p class="text-xs text-slate-400">Jl. Barawaja No. 19, Makassar</p>
+        </div>
+      </button>
+
+      <button onclick="selectShop('Vi Printing', 'Jl. Rappokalling Raya, Makassar')" 
+              class="w-full p-5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-3xl flex items-center gap-4 transition-all group active:scale-95">
+        <div class="w-12 h-12 bg-purple-500 rounded-2xl flex items-center justify-center font-bold text-white text-xl">V</div>
+        <div class="text-left">
+          <p class="font-bold text-white group-hover:text-blue-400 transition">Vi Printing</p>
+          <p class="text-xs text-slate-400">Jl. Rappokalling Raya, Makassar</p>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+  
 <div id="printArea" class="hidden"></div>
   <div id="loading-overlay">
     <div class="spinner mb-2"></div>
@@ -231,7 +263,7 @@ display: block !important;
 </div>
   
 <header class="bg-white border-b sticky top-0 z-50 p-4 shadow-sm">
-  <div class="mx-auto flex justify-between items-start">
+  <div class="mx-auto flex justify-between items-center">
     <div>
       <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Saldo Kas</p>
       <div id="balance-container">
@@ -244,6 +276,16 @@ display: block !important;
         </div>
       </div>
     </div>
+
+    <button onclick="resetShop()" class="group flex items-center gap-3 px-3 py-2 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-2xl transition-all duration-300">
+      <div class="text-right hidden sm:block">
+        <p class="text-[8px] font-bold text-slate-400 uppercase leading-none">Identitas</p>
+        <p class="text-[10px] font-black text-slate-700 group-hover:text-red-600 transition-colors mt-1">GANTI TOKO</p>
+      </div>
+      <div class="w-8 h-8 flex items-center justify-center bg-white rounded-xl shadow-sm group-hover:shadow-none group-active:scale-90 transition-all">
+        <i data-lucide="refresh-cw" class="w-4 h-4 text-slate-500 group-hover:text-red-500 group-hover:rotate-180 transition-transform duration-500"></i>
+      </div>
+    </button>
   </div>
 </header>
 
@@ -285,7 +327,36 @@ display: block !important;
     let currentView = 'Semua';
     let currentCategory = 'SEMUA';
     let productMaster = [];
+let currentShop = {
+  nama: localStorage.getItem('shopName') || '',
+  alamat: localStorage.getItem('shopAddress') || ''
+};
 
+// Fungsi saat toko dipilih
+function selectShop(nama, alamat) {
+  currentShop.nama = nama.toUpperCase();
+  currentShop.alamat = alamat;
+  
+  // Simpan ke storage agar tidak pilih ulang terus
+  localStorage.setItem('shopName', currentShop.nama);
+  localStorage.setItem('shopAddress', currentShop.alamat);
+  
+  // Sembunyikan layar pilihan
+  document.getElementById('shop-selector').style.display = 'none';
+  
+  // Jalankan inisialisasi aplikasi (misal tab jual)
+  if (typeof changeTab === "function") changeTab('penjualan');
+}
+
+// Cek saat halaman dimuat
+window.addEventListener('DOMContentLoaded', () => {
+  if (currentShop.nama) {
+    document.getElementById('shop-selector').style.display = 'none';
+  } else {
+    document.getElementById('shop-selector').style.display = 'flex';
+  }
+  if (window.lucide) lucide.createIcons();
+});
     // Inisialisasi
    
    async function refreshData() {
@@ -2257,7 +2328,12 @@ async function shareNotaJPG(id, event) {
   }
 }
 
-
+function resetShop() {
+  localStorage.removeItem('shopName');
+  localStorage.removeItem('shopAddress');
+  location.reload(); // Segarkan halaman untuk menampilkan layar pilihan lagi
+}
+    
   /** * FUNGSI CETAK NOTA 
  * Menggabungkan desain UI modern dengan logika data transaksi
  **/
@@ -2265,6 +2341,10 @@ function generateNotaHTML(t) {
   let subtotal = 0;
   const diskon = Number(t.diskon) || 0;
   let rowsHtml = '';
+
+  // 1. Ambil data identitas toko dari currentShop (Global Variable)
+  const namaToko = currentShop.nama || "BLIMI";
+  const alamatToko = currentShop.alamat || "Digital Printing & Advertising";
 
   if (t.detail && t.detail.length > 0) {
     rowsHtml = t.detail.map(d => {
@@ -2282,7 +2362,6 @@ function generateNotaHTML(t) {
         </div>`;
     }).join('');
   } else {
-    // Gunakan nilai masuk atau keluar mana yang ada angkanya
     const val = Number(t.masuk) > 0 ? Number(t.masuk) : (Number(t.keluar) || 0);
     subtotal = val + diskon;
     rowsHtml = `
@@ -2297,12 +2376,18 @@ function generateNotaHTML(t) {
   const totalBill = subtotal - diskon;
   const paid = Number(t.masuk) > 0 ? Number(t.masuk) : (Number(t.keluar) || 0);
   const sisa = totalBill - paid;
-  const isPiutang = sisa > 0.5; // Gunakan 0.5 untuk menghindari error pembulatan desimal
+  const isPiutang = sisa > 0.5;
 
   return `
   <div id="nota-container" style="width: 380px; margin: 0; padding: 25px; font-family: 'Inter', sans-serif; background-color: #ffffff; box-sizing: border-box; position: relative; border: 1px solid #f1f5f9; display: block;">
+    
     <div style="text-align: center; margin-bottom: 25px;">
-      <div style="font-size: 22px; font-weight: 900; color: #2563eb; font-style: italic; letter-spacing: -1px;">BLIMI</div>
+      <div style="font-size: 22px; font-weight: 900; color: #2563eb; letter-spacing: -1px; text-transform: uppercase;">
+        ${namaToko}
+      </div>
+      <div style="font-size: 10px; color: #64748b; font-weight: 500; margin-top: 2px;">
+        ${alamatToko}
+      </div>
       <div style="font-size: 10px; color: #94a3b8; line-height: 1.4; margin-top: 4px;">
         -----------------------------------
       </div>
@@ -2357,35 +2442,24 @@ function generateNotaHTML(t) {
       </div>
 
      ${isPiutang ? `
-<div style="display: flex; justify-content: space-between; align-items: center; background: #fef2f2; padding: 8px 12px; border-radius: 8px; margin-top: 20px; border: 1px solid #fee2e2;">
-  
-  <span style="font-size: 9px; font-weight: 800; color: #991b1b; text-transform: uppercase; 
-               position: relative; top: -6px;"> 
-    Sisa Piutang
-  </span>
-
-  <span style="font-size: 14px; font-weight: 900; color: #ef4444; 
-               position: relative; 
-               top: -7px;"> ${formatRupiah(sisa)}
-  </span>
-
-</div>` : ''}
+    <div style="display: flex; justify-content: space-between; align-items: center; background: #fef2f2; padding: 8px 12px; border-radius: 8px; margin-top: 20px; border: 1px solid #fee2e2;">
+      <span style="font-size: 9px; font-weight: 800; color: #991b1b; text-transform: uppercase; position: relative; top: -6px;">Sisa Piutang</span>
+      <span style="font-size: 14px; font-weight: 900; color: #ef4444; position: relative; top: -7px;"> ${formatRupiah(sisa)}</span>
+    </div>` : ''}
 
     </div>
 
     <div style="margin-top: 30px; text-align: center;">
-  <div style="display: inline-flex; align-items: center; justify-content: center; height: 28px; min-width: 100px; padding: 0 16px; border-radius: 20px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; line-height: 1;
-    /* Tambahkan baris di bawah ini untuk menaikkan teks 2 pixel */
-    padding-bottom: 13px; 
-    ${isPiutang ? 'background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5;' : 'background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7;'}">
-    ${isPiutang ? 'Belum Lunas' : 'Lunas'}
-  </div>
-  <p style="font-size: 10px; color: #cbd5e1; margin-top: 15px; margin-bottom: 5px;">Terima Kasih Atas Kepercayaan Anda</p>
-</div>
+      <div style="display: inline-flex; align-items: center; justify-content: center; height: 28px; min-width: 100px; padding: 0 16px; border-radius: 20px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; line-height: 1; padding-bottom: 13px;
+        ${isPiutang ? 'background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5;' : 'background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7;'}">
+        ${isPiutang ? 'Belum Lunas' : 'Lunas'}
+      </div>
+      <p style="font-size: 10px; color: #cbd5e1; margin-top: 15px; margin-bottom: 5px;">Terima Kasih Atas Kepercayaan Anda</p>
+    </div>
   </div>
 `;
 }
-
+    
 function printNota(id) {
   const t = currentTransactions.find(item => item.id === id);
   if (!t) return;
