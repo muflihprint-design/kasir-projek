@@ -1271,7 +1271,10 @@ function addItem(autoOpen = true) {
   inputNama.value = name;
   if (inputKat) inputKat.value = category || "-";
 
-  // 2. Jika harga tersedia (bukan barang manual/baru), minta konfirmasi
+if (typeof activeTab !== 'undefined' && activeTab === 'pembelian') {
+    // Jika Pembelian: Kosongkan harga agar user input manual harga belinya
+    inputHarga.value = "";
+     } else {
   if (priceUmum || priceReseller) {
     const isReseller = confirm(
       `Pilih Tipe Harga untuk ${name}:\n\n` +
@@ -1281,9 +1284,8 @@ function addItem(autoOpen = true) {
     
     const selectedPrice = isReseller ? priceReseller : priceUmum;
     inputHarga.value = selectedPrice.toLocaleString('id-ID').replace(/,/g, '.');
-  }
-
-  closeProductModal();
+  }}
+ closeProductModal();
   calcTotal();
 }
 
