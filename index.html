@@ -578,7 +578,6 @@ async function fetchTransactions() {
     let productNames = "";
     try {
       if (t.detail) {
-        // Jika t.detail string, parsing dulu. Jika sudah objek/array, gunakan langsung.
         const items = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail;
         if (Array.isArray(items)) {
           productNames = items.map(item => (item.nama || "").toLowerCase()).join(" ");
@@ -612,23 +611,29 @@ async function fetchTransactions() {
   filtered.forEach(t => {
     const isMasuk = t.tipe === 'MASUK';
     const amount = isMasuk ? t.masuk : t.keluar;
-    const div = document.createElement('div');
     
-    // Style Card: border kiri tebal sesuai tipe, efek tekan (active:scale) untuk mobile
+    const [tgl, wkt] = t.waktu.split(' ');
+    const jamMenit = wkt.substring(0, 5);
+
+    const div = document.createElement('div');
     div.className = `p-4 bg-white border-b border-slate-50 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-l-4 ${isMasuk ? 'border-l-green-500' : 'border-l-red-500'} active:scale-[0.98] transition-all`;
     
-    // Trigger Modal Detail
     div.onclick = () => showDetail(t);
     
     div.innerHTML = `
       <div class="flex-1 pr-4">
-        <p class="text-[10px] text-gray-400 font-mono mb-0.5">${t.id}</p>
+        <div class="flex items-center gap-2 mb-0.5">
+          <p class="text-[10px] text-gray-400 font-mono">${t.id}</p>
+          <span class="text-[10px] text-slate-300">•</span>
+          <p class="text-[10px] text-slate-500 font-semibold">${tgl}</p>
+        </div>
         <p class="font-bold text-sm text-slate-800 leading-tight">${t.ket}</p>
         <div class="flex items-center gap-2 mt-1.5">
           <span class="text-[9px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold uppercase">${t.kat}</span>
-          <span class="text-[10px] text-gray-400 font-medium">${t.waktu.split(' ')[1].substring(0, 5)}</span>
-          ${t.sub && t.sub !== '-' ? `<span class="text-[9px] text-blue-400 font-medium italic">@${t.sub}</span>` : ''}
-        </div>
+          <span class="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+            <i data-lucide="clock" class="w-2.5 h-2.5"></i> ${jamMenit}
+          </span>
+          </div>
       </div>
       <div class="text-right">
         <p class="font-black text-sm ${isMasuk ? 'text-green-600' : 'text-red-600'}">
@@ -642,7 +647,7 @@ async function fetchTransactions() {
   
   lucide.createIcons();
 }
-
+    
   async  function setFilter(f) {
   currentFilter = f;
   const now = new Date();
@@ -766,7 +771,7 @@ content.style.opacity = "0";
       <div class="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
           <p class="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Item & Rincian</p>
       </div>
-      <table class="w-full text-xs">
+      <table class="w-full text-[10px]">
         <thead class="bg-slate-50 border-b text-slate-400">
           <tr>
             <th class="p-2 text-left">Item</th>
@@ -780,13 +785,13 @@ content.style.opacity = "0";
             calculatedSubtotal += lineTotal;
 
             return `
-            <tr class="bg-white">
-              <td class="p-2">
-                <span class="font-medium text-slate-700">${d.nama}</span>
-              </td>
-              <td class="p-2 text-center text-slate-500">${d.qty}</td>
-              <td class="p-2 text-right font-mono text-slate-600">${formatRupiah(lineTotal)}</td>
-            </tr>`;
+<tr class="bg-white">
+  <td class="p-2">
+    <span class="font-medium text-slate-700 text-[10px]">${d.nama}</span>
+  </td>
+  <td class="p-2 text-center text-slate-500 text-[9px]">${d.qty}</td>
+  <td class="p-2 text-right font-mono text-slate-600 text-[9px]">${formatRupiah(lineTotal)}</td>
+</tr>`;
           }).join('')}
         </tbody>
       </table>
@@ -796,20 +801,19 @@ content.style.opacity = "0";
   const diskon = parseFloat(t.diskon) || 0;
   const totalSetelahDiskon = calculatedSubtotal - diskon;
 
-  const rincianBiayaHtml = calculatedSubtotal > 0 ? `
-    <div class="mt-4 p-4 bg-slate-50 border rounded-xl space-y-2">
-       <div class="flex justify-between items-center text-xs text-slate-500">
-         <span>Subtotal Kotor</span>
-         <span>${formatRupiah(calculatedSubtotal)}</span>
-       </div>
-       <div class="flex justify-between items-center text-xs text-red-500">
-         <span>Potongan Diskon</span>
-         <span>- ${formatRupiah(diskon)}</span>
-       </div>
-       <div class="flex justify-between items-center pt-2 border-t border-slate-200">
-         <span class="text-xs font-bold text-blue-600 uppercase">Total Tagihan Akhir</span>
-         <span class="text-lg font-bold text-blue-700">${formatRupiah(totalSetelahDiskon)}</span>
-       </div>
+ const rincianBiayaHtml = calculatedSubtotal > 0 ? `
+    <div class="mt-4 p-4 bg-slate-50 border rounded-xl space-y-1.5"> <div class="flex justify-between items-center text-[10px] text-slate-500">
+          <span>Subtotal Kotor</span>
+          <span>${formatRupiah(calculatedSubtotal)}</span>
+        </div>
+        <div class="flex justify-between items-center text-[10px] text-red-500">
+          <span>Potongan Diskon</span>
+          <span>- ${formatRupiah(diskon)}</span>
+        </div>
+        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200">
+          <span class="text-[9px] font-bold text-blue-600 uppercase">Total Tagihan Akhir</span>
+          <span class="text-sm font-bold text-blue-700">${formatRupiah(totalSetelahDiskon)}</span>
+        </div>
     </div>
   ` : '';
 
@@ -855,12 +859,14 @@ content.style.opacity = "0";
 
     ${rincianBiayaHtml}
 
-    <div class="mt-4 p-4 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
-       <div class="flex flex-col">
-          <span class="text-[10px] font-bold text-slate-400 uppercase">Kas ${t.tipe === 'MASUK' ? 'Diterima' : 'Dibayar'}</span>
-          ${totalSetelahDiskon > (t.masuk || t.keluar) ? '<span class="text-[9px] text-orange-500 font-bold italic">Dibayar Sebagian (DP)</span>' : ''}
-       </div>
-       <span class="text-2xl font-black text-slate-800">${formatRupiah(t.masuk > 0 ? t.masuk : t.keluar)}</span>
+    <div class="mt-4 p-3 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
+        <div class="flex flex-col">
+           <span class="text-[9px] font-bold text-slate-400 uppercase">Kas ${t.tipe === 'MASUK' ? 'Diterima' : 'Dibayar'}</span>
+           
+           ${totalSetelahDiskon > (t.masuk || t.keluar) ? '<span class="text-[8px] text-orange-500 font-bold italic leading-none">Dibayar Sebagian (DP)</span>' : ''}
+        </div>
+        
+        <span class="text-base font-black text-slate-800">${formatRupiah(t.masuk > 0 ? t.masuk : t.keluar)}</span>
     </div>
     
     ${detailHtml}
