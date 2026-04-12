@@ -258,7 +258,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyEDnlFzSv48n8Gyep_fMUTWSfpDCO6PZo63_mzMjNniVe1btG1DPq-1fXuW-F6pFkBwQ/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyvi4kwTW6B8hS1KeN_Ap0N8egjIyAikN8E0J0JtNsbQTQuP8731-Wpl2uhxQmHVUF0GA/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -1468,7 +1468,7 @@ window.selectProduct = selectProduct;
     type: 'PENJUALAN',
     pelanggan: pelanggan,
     ket: `PENJUALAN KEPADA ${pelanggan}`, // <-- Tambahkan field ket di sini
-    items: items,
+   items: JSON.stringify(items), // Ini akan mengirim objek lengkap termasuk kategori & tipeHarga
     diskon: unmask(document.getElementById('p_disc').value),
     dp: unmask(document.getElementById('p_dp').value),
     metode: document.getElementById('p_metode').value
