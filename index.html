@@ -258,7 +258,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyvi4kwTW6B8hS1KeN_Ap0N8egjIyAikN8E0J0JtNsbQTQuP8731-Wpl2uhxQmHVUF0GA/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyAqrXddzxmQyGrtPpZqpRK0jFras_UpB8eZydXFCzq3VEh_4vP6OXyIaRX5sQz7actwg/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -1250,9 +1250,6 @@ function addItem(autoOpen = true) {
   inputNama.value = name;
   if (inputKat) inputKat.value = category || "-";
 
-    // --- TAMBAHAN: Simpan data lengkap ke dataset ---
-  inputNama.dataset.kategori = category || "-";
-
   // 2. Jika harga tersedia (bukan barang manual/baru), minta konfirmasi
   if (priceUmum || priceReseller) {
     const isReseller = confirm(
@@ -1262,21 +1259,7 @@ function addItem(autoOpen = true) {
     );
     
     const selectedPrice = isReseller ? priceReseller : priceUmum;
-    const tipeHarga = isReseller ? "RESELLER" : "UMUM";
     inputHarga.value = selectedPrice.toLocaleString('id-ID').replace(/,/g, '.');
-
-    // SIMPAN METADATA (PENTING untuk update spesifik di Backend)
-    // Data ini tidak terlihat di layar tapi akan diambil saat klik "Simpan"
-    inputNama.dataset.tipeHarga = tipeHarga;
-    inputNama.dataset.hargaTerpilih = selectedPrice;
-    
-    // Simpan juga harga cadangan agar jika di masa depan butuh perbandingan
-    inputNama.dataset.hargaUmum = priceUmum;
-    inputNama.dataset.hargaReseller = priceReseller;
-  } else {
-    // Jika barang manual (tidak ada di list), hapus metadata lama
-    delete inputNama.dataset.tipeHarga;
-    delete inputNama.dataset.hargaTerpilih;
   }
 
   closeProductModal();
@@ -1366,45 +1349,30 @@ window.selectProduct = selectProduct;
       if (elFinalPembelian) elFinalPembelian.innerText = "Rp " + new Intl.NumberFormat('id-ID').format(subtotal);
     }
 
-   function collectItems() {
+  function collectItems() {
   const itemsData = [];
-  
-  // Mengambil semua baris item di dalam form penjualan
   document.querySelectorAll('[id^="item-"]').forEach(el => {
     const inputNama = el.querySelector('.item-name');
     if (!inputNama) return;
-
-    const nama = inputNama.value.trim().toUpperCase();
-    const hargaAktif = unmask(el.querySelector('.item-price').value);
-    const qtyInput = el.querySelector('.qty-input').value;
     
-    // Ambil metadata dari dataset (hasil dari fungsi selectProduct)
-    let tipeHarga = inputNama.dataset.tipeHarga; // "UMUM" atau "RESELLER"
-    let hargaTerpilih = parseFloat(inputNama.dataset.hargaTerpilih);
-    const kategori = inputNama.dataset.kategori || "-";
+    const nama = inputNama.value.toUpperCase();
+    const harga = unmask(el.querySelector('.item-price').value);
+    
+    // AMBIL NILAI KATEGORI DARI INPUT
+    const kategori = el.querySelector('.item-category').value.toUpperCase() || "-";
 
-    // LOGIKA BARU: Jika barang diketik manual (tidak melalui modal/selectProduct)
-    // maka tipeHarga akan kosong. Kita set default ke "UMUM".
-    if (!tipeHarga && nama && nama !== "PILIH BARANG STOK...") {
-      tipeHarga = "UMUM";
-      hargaTerpilih = hargaAktif;
-    }
-
-    // Pastikan hanya baris yang berisi nama valid yang dikirim
     if (nama && nama !== "PILIH BARANG STOK...") {
       itemsData.push({
         nama: nama,
-        qty: parseFloat(qtyInput) || 1,
-        harga: hargaAktif,      // Harga yang tercatat di nota saat ini
-        kategori: kategori,     // Kategori barang
-        tipeHarga: tipeHarga,   // Penanda kolom mana yang akan diupdate (G atau H)
-        hargaTerpilih: hargaTerpilih // Nilai harga master yang akan dikirim ke backend
+        qty: parseFloat(el.querySelector('.qty-input').value) || 1,
+        harga: harga,
+        kategori: kategori // <-- SEKARANG KATEGORI MASUK KE OBJEK ITEM
       });
     }
   });
-  
   return itemsData;
 }
+
     
    async function runScript(actionName, payload, stayInTab) {
   const btn = document.querySelector('button[onclick*="save"]');
@@ -1468,7 +1436,7 @@ window.selectProduct = selectProduct;
     type: 'PENJUALAN',
     pelanggan: pelanggan,
     ket: `PENJUALAN KEPADA ${pelanggan}`, // <-- Tambahkan field ket di sini
-   items: JSON.stringify(items), // Ini akan mengirim objek lengkap termasuk kategori & tipeHarga
+    items: items,
     diskon: unmask(document.getElementById('p_disc').value),
     dp: unmask(document.getElementById('p_dp').value),
     metode: document.getElementById('p_metode').value
