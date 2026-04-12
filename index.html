@@ -470,13 +470,15 @@ window.addEventListener('click', function(event) {
                 <button onclick="setFilter('today')" id="f-today" class="px-3 py-1 bg-blue-600 text-white rounded-full transition">Hari Ini</button>
                 <button onclick="setFilter('month')" id="f-month" class="px-3 py-1 bg-gray-100 rounded-full transition">Bulan Ini</button>
                 <button onclick="setFilter('all')" id="f-all" class="px-3 py-1 bg-gray-100 rounded-full transition">Semua</button>
-                <div class="flex items-center gap-0.5 bg-slate-100 border rounded-full px-2 py-0.5 ml-0.5 scale-95 origin-left">
-                                    <input type="date" id="f-date-start" onchange="checkManualDateChange()" 
-                                        class="bg-transparent outline-none border-none text-[8px] w-[75px] cursor-pointer">
-                                    <span class="text-gray-400 text-[8px] font-bold">-</span>
-                                    <input type="date" id="f-date-end" onchange="checkManualDateChange()" 
-                                        class="bg-transparent outline-none border-none text-[8px] w-[75px] cursor-pointer">
-                                </div>
+               <div class="flex items-center gap-0.5 bg-slate-100 border rounded-full px-2 py-0.5 ml-0.5 scale-95 origin-left">
+    <input type="date" id="f-date-start" onchange="checkManualDateChange()" 
+        class="bg-transparent outline-none border-none text-[9px] w-[135px] cursor-pointer font-semibold text-slate-600">
+    
+    <span class="text-gray-400 text-[9px] font-bold mx-1">-</span>
+    
+    <input type="date" id="f-date-end" onchange="checkManualDateChange()" 
+        class="bg-transparent outline-none border-none text-[9px] w-[135px] cursor-pointer font-semibold text-slate-600">
+</div>
               </div>
             </div>
             <div class="flex gap-2 items-center">
