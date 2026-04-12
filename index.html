@@ -221,7 +221,7 @@ display: block !important;
     
    <div id="modalContent" class="p-6 overflow-y-auto" onscroll="handleModalScroll()">
   </div>
-   <div id="scroll-indicator" class="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-300 opacity-0 scale-75">
+   <div id="scroll-indicator" class="absolute bottom-12 left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-300 opacity-0 scale-75">
     <div class="bg-blue-600/90 text-white p-2 rounded-full shadow-lg animate-bounce backdrop-blur-sm">
         <i data-lucide="chevrons-down" class="w-5 h-5"></i>
     </div>
@@ -326,7 +326,7 @@ function handleModalScroll() {
   const scrollRemaining = content.scrollHeight - content.scrollTop - content.clientHeight;
 
   // Jika sisa konten di bawah lebih dari 20px, tampilkan ikon
-  if (scrollRemaining > 20) {
+  if (scrollRemaining > 30) {
     indicator.classList.remove('opacity-0', 'scale-75');
     indicator.classList.add('opacity-100', 'scale-100');
   } else {
