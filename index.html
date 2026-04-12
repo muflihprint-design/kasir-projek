@@ -752,46 +752,38 @@ content.style.opacity = "0";
   let detailHtml = '';
   let calculatedSubtotal = 0;
 
-  if (items.length > 0) {
-    detailHtml = `
-      <div class="mt-6 border rounded-xl overflow-hidden shadow-sm">
-        <div class="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
-            <p class="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Item & Status Periksa</p>
-        </div>
-        <table class="w-full text-xs">
-          <thead class="bg-slate-50 border-b text-slate-400">
-            <tr>
-              <th class="p-2 text-left w-10">Pilih</th>
-              <th class="p-2 text-left">Item</th>
-              <th class="p-2 text-center">Qty</th>
-              <th class="p-2 text-right">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-            ${items.map((d, index) => {
-              const lineTotal = (parseFloat(d.qty) || 0) * (parseFloat(d.harga) || 0);
-              calculatedSubtotal += lineTotal;
-              const isChecked = d.checked || false; 
+ if (items.length > 0) {
+  detailHtml = `
+    <div class="mt-6 border rounded-xl overflow-hidden shadow-sm">
+      <div class="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
+          <p class="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Item & Rincian</p>
+      </div>
+      <table class="w-full text-xs">
+        <thead class="bg-slate-50 border-b text-slate-400">
+          <tr>
+            <th class="p-2 text-left">Item</th>
+            <th class="p-2 text-center">Qty</th>
+            <th class="p-2 text-right">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          ${items.map((d, index) => {
+            const lineTotal = (parseFloat(d.qty) || 0) * (parseFloat(d.harga) || 0);
+            calculatedSubtotal += lineTotal;
 
-              return `
-              <tr class="${isChecked ? 'bg-green-50/50' : 'bg-white'} transition-colors">
-                <td class="p-2 text-center">
-                  <input type="checkbox" 
-                    ${isChecked ? 'checked' : ''} 
-                    class="w-4 h-4 cursor-pointer accent-green-600"
-                    onchange="toggleItemCheck('${t.id}', ${index}, this.checked)">
-                </td>
-                <td class="p-2">
-                  <span class="font-medium ${isChecked ? 'line-through text-slate-400' : 'text-slate-700'}">${d.nama}</span>
-                </td>
-                <td class="p-2 text-center text-slate-500">${d.qty}</td>
-                <td class="p-2 text-right font-mono ${isChecked ? 'text-slate-300' : 'text-slate-600'}">${formatRupiah(lineTotal)}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>`;
-  }
+            return `
+            <tr class="bg-white">
+              <td class="p-2">
+                <span class="font-medium text-slate-700">${d.nama}</span>
+              </td>
+              <td class="p-2 text-center text-slate-500">${d.qty}</td>
+              <td class="p-2 text-right font-mono text-slate-600">${formatRupiah(lineTotal)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
 
   const diskon = parseFloat(t.diskon) || 0;
   const totalSetelahDiskon = calculatedSubtotal - diskon;
@@ -871,7 +863,7 @@ content.style.opacity = "0";
        </button>
        ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
          <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-            <i data-lucide="share-2" class="w-4 h-4"></i> Bagikan Nota (JPG)
+            <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
           </button>
         ` : ''}
     </div>
@@ -2182,8 +2174,8 @@ async function shareNotaJPG(id, event) {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
         files: [file],
-        title: 'Nota Vi Printing',
-        text: `Nota transaksi #${t.id} - Vi Printing`
+        title: 'Nota Blimi',
+        text: `Nota transaksi #${t.id} - Blimi`
       });
     } else {
       // Fallback: Jika tidak bisa share, maka download otomatis
@@ -2249,10 +2241,9 @@ function generateNotaHTML(t) {
   return `
   <div id="nota-container" style="width: 380px; margin: 0; padding: 25px; font-family: 'Inter', sans-serif; background-color: #ffffff; box-sizing: border-box; position: relative; border: 1px solid #f1f5f9; display: block;">
     <div style="text-align: center; margin-bottom: 25px;">
-      <div style="font-size: 22px; font-weight: 900; color: #2563eb; font-style: italic; letter-spacing: -1px;">Vi Printing</div>
+      <div style="font-size: 22px; font-weight: 900; color: #2563eb; font-style: italic; letter-spacing: -1px;">BLIMI</div>
       <div style="font-size: 10px; color: #94a3b8; line-height: 1.4; margin-top: 4px;">
-        Card Invitation Printing & Design<br>
-        Jl. Rappokalling Raya (Samping Masjid Jami), Makassar
+        -----------------------------------
       </div>
     </div>
 
