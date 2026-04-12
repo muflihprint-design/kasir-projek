@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -23,6 +22,19 @@
     input, select, textarea { font-size: 16px !important; }
     .accounting { text-align: right; font-family: monospace; }
 
+/* Pastikan container saldo memiliki tinggi minimum yang konsisten */
+#balance-container {
+  height: 40px; /* Atur tinggi yang pas dengan elemen saldo Anda */
+  display: flex;
+  align-items: center; /* Menjaga konten tetap di tengah secara vertikal */
+  overflow: hidden;
+}
+
+/* Opsional: Memastikan skeleton tidak lebih tinggi dari teks asli */
+.animate-pulse {
+  display: flex;
+  align-items: flex-end;
+}    
     /* Efek untuk tombol menu 'Lainnya' yang aktif */
 /* Style Tombol Aktif di Menu Lainnya */
 .action-btn-active {
@@ -302,29 +314,37 @@ function showBalanceLoading(isLoading) {
   const container = document.getElementById('balance-container');
   if (!container) return;
 
+  // Menggunakan wrapper dengan tinggi tetap (h-8 = 32px) agar layout tidak bergeser
   if (isLoading) {
-    // Tampilan Skeleton Loading Horizontal
+    // Tampilan Skeleton Loading
     container.innerHTML = `
-      <div class="animate-pulse flex items-end gap-4 mt-1">
-        <div class="h-8 bg-slate-200 rounded-md w-32"></div>
-        <div class="flex gap-2 mb-1">
-          <div class="h-3 bg-slate-100 rounded w-16"></div>
-          <div class="h-3 bg-slate-100 rounded w-16"></div>
+      <div class="animate-pulse flex items-end gap-3 mt-1 h-8">
+        <div class="h-7 bg-slate-200 rounded-md w-32"></div>
+        
+        <div class="flex gap-3 mb-0.5 border-l border-transparent pl-3">
+          <div class="flex flex-col gap-1">
+            <div class="h-2 bg-slate-100 rounded w-8"></div>
+            <div class="h-3 bg-slate-100 rounded w-12"></div>
+          </div>
+          <div class="flex flex-col gap-1 pl-3">
+            <div class="h-2 bg-slate-100 rounded w-8"></div>
+            <div class="h-3 bg-slate-100 rounded w-12"></div>
+          </div>
         </div>
       </div>
     `;
   } else {
-    // Tampilan Saldo dengan Rincian di Samping
+    // Tampilan Saldo Asli
     container.innerHTML = `
-      <div class="flex items-end gap-3 mt-1">
+      <div class="flex items-end gap-3 mt-1 h-8">
         <h1 id="total-balance" class="text-xl font-black text-slate-800 leading-none">Rp 0</h1>
         
         <div class="flex gap-3 mb-0.5 border-l border-slate-100 pl-3">
-          <div class="flex flex-col">
+          <div class="flex flex-col justify-end">
             <span class="text-[8px] uppercase font-bold text-slate-400 leading-none mb-1">Cash</span>
             <span id="saldo-cash" class="text-[11px] font-bold text-emerald-600 leading-none">Rp 0</span>
           </div>
-          <div class="flex flex-col border-l border-slate-50 pl-3">
+          <div class="flex flex-col justify-end border-l border-slate-50 pl-3">
             <span class="text-[8px] uppercase font-bold text-slate-400 leading-none mb-1">Rekening</span>
             <span id="saldo-rekening" class="text-[11px] font-bold text-blue-600 leading-none">Rp 0</span>
           </div>
@@ -401,13 +421,14 @@ function updateBalanceDisplay() {
   document.getElementById('saldo-rekening').innerText = formatRupiah(rekening);
 }
 
-
-
 window.addEventListener('DOMContentLoaded', () => {
   lucide.createIcons();
-  changeTab('penjualan');
-  refreshData();
+refreshData();
+   changeTab('penjualan');
   fetchMasterStock();
+  setTimeout(() => {
+    window.scrollTo(0, 0);
+  }, 100);
 });
    function showLoading(show) {
       document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
@@ -1134,7 +1155,7 @@ function addItem(autoOpen = true) {
     </div>
     <div class="grid grid-cols-12 gap-2 items-center">
       <div class="col-span-5">
-        <input type="text" id="kat-${id}" placeholder="Kategori" 
+        <input type="text" id="kat-${id}" placeholder="LOT" 
                oninput="this.value = this.value.toUpperCase()"
                class="w-full p-2 border-2 border-slate-100 bg-white rounded-lg text-[10px] font-bold uppercase text-blue-600 h-10 outline-none focus:ring-2 focus:ring-blue-400 item-category">
       </div>
