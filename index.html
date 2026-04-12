@@ -1023,13 +1023,17 @@ content.style.opacity = "0";
                  oninput="this.value = this.value.toUpperCase()"
                  class="w-full p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-red-500 outline-none font-medium">
           
-          <div class="bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-300">
-            <p class="text-[10px] font-bold mb-3 text-slate-500 uppercase tracking-widest">Daftar Belanja</p>
-            <div id="itemContainer" class="space-y-0"></div>
-            <button onclick="addItem(true)" class="w-full mt-2 p-3 bg-white border border-red-100 text-red-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform">
-              <i data-lucide="plus-circle" class="w-4 h-4"></i> TAMBAH BARANG
-            </button>
-          </div>
+          <div class="py-2">
+  <div class="border-t border-b border-slate-200 py-3">
+    <p class="text-[10px] font-bold mb-3 text-slate-400 uppercase tracking-widest text-center">Daftar Barang</p>
+    
+    <div id="itemContainer" class="space-y-0"></div>
+
+    <button onclick="addItem(true)" class="w-full mt-2 p-3 bg-red-50 text-red-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-transform">
+      <i data-lucide="plus-circle" class="w-4 h-4"></i> TAMBAH BARANG
+    </button>
+  </div>
+</div>
 
           <select id="b_metode" class="w-full p-3 bg-slate-50 border-none rounded-xl bg-white font-bold text-slate-700 focus:ring-2 focus:ring-red-500 outline-none appearance-none">
             <option value="Cash">Cash</option>
