@@ -262,28 +262,23 @@ display: block !important;
   </div>
 </div>
   
-<header class="bg-white border-b sticky top-0 z-50 p-4 shadow-sm">
-  <div class="mx-auto flex justify-between items-center">
+<header class="bg-white border-b sticky top-0 z-50 p-3 shadow-sm"> <div class="mx-auto flex justify-between items-center">
     <div>
-      <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Saldo Kas</p>
-      <div id="balance-container">
-        <div class="animate-pulse flex items-end gap-4 mt-1">
-          <div class="h-8 bg-slate-200 rounded-md w-32"></div>
-          <div class="flex gap-2 mb-1">
-            <div class="h-3 bg-slate-100 rounded w-16"></div>
-            <div class="h-3 bg-slate-100 rounded w-16"></div>
+      <p class="text-[9px] uppercase font-bold text-slate-400 tracking-tight">Total Saldo Kas</p> <div id="balance-container">
+        <div class="animate-pulse flex items-end gap-3 mt-0.5">
+          <div class="h-6 bg-slate-200 rounded-md w-28"></div> <div class="flex gap-1.5 mb-0.5">
+            <div class="h-2.5 bg-slate-100 rounded w-12"></div>
+            <div class="h-2.5 bg-slate-100 rounded w-12"></div>
           </div>
         </div>
       </div>
     </div>
 
-    <button onclick="resetShop()" class="group flex items-center gap-3 px-3 py-2 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-2xl transition-all duration-300">
-      <div class="text-right hidden sm:block">
-        <p class="text-[8px] font-bold text-slate-400 uppercase leading-none">Identitas</p>
-        <p class="text-[10px] font-black text-slate-700 group-hover:text-red-600 transition-colors mt-1">GANTI TOKO</p>
-      </div>
-      <div class="w-8 h-8 flex items-center justify-center bg-white rounded-xl shadow-sm group-hover:shadow-none group-active:scale-90 transition-all">
-        <i data-lucide="refresh-cw" class="w-4 h-4 text-slate-500 group-hover:text-red-500 group-hover:rotate-180 transition-transform duration-500"></i>
+    <button onclick="resetShop()" class="group flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 hover:bg-red-50 border border-slate-100 rounded-xl transition-all duration-300">
+      <div class="text-right hidden xs:block">
+        <p class="text-[7px] font-bold text-slate-400 uppercase leading-none">Identitas</p> <p class="text-[9px] font-black text-slate-600 group-hover:text-red-600 transition-colors mt-0.5">GANTI TOKO</p> </div>
+      <div class="w-7 h-7 flex items-center justify-center bg-white rounded-lg shadow-sm group-active:scale-90 transition-all">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-400 group-hover:text-red-500 group-hover:rotate-180 transition-transform duration-500"></i>
       </div>
     </button>
   </div>
