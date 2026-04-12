@@ -1548,19 +1548,23 @@ window.selectProduct = selectProduct;
   }
 }
 
- function savePenjualan() {
+function savePenjualan() {
   const items = collectItems();
   if(items.length === 0) return alert("Pilih barang terlebih dahulu!");
   
-  // Ambil keterangan dari input (pastikan ID ini ada di HTML Anda)
-  // atau buat keterangan otomatis berdasarkan pelanggan
-  const pelanggan = (document.getElementById('p_cust').value || 'UMUM').toUpperCase();
+  // 1. Ambil inisial dari currentShop (M atau V)
+  // currentShop.nama biasanya "MUFLIH PRINT" atau "VI PRINTING"
+  const shopInitial = currentShop.nama ? currentShop.nama.charAt(0).toUpperCase() : '?';
+  
+  // 2. Ambil nama pelanggan dan tambahkan format (Inisial)
+  const inputPelanggan = (document.getElementById('p_cust').value || 'UMUM').toUpperCase();
+  const pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
   
   const payload = {
     action: 'processTransaction',
     type: 'PENJUALAN',
-    pelanggan: pelanggan,
-    ket: `PENJUALAN KEPADA ${pelanggan}`, // <-- Tambahkan field ket di sini
+    pelanggan: pelangganFormatted, // Hasilnya: "(M) NAMA" atau "(V) NAMA"
+    ket: `PENJUALAN KEPADA ${pelangganFormatted}`, 
     items: items,
     diskon: unmask(document.getElementById('p_disc').value),
     dp: unmask(document.getElementById('p_dp').value),
