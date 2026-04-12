@@ -1140,7 +1140,7 @@ function addItem(autoOpen = true) {
   div.id = `item-${id}`;
   div.className = "bg-white p-3 rounded-xl border border-slate-200 mb-3 shadow-sm animate-in slide-in-from-left duration-300";
   div.innerHTML = `
-    <div class="flex gap-2 mb-3">
+    <div class="flex gap-2 mb-2">
       <div class="relative flex-1">
         <input type="text" id="input-${id}" placeholder="Pilih barang..." readonly
                onclick="openProductModal('input-${id}')"
@@ -1152,27 +1152,29 @@ function addItem(autoOpen = true) {
       </button>
     </div>
 
-    <div class="flex flex-col gap-2">
+    <div class="grid grid-cols-2 md:grid-cols-12 gap-2 items-center">
       
-      <div class="flex gap-2">
-        <div class="flex-1">
-          <label class="text-[9px] font-bold text-slate-400 uppercase ml-1">Kategori/LOT</label>
-          <input type="text" id="kat-${id}" placeholder="LOT" 
-                 oninput="this.value = this.value.toUpperCase()"
-                 class="w-full p-2 border-2 border-slate-100 bg-white rounded-lg text-[10px] font-bold uppercase text-blue-600 h-10 outline-none focus:ring-2 focus:ring-blue-400 item-category">
-        </div>
-        <div class="w-24">
-          <label class="text-[9px] font-bold text-slate-400 uppercase ml-1">Qty</label>
-          <input type="number" placeholder="Qty" oninput="calcTotal()" value="1" onfocus="this.select()" 
-                 class="w-full p-2 border-2 border-slate-200 rounded-lg text-sm font-black text-center h-10 outline-none focus:ring-2 focus:ring-blue-400 qty-input">
-        </div>
+      <div class="col-span-1 md:col-span-5">
+        <label class="block md:hidden text-[9px] font-bold text-slate-400 ml-1 mb-0.5">KATEGORI</label>
+        <input type="text" id="kat-${id}" placeholder="LOT" 
+               oninput="this.value = this.value.toUpperCase()"
+               class="w-full p-2 border-2 border-slate-100 bg-white rounded-lg text-[10px] font-bold uppercase text-blue-600 h-10 outline-none focus:ring-2 focus:ring-blue-400 item-category">
       </div>
 
-      <div>
-        <label class="text-[9px] font-bold text-slate-400 uppercase ml-1">Harga Satuan (Rp)</label>
-        <input type="text" inputmode="numeric" placeholder="Harga" 
-               oninput="maskNominal(this); calcTotal()" 
-               class="w-full p-2 border-2 border-blue-50 rounded-lg text-base font-bold accounting h-11 text-right outline-none focus:ring-2 focus:ring-blue-400 item-price bg-blue-50/30">
+      <div class="col-span-1 md:col-span-3">
+        <label class="block md:hidden text-[9px] font-bold text-slate-400 ml-1 mb-0.5">QTY</label>
+        <input type="number" placeholder="Qty" oninput="calcTotal()" value="1" onfocus="this.select()" 
+               class="w-full p-2 border-2 border-slate-200 rounded-lg text-sm font-black text-center h-10 outline-none focus:ring-2 focus:ring-blue-400 qty-input">
+      </div>
+
+      <div class="col-span-2 md:col-span-4">
+        <label class="block md:hidden text-[9px] font-bold text-slate-400 ml-1 mb-0.5">HARGA</label>
+        <div class="relative">
+          <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 md:hidden">Rp</span>
+          <input type="text" inputmode="numeric" placeholder="Harga" 
+                 oninput="maskNominal(this); calcTotal()" 
+                 class="w-full p-2 pl-7 md:pl-2 border rounded-lg text-base font-bold accounting h-10 text-right outline-none focus:ring-2 focus:ring-blue-100 item-price">
+        </div>
       </div>
 
     </div>
