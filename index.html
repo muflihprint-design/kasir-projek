@@ -7,6 +7,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     body { 
@@ -310,7 +312,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzd-7rLr6HnGwu9QuPewt3oVIojG570qC1ccEoAdq9IrXyT1w0f1xKAxEKjROFysj6oXg/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyt9ifyZoKRGAhjpn-5wMOvE0qD1UZHCirInR70XJCiwuo_tjtkT3C-8LxeF7GJVLKVGw/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -976,7 +978,7 @@ content.style.opacity = "0";
 }
  
 
-    function downloadExcel() { alert("Fitur Excel akan segera hadir."); }
+    
 
     // Halaman placeholder untuk contoh integrasi
     function renderPenjualanPage() {
@@ -2466,6 +2468,173 @@ function printNota(id) {
       fetchMasterStock();
       changeTab('penjualan');
     };
+
+function downloadExcel() {
+    try {
+        // 1. Ambil Parameter Filter dari UI (dengan proteksi jika elemen null)
+        const dsInput = document.getElementById('f-date-start');
+        const deInput = document.getElementById('f-date-end');
+        const searchInput = document.getElementById('searchInput');
+
+        const ds = dsInput ? dsInput.value : '';
+        const de = deInput ? deInput.value : '';
+        const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+
+        // 2. Gunakan allTransactions (disesuaikan dengan variabel di fungsi render Anda)
+        if (typeof allTransactions === 'undefined' || allTransactions.length === 0) {
+            return alert("Data transaksi belum dimuat atau kosong.");
+        }
+
+        // 3. Logika Filter (disamakan dengan logika renderTransactions agar hasil konsisten)
+        const filteredData = allTransactions.filter(t => {
+            // Filter Tab Metode
+            if (currentView !== 'Semua' && t.metode !== currentView) return false;
+            
+            // Filter Kategori/Tipe
+            if (currentCategory !== 'SEMUA' && t.tipe !== currentCategory) return false;
+            
+            // Filter Rentang Tanggal
+            const tDate = t.waktu.split(' ')[0];
+            if (ds && tDate < ds) return false;
+            if (de && tDate > de) return false;
+
+            // Filter Pencarian (Cek Ket, Sub/Pelanggan, dan ID)
+            const ket = (t.ket || "").toLowerCase();
+            const sub = (t.sub || "").toLowerCase();
+            const id = (t.id || "").toLowerCase();
+            
+            return ket.includes(searchTerm) || sub.includes(searchTerm) || id.includes(searchTerm);
+        });
+
+        if (filteredData.length === 0) return alert("Tidak ada data hasil filter untuk diunduh.");
+
+        let excelRows = [];
+        let summaryMap = {};
+
+        // 4. Susun Baris Data
+        filteredData.forEach(t => {
+            const diskonTotal = parseFloat(t.diskon) || 0;
+            const kategori = (t.kat || 'LAIN-LAIN').toUpperCase().trim();
+            
+            if (!summaryMap[kategori]) {
+                summaryMap[kategori] = { Masuk: 0, Keluar: 0, Diskon: 0, Net: 0 };
+            }
+
+            // Cek apakah ada detail produk
+            let detailItems = [];
+            try {
+                detailItems = typeof t.detail === 'string' ? JSON.parse(t.detail) : (t.detail || []);
+            } catch (e) { 
+                detailItems = []; 
+            }
+
+            if (detailItems.length > 0) {
+                detailItems.forEach((item, index) => {
+                    const subItem = (parseFloat(item.qty) || 0) * (parseFloat(item.harga) || 0);
+                    const dRow = index === 0 ? diskonTotal : 0; // Diskon hanya di baris pertama
+                    const netRow = subItem - dRow;
+
+                    excelRows.push({
+                        'Waktu': t.waktu, 'ID': t.id, 'Kategori': t.kat, 'Pelanggan': t.sub, 'Barang': item.nama,
+                        'Qty': parseFloat(item.qty), 'Harga Satuan': parseFloat(item.harga), 'Subtotal': subItem,
+                        'Diskon': dRow, 'Total Net': netRow, 'Metode': t.metode, 'Ket': t.ket
+                    });
+
+                    if (t.tipe === 'MASUK') summaryMap[kategori].Masuk += subItem;
+                    else summaryMap[kategori].Keluar += subItem;
+                    summaryMap[kategori].Diskon += dRow;
+                    summaryMap[kategori].Net += netRow;
+                });
+            } else {
+                const nom = parseFloat(t.masuk || t.keluar) || 0;
+                const netRow = nom - diskonTotal;
+                excelRows.push({
+                    'Waktu': t.waktu, 'ID': t.id, 'Kategori': t.kat, 'Pelanggan': t.sub, 'Barang': '-',
+                    'Qty': 1, 'Harga Satuan': nom, 'Subtotal': nom, 'Diskon': diskonTotal, 'Total Net': netRow,
+                    'Metode': t.metode, 'Ket': t.ket
+                });
+                if (t.tipe === 'MASUK') summaryMap[kategori].Masuk += nom;
+                else summaryMap[kategori].Keluar += nom;
+                summaryMap[kategori].Diskon += diskonTotal;
+                summaryMap[kategori].Net += netRow;
+            }
+        });
+
+        // 5. Buat File Excel
+        let summaryRows = Object.keys(summaryMap).map(kat => ({
+            'Kategori': kat,
+            'Total Masuk': summaryMap[kat].Masuk,
+            'Total Keluar': summaryMap[kat].Keluar,
+            'Total Diskon': summaryMap[kat].Diskon,
+            'Total Bersih (Net)': summaryMap[kat].Net
+        }));
+
+        const labelKategori = currentCategory === 'SEMUA' ? 'SEMUA TRANSAKSI' : currentCategory;
+        const fileName = `Laporan_${labelKategori}_${ds || 'Awal'}_sd_${de || 'Akhir'}.xlsx`;
+        const workbook = XLSX.utils.book_new();
+
+        /** SHEET 1: DETAIL **/
+        const wsDetail = XLSX.utils.aoa_to_sheet([
+            [`LAPORAN DETAIL TRANSAKSI`],
+            [`Periode: ${ds || '-'} s/d ${de || '-'} | Kategori: ${labelKategori}`],
+            []
+        ]);
+        XLSX.utils.sheet_add_json(wsDetail, excelRows, { origin: "A4" });
+        autoFitColumns(wsDetail, excelRows);
+        formatRupiahExcel(wsDetail, [5, 6, 7, 8, 9], 4);
+        XLSX.utils.book_append_sheet(workbook, wsDetail, "Detail Transaksi");
+
+        /** SHEET 2: RINGKASAN **/
+        const wsSummary = XLSX.utils.aoa_to_sheet([
+            [`RINGKASAN KATEGORI`],
+            [`Periode: ${ds || '-'} s/d ${de || '-'}`],
+            []
+        ]);
+        XLSX.utils.sheet_add_json(wsSummary, summaryRows, { origin: "A4" });
+        autoFitColumns(wsSummary, summaryRows);
+        formatRupiahExcel(wsSummary, [1, 2, 3, 4], 4);
+        XLSX.utils.book_append_sheet(workbook, wsSummary, "Ringkasan Kategori");
+
+        XLSX.writeFile(workbook, fileName);
+
+    } catch (error) {
+        console.error("Excel Error:", error);
+        alert("Gagal mengunduh Excel: " + error.message);
+    }
+}
+
+function autoFitColumns(worksheet, jsonData) {
+    if (!jsonData.length) return;
+    const objectMaxLength = [];
+    const keys = Object.keys(jsonData[0]);
+    keys.forEach((key) => { objectMaxLength.push(key.length + 5); });
+    jsonData.forEach((row) => {
+        keys.forEach((key, index) => {
+            const value = row[key] ? row[key].toString() : "";
+            if (value.length + 2 > objectMaxLength[index]) {
+                objectMaxLength[index] = value.length + 2;
+            }
+        });
+    });
+    worksheet['!cols'] = objectMaxLength.map(w => ({ wch: w }));
+}
+
+function formatRupiahExcel(worksheet, cols, dataStartRow = 1) {
+    if (!worksheet['!ref']) return;
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    for (let R = dataStartRow; R <= range.e.r; ++R) {
+        cols.forEach(colIdx => {
+            const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: colIdx })];
+            if (cell && typeof cell.v === 'number') {
+                cell.t = 'n';
+                cell.z = '#,##0'; 
+            }
+        });
+    }
+}    
+
+    
+    
   </script>
   <div id="modalOverlay" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-end sm:items-center justify-center p-4 backdrop-blur-sm transition-all">
   <div id="modalContent" class="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl page-transition">
