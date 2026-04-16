@@ -1043,7 +1043,6 @@ content.style.opacity = "0";
     riwayatContainer.classList.add('hidden');
     menuContainer.classList.remove('hidden');
     
-    // Render form sesuai tab
   if (tab === 'penjualan') {
     menuContainer.innerHTML = `
       <div class="space-y-4 page-transition">
@@ -1554,19 +1553,45 @@ function savePenjualan() {
   const items = collectItems();
   if(items.length === 0) return alert("Pilih barang terlebih dahulu!");
   
-  // 1. Ambil inisial dari currentShop (M atau V)
-  // currentShop.nama biasanya "MUFLIH PRINT" atau "VI PRINTING"
+  // --- ATURAN KHUSUS: TARIK DANA SHOPEE ---
+  // Kita cek apakah ada item yang mengandung nama "Tarik Dana Shopee"
+  const shopeeItems = items.filter(item => 
+    item.nama.toLowerCase().includes("tarik dana shopee")
+  );
+
+  if (shopeeItems.length > 0) {
+    // Aturan 1: Tidak boleh ada lebih dari 1 jenis barang jika itu Tarik Dana Shopee
+    if (items.length > 1) {
+      return alert("Transaksi 'Tarik Dana Shopee' tidak boleh digabung dengan barang lain!");
+    }
+    
+    // Aturan 2: Qty barang tersebut tidak boleh lebih dari 1
+    if (shopeeItems[0].qty > 1) {
+      return alert("Jumlah (Qty) untuk 'Tarik Dana Shopee' maksimal hanya 1!");
+    }
+  }
+  // ----------------------------------------
+
   const shopInitial = currentShop.nama ? currentShop.nama.charAt(0).toUpperCase() : '?';
-  
-  // 2. Ambil nama pelanggan dan tambahkan format (Inisial)
   const inputPelanggan = (document.getElementById('p_cust').value || 'UMUM').toUpperCase();
   const pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
   
+  // Logika otomatis keterangan
+  let keteranganOtomatis = `PENJUALAN KEPADA ${pelangganFormatted}`;
+  const hasShopee1 = items.some(item => item.nama === "Tarik Dana Shopee1");
+  const hasShopee2 = items.some(item => item.nama === "Tarik Dana Shopee2");
+
+  if (hasShopee1) {
+    keteranganOtomatis = "Tarik Dana Shopee1";
+  } else if (hasShopee2) {
+    keteranganOtomatis = "Tarik Dana Shopee2";
+  }
+
   const payload = {
     action: 'processTransaction',
     type: 'PENJUALAN',
-    pelanggan: pelangganFormatted, // Hasilnya: "(M) NAMA" atau "(V) NAMA"
-    ket: `PENJUALAN KEPADA ${pelangganFormatted}`, 
+    pelanggan: pelangganFormatted,
+    ket: keteranganOtomatis,
     items: items,
     diskon: unmask(document.getElementById('p_disc').value),
     dp: unmask(document.getElementById('p_dp').value),
@@ -1576,6 +1601,8 @@ function savePenjualan() {
   payload.total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
   runScript('processTransaction', payload, 'penjualan');
 }
+
+    
 
   function savePembelian() {
   const items = collectItems();
