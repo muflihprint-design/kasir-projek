@@ -1577,13 +1577,15 @@ function savePenjualan() {
   const pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
   
   // Logika otomatis keterangan
-  let keteranganOtomatis = `Penjualan Ke ${pelangganFormatted}`;
-  const hasShopee1 = items.some(item => item.nama === "Tarik Dana Shopee1");
-  const hasShopee2 = items.some(item => item.nama === "Tarik Dana Shopee2");
+ let keteranganOtomatis = `Penjualan Ke ${pelangganFormatted}`;
 
-  if (hasShopee1) {
+  // Cari item menggunakan find agar bisa mengambil nama aslinya jika cocok
+  const shopee1 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee1");
+  const shopee2 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee2");
+
+  if (shopee1) {
     keteranganOtomatis = "Tarik Dana Shopee1";
-  } else if (hasShopee2) {
+  } else if (shopee2) {
     keteranganOtomatis = "Tarik Dana Shopee2";
   }
 
