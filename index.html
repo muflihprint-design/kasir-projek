@@ -312,7 +312,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwVeQuvhcrfD9F6UIfMTAKCIS2ugySOdrOhuk7jVSiZoDlo8iK0-asQUuK2TofXsQqk3A/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwkxmiwl6GNQCurp9-JdxRCMHv4jOB1CS6bzfobbPI64OxT35z6D9rBpaDSmbpioTrl3g/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -1695,27 +1695,6 @@ function openModal() {
   modal.classList.remove('hidden');
 }
 
-async function saveBayarPiutang(id, sisa) {
-  const namaPelanggan = document.querySelector('.bg-slate-900 p.text-purple-300')?.innerText || 'PELANGGAN';
-  const metodePilihan = document.getElementById('pi_metode').value;
-
-  const payload = { 
-    action: 'processTransaction', 
-    type: 'BAYAR_PIUTANG', 
-    idPiutang: id, 
-    nominal: sisa, 
-    metode: metodePilihan 
-  };
-  
-  // Tutup modal sebelum menjalankan script
-  closeModal(); 
-  
-  // Panggil runScript
-  // Parameter ketiga 'riwayat' memastikan setelah sukses, tab berpindah ke riwayat
-  await runScript('processTransaction', payload, 'riwayat');
-  
-
-}
 
 async function eksekusiPelunasanUtang(id, nominal) {
   const metodeSelect = document.getElementById('pay_utang_metode');
@@ -1963,7 +1942,6 @@ async function bayarPiutang(id, sisa, nama) {
   openModal();
   const content = document.getElementById('modalContent');
   
-  // Tampilan Loading awal
   content.innerHTML = `
     <div class="flex flex-col items-center py-10">
       <div class="w-10 h-10 border-4 border-slate-100 border-t-purple-600 rounded-full animate-spin"></div>
@@ -1971,8 +1949,7 @@ async function bayarPiutang(id, sisa, nama) {
     </div>`;
 
   try {
-    // Mengambil rincian barang dari database transaksi menggunakan ID Penjualan
-   const response = await fetch(`${WEB_APP_URL}?action=getDetail&id=${encodeURIComponent(id)}&t=${Date.now()}`);
+    const response = await fetch(`${WEB_APP_URL}?action=getDetail&id=${encodeURIComponent(id)}&t=${Date.now()}`);
     const detailRaw = await response.json();
     let items = typeof detailRaw === 'string' ? JSON.parse(detailRaw) : detailRaw;
 
@@ -2008,7 +1985,7 @@ async function bayarPiutang(id, sisa, nama) {
         <div class="bg-slate-900 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
           <div class="absolute top-0 right-0 p-2 opacity-10"><i data-lucide="user" class="w-12 h-12"></i></div>
           <div class="relative z-10">
-            <p class="text-[10px] font-bold text-purple-300 uppercase tracking-widest">${nama || 'Pelanggan Umum'}</p>
+            <p id="pi_nama_display" class="text-[10px] font-bold text-purple-300 uppercase tracking-widest">${nama || 'Pelanggan Umum'}</p>
             <p class="text-[9px] font-mono text-slate-500 mb-2">${id}</p>
             <div class="flex justify-between items-end border-t border-slate-800 pt-3 mt-1">
               <span class="text-xs text-slate-400">Sisa Piutang:</span>
@@ -2022,10 +1999,16 @@ async function bayarPiutang(id, sisa, nama) {
         <div class="space-y-3 pt-2">
           <div>
             <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Metode Penerimaan</label>
-            <select id="pi_metode" class="w-full mt-1 p-3.5 border-2 border-slate-100 rounded-xl font-bold bg-slate-50 text-slate-800 outline-none focus:border-purple-300 transition-all appearance-none">
+            <select id="pi_metode" onchange="toggleShopeeInput()" class="w-full mt-1 p-3.5 border-2 border-slate-100 rounded-xl font-bold bg-slate-50 text-slate-800 outline-none focus:border-purple-300 transition-all appearance-none">
               <option value="Cash">Cash (Tunai)</option>
               <option value="Rekening">Rekening (Transfer)</option>
+              <option value="Shopee">Shopee</option>
             </select>
+          </div>
+
+          <div id="shopee_ref_container" class="hidden animate-in fade-in slide-in-from-top-2">
+            <label class="text-[10px] font-bold text-orange-500 uppercase ml-1">No. Transaksi Shopee</label>
+            <input type="text" id="pi_shope_ref" placeholder="Masukkan nomor pesanan..." class="w-full mt-1 p-3.5 border-2 border-orange-100 rounded-xl font-bold bg-orange-50 text-slate-800 outline-none focus:border-orange-400 transition-all">
           </div>
           
           <div class="flex gap-2">
@@ -2044,6 +2027,35 @@ async function bayarPiutang(id, sisa, nama) {
   }
 }
 
+function toggleShopeeInput() {
+  const m = document.getElementById('pi_metode').value;
+  const container = document.getElementById('shopee_ref_container');
+  m === 'Shopee' ? container.classList.remove('hidden') : container.classList.add('hidden');
+}
+
+async function saveBayarPiutang(id, sisa) {
+  const namaAsli = document.getElementById('pi_nama_display')?.innerText || 'PELANGGAN';
+  const metodePilihan = document.getElementById('pi_metode').value;
+  const noShopee = document.getElementById('pi_shope_ref').value;
+
+  // Gabungkan nama jika via Shopee
+  let namaPelanggan = namaAsli;
+  if (metodePilihan === 'Shopee' && noShopee) {
+    namaPelanggan = `${namaAsli} - ${noShopee}`;
+  }
+
+  const payload = { 
+    action: 'processTransaction', 
+    type: 'BAYAR_PIUTANG', 
+    idPiutang: id, 
+    nominal: sisa, 
+    metode: metodePilihan,
+    pelanggan: namaPelanggan // Kirim nama yang sudah dimodifikasi
+  };
+  
+  closeModal(); 
+  await runScript('processTransaction', payload, 'riwayat');
+}
 
 
 
