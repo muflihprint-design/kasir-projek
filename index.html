@@ -1770,14 +1770,23 @@ function openModal() {
 
 
 async function eksekusiPelunasanUtang(id, nominal) {
-  const metodeSelect = document.getElementById('pay_utang_metode');
-  const metode = metodeSelect ? metodeSelect.value : 'Cash';
+  // --- VALIDASI & PENGAMBILAN METODE (Update Baru) ---
+  // Mencari radio button yang dipilih dalam grup 'pay-utang-method'
+  const selectedRadio = document.querySelector('input[name="pay-utang-method"]:checked');
   
-  // Pastikan pengambilan namaSupplier dilakukan sebelum payload dibuat
-  const elSupplier = document.querySelector('.modal-supplier-name');
-  const namaSupplier = elSupplier ? elSupplier.innerText : 'Supplier';
+  if (!selectedRadio) {
+    return alert("Silahkan pilih Metode Pembayaran terlebih dahulu!");
+  }
+  
+  const metode = selectedRadio.value;
+  // --------------------------------------------------
 
-  // DEFINISIKAN payload terlebih dahulu
+  // Mengambil nama supplier dari elemen display di modal
+  // Pastikan di HTML bayarUtang, elemen nama supplier memiliki class ini atau sesuaikan selector-nya
+  const elSupplier = document.querySelector('.modal-supplier-name') || { innerText: 'Supplier' };
+  const namaSupplier = elSupplier.innerText;
+
+  // DEFINISIKAN payload
   const payload = {
     action: 'processTransaction',
     type: 'BAYAR_UTANG',
@@ -1790,17 +1799,17 @@ async function eksekusiPelunasanUtang(id, nominal) {
   // Sembunyikan modal
   closeModal(); 
   
-  // Jalankan runScript menggunakan payload yang sudah didefinisikan di atas
   try {
-    // Pastikan fungsi runScript sudah tersedia di scope global
+    // Jalankan runScript menggunakan payload yang sudah didefinisikan
     await runScript('processTransaction', payload, 'riwayat');
     
-    // Refresh list utang jika fungsi tersedia
+    // Refresh list utang jika fungsi tersedia agar sisa utang langsung terupdate di layar
     if (typeof fetchUtangList === 'function') {
       fetchUtangList();
     }
   } catch (error) {
     console.error("Gagal eksekusi utang:", error);
+    alert("Terjadi kesalahan saat memproses pelunasan.");
   }
 }
 
@@ -1862,11 +1871,10 @@ async function fetchUtangList() {
 }
 
 async function bayarUtang(idUtang, sisaLama, namaSupplier) {
-  // 1. Pastikan modal utama muncul (Gunakan ID yang ada di index.html Anda)
   const modal = document.getElementById('general-modal');
   const content = document.getElementById('modalContent');
   
-  if (modal) modal.classList.remove('hidden'); // Membuka modal
+  if (modal) modal.classList.remove('hidden'); 
   
   content.innerHTML = `
     <div class="flex flex-col items-center py-10">
@@ -1879,7 +1887,6 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier) {
     const detailRaw = await response.json();
     let items = typeof detailRaw === 'string' ? JSON.parse(detailRaw) : detailRaw;
 
-    // ... (kode itemsHtml tetap sama seperti punya Anda) ...
     let itemsHtml = `<div class="mt-4 py-4 border-t border-dashed border-slate-200 text-center"><p class="text-[10px] text-slate-400">Rincian barang tidak tersedia</p></div>`;
     if (Array.isArray(items) && items.length > 0) {
       itemsHtml = `
@@ -1924,14 +1931,26 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier) {
 
         <div class="space-y-3 pt-2">
           <div>
-            <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Metode Pembayaran</label>
-            <select id="pay_utang_metode" class="w-full mt-1 p-3.5 border-2 border-slate-100 rounded-xl font-bold bg-slate-50 text-slate-800 outline-none focus:border-red-300 transition-all appearance-none">
-              <option value="Cash">Cash (Tunai)</option>
-              <option value="Rekening">Rekening (Transfer)</option>
-            </select>
+            <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 block">Metode Pembayaran</label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="cursor-pointer group">
+                <input type="radio" name="pay-utang-method" value="Cash" class="hidden peer">
+                <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-red-500 peer-checked:bg-red-50 group-active:scale-95">
+                  <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-red-600"></i>
+                  <span class="text-sm font-bold text-slate-600 peer-checked:text-red-700">Cash</span>
+                </div>
+              </label>
+              <label class="cursor-pointer group">
+                <input type="radio" name="pay-utang-method" value="Rekening" class="hidden peer">
+                <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-red-500 peer-checked:bg-red-50 group-active:scale-95">
+                  <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-red-600"></i>
+                  <span class="text-sm font-bold text-slate-600 peer-checked:text-red-700">Rekening</span>
+                </div>
+              </label>
+            </div>
           </div>
           
-          <div class="flex gap-2">
+          <div class="flex gap-2 pt-2">
             <button onclick="closeModal()" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl active:scale-95 transition-transform">Batal</button>
             <button onclick="eksekusiPelunasanUtang('${idUtang}', ${sisaLama})" 
                     class="flex-[2] py-4 bg-red-600 text-white font-bold rounded-2xl shadow-lg shadow-red-200 active:scale-95 transition-all">
@@ -1946,7 +1965,6 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier) {
     content.innerHTML = `<div class="p-10 text-center text-red-500 font-bold">Error: ${e.message}</div>`;
   }
 }
-
 
 
 
