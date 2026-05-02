@@ -1077,7 +1077,7 @@ content.style.opacity = "0";
             <label class="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-2 block">Metode Pembayaran</label>
             <div class="grid grid-cols-2 gap-3">
               <label class="cursor-pointer group">
-                <input type="radio" name="payment-method" value="Cash" class="hidden peer" checked>
+                <input type="radio" name="payment-method" value="Cash" class="hidden peer">
                 <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
                   <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-blue-600"></i>
                   <span class="text-sm font-bold text-slate-600 peer-checked:text-blue-700">Cash</span>
@@ -1121,84 +1121,123 @@ content.style.opacity = "0";
     lucide.createIcons();
     addItem(false);
 }
-  else if (tab === 'pembelian') {
-    menuContainer.innerHTML = `
-      <div class="space-y-4 page-transition">
-        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="truck" class="text-red-600"></i> Pembelian Barang</h2>
-        <div class="space-y-4">
-          <input id="b_supp" type="text" placeholder="NAMA SUPPLIER" 
-                 oninput="this.value = this.value.toUpperCase()"
-                 class="w-full p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-red-500 outline-none font-medium">
-          
-          <div class="py-2">
-  <div class="border-t border-b border-slate-200 py-3">
-    <p class="text-[10px] font-bold mb-3 text-slate-400 uppercase tracking-widest text-center">Daftar Barang</p>
-    
-    <div id="itemContainer" class="space-y-0"></div>
-
-    <button onclick="addItem(true)" class="w-full mt-2 p-3 bg-red-50 text-red-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-transform">
-      <i data-lucide="plus-circle" class="w-4 h-4"></i> TAMBAH BARANG
-    </button>
-  </div>
-</div>
-
-          <select id="b_metode" class="w-full p-3 bg-slate-50 border-none rounded-xl bg-white font-bold text-slate-700 focus:ring-2 focus:ring-red-500 outline-none appearance-none">
-            <option value="Cash">Cash</option>
-            <option value="Rekening">Rekening</option>
-          </select>
-
-          <div>
-            <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Bayar Sekarang (DP)</label>
-            <input id="b_dp" type="text" inputmode="numeric" oninput="maskNominal(this); calcTotal()" placeholder="0" class="w-full p-4 bg-red-50 border-2 border-red-100 rounded-2xl text-xl font-extrabold text-red-600 focus:ring-4 focus:ring-red-100 outline-none accounting">
+else if (tab === 'pembelian') {
+  menuContainer.innerHTML = `
+    <div class="space-y-4 page-transition">
+      <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+        <i data-lucide="truck" class="text-red-600"></i> Pembelian Barang
+      </h2>
+      
+      <div class="space-y-4">
+        <input id="b_supp" type="text" placeholder="NAMA SUPPLIER" 
+               oninput="this.value = this.value.toUpperCase()"
+               class="w-full p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-red-500 outline-none font-medium">
+        
+        <div class="py-2">
+          <div class="border-t border-b border-slate-200 py-3">
+            <p class="text-[10px] font-bold mb-3 text-slate-400 uppercase tracking-widest text-center">Daftar Barang</p>
+            <div id="itemContainer" class="space-y-0"></div>
+            <button onclick="addItem(true)" class="w-full mt-2 p-3 bg-red-50 text-red-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-transform">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i> TAMBAH BARANG
+            </button>
           </div>
-
-          <div class="bg-red-50 p-4 rounded-2xl border border-red-100 flex justify-between items-center">
-            <span class="font-bold text-red-800">Total Belanja:</span>
-            <span id="b_final" class="text-xl font-black text-red-700 tracking-tight">Rp 0</span>
-          </div>
-
-          <button onclick="savePembelian()" class="w-full bg-red-600 text-white p-4 rounded-2xl font-extrabold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
-             <i data-lucide="save" class="w-5"></i> SIMPAN PEMBELIAN
-          </button>
         </div>
-      </div>
-    `;
-    addItem(false);
-  }
-  else if (tab === 'operasional') {
-    menuContainer.innerHTML = `
-      <div class="space-y-4 page-transition">
-        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="calculator" class="text-orange-600"></i> Pengeluaran Biaya</h2>
-        <div class="space-y-4">
-          <select id="op_metode" class="w-full p-3 bg-slate-50 border-none rounded-xl bg-white font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none appearance-none">
-            <option value="Cash">Metode: Cash</option>
-            <option value="Rekening">Metode: Rekening</option>
-          </select>
-          
-          <div class="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl">
-            <input type="checkbox" id="is_refund" class="w-6 h-6 accent-red-600 cursor-pointer">
-            <label for="is_refund" class="text-xs font-bold text-red-700 cursor-pointer">Ini adalah Dana Refund (Pengembalian)</label>
-          </div>
 
-          <div>
-            <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Nominal Pengeluaran</label>
-            <input id="op_nom" type="text" inputmode="numeric" oninput="maskNominal(this)" placeholder="0" 
-                   class="w-full p-4 bg-slate-50 border-none rounded-2xl text-xl font-extrabold text-slate-800 focus:ring-4 focus:ring-slate-100 outline-none accounting">
+        <!-- Update: Metode Pembayaran Card Style -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 tracking-widest">Metode Pembayaran</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="cursor-pointer group">
+              <input type="radio" name="payment-method-beli" value="Cash" class="hidden peer">
+              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-red-500 peer-checked:bg-red-50 group-active:scale-95">
+                <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-red-600"></i>
+                <span class="text-sm font-bold text-slate-600 peer-checked:text-red-700">Cash</span>
+              </div>
+            </label>
+            <label class="cursor-pointer group">
+              <input type="radio" name="payment-method-beli" value="Rekening" class="hidden peer">
+              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-red-500 peer-checked:bg-red-50 group-active:scale-95">
+                <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-red-600"></i>
+                <span class="text-sm font-bold text-slate-600 peer-checked:text-red-700">Rekening</span>
+              </div>
+            </label>
           </div>
-
-          <div>
-            <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Keterangan</label>
-            <textarea id="op_ket" placeholder="Tulis rincian pengeluaran..." 
-                      class="w-full p-4 bg-slate-50 border-none rounded-2xl h-32 focus:ring-4 focus:ring-slate-100 outline-none font-medium"></textarea>
-          </div>
-
-          <button onclick="saveOperasional()" class="w-full bg-slate-800 text-white p-4 rounded-2xl font-extrabold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
-             <i data-lucide="send" class="w-5"></i> SIMPAN PENGELUARAN
-          </button>
         </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Bayar Sekarang (DP)</label>
+          <input id="b_dp" type="text" inputmode="numeric" oninput="maskNominal(this); calcTotal()" placeholder="0" class="w-full p-4 bg-red-50 border-2 border-red-100 rounded-2xl text-xl font-extrabold text-red-600 focus:ring-4 focus:ring-red-100 outline-none accounting">
+        </div>
+
+        <div class="bg-red-50 p-4 rounded-2xl border border-red-100 flex justify-between items-center">
+          <span class="font-bold text-red-800">Total Belanja:</span>
+          <span id="b_final" class="text-xl font-black text-red-700 tracking-tight">Rp 0</span>
+        </div>
+
+        <button onclick="savePembelian()" class="w-full bg-red-600 text-white p-4 rounded-2xl font-extrabold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
+           <i data-lucide="save" class="w-5"></i> SIMPAN PEMBELIAN
+        </button>
       </div>
-    `;
-  }
+    </div>
+  `;
+  
+  lucide.createIcons(); // Penting: Agar ikon muncul
+  addItem(false);
+}
+ else if (tab === 'operasional') {
+  menuContainer.innerHTML = `
+    <div class="space-y-4 page-transition">
+      <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+        <i data-lucide="calculator" class="text-orange-600"></i> Pengeluaran Biaya
+      </h2>
+      
+      <div class="space-y-4">
+        <!-- Update: Metode Pembayaran Card Style -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 tracking-widest">Metode Pembayaran</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="cursor-pointer group">
+              <input type="radio" name="payment-method-op" value="Cash" class="hidden peer">
+              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-orange-500 peer-checked:bg-orange-50 group-active:scale-95">
+                <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-orange-600"></i>
+                <span class="text-sm font-bold text-slate-600 peer-checked:text-orange-700">Cash</span>
+              </div>
+            </label>
+            <label class="cursor-pointer group">
+              <input type="radio" name="payment-method-op" value="Rekening" class="hidden peer">
+              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-orange-500 peer-checked:bg-orange-50 group-active:scale-95">
+                <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-orange-600"></i>
+                <span class="text-sm font-bold text-slate-600 peer-checked:text-orange-700">Rekening</span>
+              </div>
+            </label>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl">
+          <input type="checkbox" id="is_refund" class="w-6 h-6 accent-red-600 cursor-pointer">
+          <label for="is_refund" class="text-xs font-bold text-red-700 cursor-pointer">Ini adalah Dana Refund (Pengembalian)</label>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Nominal Pengeluaran</label>
+          <input id="op_nom" type="text" inputmode="numeric" oninput="maskNominal(this)" placeholder="0" 
+                 class="w-full p-4 bg-slate-50 border-none rounded-2xl text-xl font-extrabold text-slate-800 focus:ring-4 focus:ring-slate-100 outline-none accounting">
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Keterangan</label>
+          <textarea id="op_ket" placeholder="Tulis rincian pengeluaran..." 
+                    class="w-full p-4 bg-slate-50 border-none rounded-2xl h-32 focus:ring-4 focus:ring-slate-100 outline-none font-medium"></textarea>
+        </div>
+
+        <button onclick="saveOperasional()" class="w-full bg-slate-800 text-white p-4 rounded-2xl font-extrabold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
+           <i data-lucide="send" class="w-5"></i> SIMPAN PENGELUARAN
+        </button>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
   else if (tab === 'lainnya') {
     menuContainer.innerHTML = `
       <div class="space-y-6 page-transition">
@@ -1565,32 +1604,34 @@ function savePenjualan() {
   if(items.length === 0) return alert("Pilih barang terlebih dahulu!");
   
   // --- ATURAN KHUSUS: TARIK DANA SHOPEE ---
-  // Kita cek apakah ada item yang mengandung nama "Tarik Dana Shopee"
   const shopeeItems = items.filter(item => 
     item.nama.toLowerCase().includes("tarik dana shopee")
   );
 
   if (shopeeItems.length > 0) {
-    // Aturan 1: Tidak boleh ada lebih dari 1 jenis barang jika itu Tarik Dana Shopee
     if (items.length > 1) {
       return alert("Transaksi 'Tarik Dana Shopee' tidak boleh digabung dengan barang lain!");
     }
     
-    // Aturan 2: Qty barang tersebut tidak boleh lebih dari 1
     if (shopeeItems[0].qty > 1) {
       return alert("Jumlah (Qty) untuk 'Tarik Dana Shopee' maksimal hanya 1!");
     }
   }
   // ----------------------------------------
 
+  // --- VALIDASI METODE PEMBAYARAN (Update Baru) ---
+  const selectedRadio = document.querySelector('input[name="payment-method"]:checked');
+  if (!selectedRadio) {
+    return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
+  }
+  // ------------------------------------------------
+
   const shopInitial = currentShop.nama ? currentShop.nama.charAt(0).toUpperCase() : '?';
   const inputPelanggan = (document.getElementById('p_cust').value || 'UMUM').toUpperCase();
   const pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
   
-  // Logika otomatis keterangan
- let keteranganOtomatis = `Penjualan Ke ${pelangganFormatted}`;
+  let keteranganOtomatis = `Penjualan Ke ${pelangganFormatted}`;
 
-  // Cari item menggunakan find agar bisa mengambil nama aslinya jika cocok
   const shopee1 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee1");
   const shopee2 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee2");
 
@@ -1608,18 +1649,25 @@ function savePenjualan() {
     items: items,
     diskon: unmask(document.getElementById('p_disc').value),
     dp: unmask(document.getElementById('p_dp').value),
-    metode: document.querySelector('input[name="payment-method"]:checked').value
+    // Mengambil nilai dari radio yang terpilih
+    metode: selectedRadio.value 
   };
   
   payload.total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
   runScript('processTransaction', payload, 'penjualan');
 }
-
     
 
-  function savePembelian() {
+ function savePembelian() {
   const items = collectItems();
   if(items.length === 0) return alert("Daftar belanja kosong!");
+  
+  // --- VALIDASI METODE PEMBAYARAN (Wajib Pilih) ---
+  const selectedRadioBeli = document.querySelector('input[name="payment-method-beli"]:checked');
+  if (!selectedRadioBeli) {
+    return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
+  }
+  // ------------------------------------------------
   
   const supplier = (document.getElementById('b_supp').value || '-').toUpperCase();
   const total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
@@ -1628,35 +1676,49 @@ function savePenjualan() {
     action: 'processTransaction',
     type: 'PEMBELIAN',
     supplier: supplier,
-    // Tambahkan keterangan di sini agar terbaca oleh sistem riwayat
+    // Keterangan otomatis untuk riwayat
     ket: `PEMBELIAN DARI ${supplier}`, 
     items: items,
     total: total,
     dp: unmask(document.getElementById('b_dp').value),
-    metode: document.getElementById('b_metode').value
+    // Mengambil nilai dari radio button yang dipilih
+    metode: selectedRadioBeli.value
   };
   
   runScript('processTransaction', payload, 'pembelian');
 }
 
-    async function saveOperasional() {
-      const elNom = document.getElementById('op_nom');
-      const elKet = document.getElementById('op_ket');
-      const nominal = unmask(elNom?.value);
-      const keterangan = elKet?.value.trim();
-      const isRefund = document.getElementById('is_refund')?.checked;
+   async function saveOperasional() {
+  const elNom = document.getElementById('op_nom');
+  const elKet = document.getElementById('op_ket');
+  const nominal = unmask(elNom?.value);
+  const keterangan = elKet?.value.trim();
+  const isRefund = document.getElementById('is_refund')?.checked;
 
-      if (nominal <= 0 || !keterangan) return alert("Nominal dan keterangan wajib diisi.");
-      
-      const payload = {
-        action: "saveOperasional", 
-        type: isRefund ? "PENGEMBALIAN_DANA" : "OPERASIONAL",
-        nominal: nominal,
-        ket: isRefund ? "[REFUND] " + keterangan : keterangan,
-        metode: document.getElementById('op_metode').value
-      };
-      runScript('saveOperasional', payload, 'operasional');
-    }
+  // --- VALIDASI METODE PEMBAYARAN (Update Baru) ---
+  // Mencari radio button yang dipilih dalam grup 'payment-method-op'
+  const selectedRadioOp = document.querySelector('input[name="payment-method-op"]:checked');
+  
+  if (nominal <= 0 || !keterangan) {
+    return alert("Nominal dan keterangan wajib diisi.");
+  }
+
+  if (!selectedRadioOp) {
+    return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
+  }
+  // ------------------------------------------------
+
+  const payload = {
+    action: "saveOperasional", 
+    type: isRefund ? "PENGEMBALIAN_DANA" : "OPERASIONAL",
+    nominal: nominal,
+    ket: isRefund ? "[REFUND] " + keterangan.toUpperCase() : keterangan.toUpperCase(),
+    // Mengambil nilai dari radio card yang terpilih
+    metode: selectedRadioOp.value
+  };
+
+  runScript('saveOperasional', payload, 'operasional');
+}
 
   function showMenuAction(type, element) {
   const container = document.getElementById('action-form-container');
@@ -2009,12 +2071,30 @@ async function bayarPiutang(id, sisa, nama) {
 
         <div class="space-y-3 pt-2">
           <div>
-            <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Metode Penerimaan</label>
-            <select id="pi_metode" onchange="toggleShopeeInput()" class="w-full mt-1 p-3.5 border-2 border-slate-100 rounded-xl font-bold bg-slate-50 text-slate-800 outline-none focus:border-purple-300 transition-all appearance-none">
-              <option value="Cash">Cash (Tunai)</option>
-              <option value="Rekening">Rekening (Transfer)</option>
-              <option value="Shopee">Shopee</option>
-            </select>
+            <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 block">Metode Penerimaan</label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="cursor-pointer group">
+                <input type="radio" name="pi-method" value="Cash" class="hidden peer" onchange="toggleShopeeInput()">
+                <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-purple-500 peer-checked:bg-purple-50 group-active:scale-95">
+                  <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-purple-600"></i>
+                  <span class="text-[10px] font-bold text-slate-600 peer-checked:text-purple-700 mt-1">Cash</span>
+                </div>
+              </label>
+              <label class="cursor-pointer group">
+                <input type="radio" name="pi-method" value="Rekening" class="hidden peer" onchange="toggleShopeeInput()">
+                <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-purple-500 peer-checked:bg-purple-50 group-active:scale-95">
+                  <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-purple-600"></i>
+                  <span class="text-[10px] font-bold text-slate-600 peer-checked:text-purple-700 mt-1">Transfer</span>
+                </div>
+              </label>
+              <label class="cursor-pointer group">
+                <input type="radio" name="pi-method" value="Shopee" class="hidden peer" onchange="toggleShopeeInput()">
+                <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-purple-500 peer-checked:bg-purple-50 group-active:scale-95">
+                  <i data-lucide="shopping-bag" class="w-4 h-4 text-slate-400 peer-checked:text-purple-600"></i>
+                  <span class="text-[10px] font-bold text-slate-600 peer-checked:text-purple-700 mt-1">Shopee</span>
+                </div>
+              </label>
+            </div>
           </div>
 
           <div id="shopee_ref_container" class="hidden animate-in fade-in slide-in-from-top-2">
@@ -2022,7 +2102,7 @@ async function bayarPiutang(id, sisa, nama) {
             <input type="text" id="pi_shope_ref" placeholder="Masukkan nomor pesanan..." class="w-full mt-1 p-3.5 border-2 border-orange-100 rounded-xl font-bold bg-orange-50 text-slate-800 outline-none focus:border-orange-400 transition-all">
           </div>
           
-          <div class="flex gap-2">
+          <div class="flex gap-2 pt-2">
             <button onclick="closeModal()" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl active:scale-95 transition-transform">Batal</button>
             <button onclick="saveBayarPiutang('${id}', ${sisa})" 
                     class="flex-[2] py-4 bg-purple-600 text-white font-bold rounded-2xl shadow-lg shadow-purple-200 active:scale-95 transition-all">
@@ -2039,15 +2119,32 @@ async function bayarPiutang(id, sisa, nama) {
 }
 
 function toggleShopeeInput() {
-  const m = document.getElementById('pi_metode').value;
+  // Mencari nilai dari radio button yang dipilih
+  const selectedRadio = document.querySelector('input[name="pi-method"]:checked');
+  const m = selectedRadio ? selectedRadio.value : "";
   const container = document.getElementById('shopee_ref_container');
+  
   m === 'Shopee' ? container.classList.remove('hidden') : container.classList.add('hidden');
 }
 
-async function saveBayarPiutang(id, sisa) {
+    async function saveBayarPiutang(id, sisa) {
   const namaAsli = document.getElementById('pi_nama_display')?.innerText || 'PELANGGAN';
-  const metodePilihan = document.getElementById('pi_metode').value;
+  
+  // Ambil elemen radio yang terpilih
+  const selectedRadio = document.querySelector('input[name="pi-method"]:checked');
   const noShopee = document.getElementById('pi_shope_ref').value;
+
+  // Validasi: Harus pilih metode
+  if (!selectedRadio) {
+    return alert("Silahkan pilih Metode Penerimaan (Cash, Transfer, atau Shopee)!");
+  }
+
+  const metodePilihan = selectedRadio.value;
+
+  // Validasi: Jika Shopee, nomor referensi wajib diisi
+  if (metodePilihan === 'Shopee' && !noShopee) {
+    return alert("Untuk metode Shopee, No. Transaksi wajib diisi!");
+  }
 
   // Gabungkan nama jika via Shopee
   let namaPelanggan = namaAsli;
@@ -2067,8 +2164,6 @@ async function saveBayarPiutang(id, sisa) {
   closeModal(); 
   await runScript('processTransaction', payload, 'riwayat');
 }
-
-
 
 // --- LOGIKA TRANSFER KAS ---
 function showTransferForm() {
