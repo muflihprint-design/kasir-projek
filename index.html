@@ -250,7 +250,8 @@ display: block !important;
         <i data-lucide="search" class="absolute left-3 top-3.5 w-4 h-4 text-slate-400"></i>
         <input type="text" id="modal-search" placeholder="Cari di stok atau ketik nama baru..." 
                class="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-               oninput="this.value = this.value.toUpperCase(); filterProducts()">
+          onkeypress="return event.charCode != 44"     
+          oninput="this.value = this.value.toUpperCase(); filterProducts()">
       </div>
       <div id="product-list" class="space-y-2 overflow-y-auto pr-1 mb-4 flex-1 min-h-[200px]">
         <!-- List barang dari sheet akan muncul di sini -->
@@ -1063,7 +1064,8 @@ content.style.opacity = "0";
         </h2>
         
         <div class="grid grid-cols-1 gap-2">
-          <input id="p_cust" type="text" placeholder="NAMA PELANGGAN" 
+          <input id="p_cust" type="text" placeholder="NAMA PELANGGAN"
+          onkeypress="return event.charCode != 44"
             oninput="this.value = this.value.toUpperCase()"
             class="w-full p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium">
         </div>
