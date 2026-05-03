@@ -574,35 +574,38 @@ function initRiwayatStructure() {
       <!-- Header Section -->
       <div class="p-4 bg-white border-b border-slate-50 flex flex-col gap-3">
         
-        <!-- Row 1: Time Filters & Export (Export filling remaining space) -->
-        <div class="flex items-center gap-2">
-          <div class="flex items-center gap-1 p-1 bg-slate-100 rounded-full shrink-0">
-            <button onclick="setFilter('today')" id="f-today" class="px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Hari Ini</button>
-            <button onclick="setFilter('month')" id="f-month" class="px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Bulan Ini</button>
-            <button onclick="setFilter('all')" id="f-all" class="px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Semua</button>
-          </div>
+        <!-- Row: Combined Filters & Date Picker -->
+        <!-- md:flex-row akan membuat semua jadi satu baris di layar desktop -->
+        <div class="flex flex-col md:flex-row items-center gap-2">
           
-          <button onclick="downloadExcel()" class="flex-1 flex items-center justify-center gap-2 h-9 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-500 hover:text-white transition-all duration-300 shadow-sm border border-emerald-100 px-4">
-            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-            <span class="text-[10px] font-bold uppercase tracking-wider">Excel</span>
-          </button>
+          <!-- Group 1: Time Filters & Excel Icon -->
+          <div class="flex items-center gap-1 p-1 bg-slate-100 rounded-full w-full md:w-auto">
+            <div class="flex items-center gap-1 flex-1 md:flex-none">
+              <button onclick="setFilter('today')" id="f-today" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Hari Ini</button>
+              <button onclick="setFilter('month')" id="f-month" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Bulan Ini</button>
+              <button onclick="setFilter('all')" id="f-all" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Semua</button>
+            </div>
+            
+            <!-- Tombol Excel Hanya Ikon -->
+            <button onclick="downloadExcel()" class="w-8 h-8 flex items-center justify-center bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-all shadow-sm shrink-0" title="Ekspor Excel">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Group 2: Date Picker Range (Wider for Year) -->
+          <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus-within:border-blue-300 transition-all justify-center w-full md:w-auto">
+            <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
+            <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
+              <input type="date" id="f-date-start" onchange="checkManualDateChange()" 
+                  class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
+              <span class="text-slate-300 font-sans">—</span>
+              <input type="date" id="f-date-end" onchange="checkManualDateChange()" 
+                  class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
+            </div>
+          </div>
         </div>
 
-        <!-- Row 2: Date Picker Range (Adjusted Width for Year) -->
-<div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus-within:border-blue-300 transition-all justify-center">
-  <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
-  <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
-    <input type="date" id="f-date-start" onchange="checkManualDateChange()" 
-        class="bg-transparent outline-none border-none w-[130px] cursor-pointer text-center focus:text-blue-600">
-    
-    <span class="text-slate-300 font-sans px-1">—</span>
-    
-    <input type="date" id="f-date-end" onchange="checkManualDateChange()" 
-        class="bg-transparent outline-none border-none w-[130px] cursor-pointer text-center focus:text-blue-600">
-  </div>
-</div>
-
-        <!-- Row 3: Search Input (Full Width) -->
+        <!-- Row: Search Input -->
         <div class="relative w-full group">
           <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
             <i data-lucide="search" class="w-4 h-4"></i>
@@ -613,21 +616,19 @@ function initRiwayatStructure() {
         </div>
       </div>
 
-      <!-- Navigation Tabs: Payment Method -->
+      <!-- Rest of the UI (Tabs, List Container, etc.) tetap sama -->
       <div class="bg-slate-50/50 flex border-b border-slate-100">
         <button onclick="setView('Cash')" id="v-cash" class="flex-1 py-3 text-[10px] font-black text-slate-400 border-b-2 border-transparent tracking-tighter">CASH</button>
         <button onclick="setView('Rekening')" id="v-bank" class="flex-1 py-3 text-[10px] font-black text-slate-400 border-b-2 border-transparent tracking-tighter">REKENING</button>
         <button onclick="setView('Semua')" id="v-all" class="flex-1 py-3 text-[10px] font-black text-slate-400 border-b-2 border-transparent tracking-tighter">SEMUA</button>
       </div>
 
-      <!-- Category Filter Tabs: Masuk/Keluar -->
       <div class="flex bg-white border-b border-slate-100 p-1.5 gap-1.5">
         <button onclick="setCategory('SEMUA')" id="cat-semua" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Semua</button>
         <button onclick="setCategory('MASUK')" id="cat-masuk" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Masuk</button>
         <button onclick="setCategory('KELUAR')" id="cat-keluar" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Keluar</button>
       </div>
 
-      <!-- List Content -->
       <div id="listContainer" class="bg-slate-50/20 divide-y divide-slate-50 max-h-[550px] overflow-y-auto pb-10 custom-scrollbar"></div>
     </div>
   `;
