@@ -712,13 +712,13 @@ async function fetchTransactions() {
     
     div.innerHTML = `
       <div class="flex-1 pr-4">
+        <p class="font-bold text-xs text-slate-800 leading-tight">${t.ket}</p>
         <div class="flex items-center gap-2 mb-0.5">
           <p class="text-[10px] text-gray-400 font-mono">${t.id}</p>
           <span class="text-[10px] text-slate-300">•</span>
           <p class="text-[10px] text-slate-500 font-semibold">${tgl}</p>
         </div>
-        <p class="font-bold text-xs text-slate-800 leading-tight">${t.ket}</p>
-        <div class="flex items-center gap-2 mt-1.5">
+          <div class="flex items-center gap-2 mt-1.5">
           <span class="text-[9px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold uppercase">${t.kat}</span>
           <span class="text-[10px] text-gray-400 font-medium flex items-center gap-1">
             <i data-lucide="clock" class="w-2.5 h-2.5"></i> ${jamMenit}
