@@ -1525,7 +1525,7 @@ window.selectProduct = selectProduct;
       if (elFinalPembelian) elFinalPembelian.innerText = "Rp " + new Intl.NumberFormat('id-ID').format(subtotal);
     }
 
-  function collectItems() {
+ function collectItems() {
   const itemsData = [];
   document.querySelectorAll('[id^="item-"]').forEach(el => {
     const inputNama = el.querySelector('.item-name');
@@ -1534,21 +1534,28 @@ window.selectProduct = selectProduct;
     const nama = inputNama.value.toUpperCase();
     const harga = unmask(el.querySelector('.item-price').value);
     
-    // AMBIL NILAI KATEGORI DARI INPUT
+    // 1. Ambil nilai Qty mentah dari input
+    let qtyRaw = el.querySelector('.qty-input').value || "1";
+    
+    // 2. Bersihkan input: Ubah koma (,) menjadi titik (.) agar bisa diproses parseFloat
+    let qtyClean = qtyRaw.toString().replace(',', '.');
+    
+    // 3. Konversi ke angka desimal murni
+    let qtyFinal = parseFloat(qtyClean) || 0;
+
     const kategori = el.querySelector('.item-category').value.toUpperCase() || "-";
 
     if (nama && nama !== "PILIH BARANG STOK...") {
       itemsData.push({
         nama: nama,
-        qty: parseFloat(el.querySelector('.qty-input').value) || 1,
+        qty: qtyFinal, // Mengirim angka valid ke JSON
         harga: harga,
-        kategori: kategori // <-- SEKARANG KATEGORI MASUK KE OBJEK ITEM
+        kategori: kategori
       });
     }
   });
   return itemsData;
 }
-
     
    async function runScript(actionName, payload, stayInTab) {
   const btn = document.querySelector('button[onclick*="save"]');
