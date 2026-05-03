@@ -553,55 +553,67 @@ window.addEventListener('click', function(event) {
    function initRiwayatStructure() {
   const container = document.getElementById('riwayat-container');
   container.innerHTML = `
-    <div class="overflow-hidden bg-white rounded-3xl border shadow-sm">
-      <div class="p-4 border-b flex flex-col gap-3">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                           <div class="flex flex-wrap gap-1 text-[10px] items-center">
-                <button onclick="setFilter('today')" id="f-today" class="px-3 py-1 bg-blue-600 text-white rounded-full transition">Hari Ini</button>
-                <button onclick="setFilter('month')" id="f-month" class="px-3 py-1 bg-gray-100 rounded-full transition">Bulan Ini</button>
-                <button onclick="setFilter('all')" id="f-all" class="px-3 py-1 bg-gray-100 rounded-full transition">Semua</button>
-               <div class="flex items-center gap-0.5 bg-slate-100 border rounded-full px-2 py-0.5 ml-0.5 scale-95 origin-left">
-    <input type="date" id="f-date-start" onchange="checkManualDateChange()" 
-        class="bg-transparent outline-none border-none text-[9px] w-[135px] cursor-pointer font-semibold text-slate-600">
-    
-    <span class="text-gray-400 text-[9px] font-bold mx-1">-</span>
-    
-    <input type="date" id="f-date-end" onchange="checkManualDateChange()" 
-        class="bg-transparent outline-none border-none text-[9px] w-[135px] cursor-pointer font-semibold text-slate-600">
-</div>
-              </div>
-            </div>
-            <div class="flex gap-2 items-center">
-              <div class="relative flex-1">
-  <span class="absolute inset-y-0 left-3 flex items-center text-gray-400">
-    <i data-lucide="search" class="w-3.5 h-3.5"></i>
-  </span>
-  <input type="text" id="searchInput" oninput="renderTransactions()" 
-    placeholder="ID, Keterangan, Produk" 
-    class="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-medium outline-none focus:ring-2 focus:ring-blue-100 h-8">
-</div>
-              <button onclick="downloadExcel()" class="px-4 py-2 bg-green-600 text-white rounded-lg flex items-center gap-2 h-[40px]"><i data-lucide="download" class="w-4 h-4"></i></button>
-            </div>
+    <div class="overflow-hidden bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50">
+      <!-- Header Section: Filter & Search -->
+      <div class="p-5 bg-white border-b border-slate-50 flex flex-col gap-4">
+        
+        <!-- Row 1: Time Filters -->
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-full w-fit">
+            <button onclick="setFilter('today')" id="f-today" class="px-4 py-1.5 text-[11px] font-bold rounded-full transition-all duration-200">Hari Ini</button>
+            <button onclick="setFilter('month')" id="f-month" class="px-4 py-1.5 text-[11px] font-bold rounded-full transition-all duration-200">Bulan Ini</button>
+            <button onclick="setFilter('all')" id="f-all" class="px-4 py-1.5 text-[11px] font-bold rounded-full transition-all duration-200">Semua</button>
           </div>
-          <div>
-            <div class="flex border-b text-sm">
-              <button onclick="setView('Cash')" id="v-cash" class="flex-1 py-3 font-semibold text-gray-500 hover:bg-gray-50 transition border-b-2 border-transparent">Cash</button>
-              <button onclick="setView('Rekening')" id="v-bank" class="flex-1 py-3 font-semibold text-gray-500 hover:bg-gray-50 transition border-b-2 border-transparent">Rekening</button>
-              <button onclick="setView('Semua')" id="v-all" class="flex-1 py-3 font-semibold border-b-2 border-blue-600 text-blue-600 transition">Semua</button>
-            </div>
-          <div class="flex border-b text-[10px] uppercase tracking-wider font-bold text-slate-400 no-scrollbar overflow-x-auto bg-slate-50/50">
-  <button onclick="setCategory('SEMUA')" id="cat-semua" class="flex-1 min-w-[80px] py-2 border-b-2 border-blue-500 text-blue-600 bg-white font-bold transition">Semua</button>
-  <button onclick="setCategory('MASUK')" id="cat-masuk" class="flex-1 min-w-[80px] py-2 border-b-2 border-transparent hover:bg-gray-50 transition">Masuk</button>
-  <button onclick="setCategory('KELUAR')" id="cat-keluar" class="flex-1 min-w-[80px] py-2 border-b-2 border-transparent hover:bg-gray-50 transition">Keluar</button>
-</div>
-            <div id="listContainer" class="divide-y max-h-[500px] overflow-y-auto"></div>
+
+          <!-- Date Picker Range -->
+          <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-3 py-1.5 shadow-sm">
+            <i data-lucide="calendar" class="w-3 h-3 text-slate-400"></i>
+            <input type="date" id="f-date-start" onchange="checkManualDateChange()" 
+                class="bg-transparent outline-none border-none text-[10px] w-[110px] cursor-pointer font-bold text-slate-600">
+            <span class="text-slate-300 text-[10px] font-bold">—</span>
+            <input type="date" id="f-date-end" onchange="checkManualDateChange()" 
+                class="bg-transparent outline-none border-none text-[10px] w-[110px] cursor-pointer font-bold text-slate-600">
           </div>
         </div>
-      `;
-      lucide.createIcons();
-     setFilter('today');
-      fetchTransactions();
-    }
+
+        <!-- Row 2: Search & Export -->
+        <div class="flex gap-2 items-center">
+          <div class="relative flex-1 group">
+            <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
+              <i data-lucide="search" class="w-4 h-4"></i>
+            </span>
+            <input type="text" id="searchInput" oninput="renderTransactions()" 
+              placeholder="Cari ID, Nama Pelanggan, atau Produk..." 
+              class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200 transition-all">
+          </div>
+          <button onclick="downloadExcel()" class="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl flex items-center justify-center transition-colors shadow-lg shadow-emerald-200/50">
+            <i data-lucide="download" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs: Payment Method -->
+      <div class="bg-slate-50/50 flex border-b border-slate-100">
+        <button onclick="setView('Cash')" id="v-cash" class="flex-1 py-3.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition-all border-b-2 border-transparent">CASH</button>
+        <button onclick="setView('Rekening')" id="v-bank" class="flex-1 py-3.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition-all border-b-2 border-transparent">REKENING</button>
+        <button onclick="setView('Semua')" id="v-all" class="flex-1 py-3.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition-all border-b-2 border-transparent">SEMUA</button>
+      </div>
+
+      <!-- Category Filter Tabs: Masuk/Keluar -->
+      <div class="flex no-scrollbar overflow-x-auto bg-white border-b border-slate-100 p-1.5 gap-1.5">
+        <button onclick="setCategory('SEMUA')" id="cat-semua" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Semua</button>
+        <button onclick="setCategory('MASUK')" id="cat-masuk" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Masuk</button>
+        <button onclick="setCategory('KELUAR')" id="cat-keluar" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Keluar</button>
+      </div>
+
+      <!-- List Content -->
+      <div id="listContainer" class="bg-slate-50/30 divide-y divide-slate-50 max-h-[600px] overflow-y-auto pb-10 custom-scrollbar"></div>
+    </div>
+  `;
+  lucide.createIcons();
+  setFilter('today');
+  fetchTransactions();
+}
 
 async function fetchTransactions() {
   if (isDataLoaded && allTransactions.length > 0) {
