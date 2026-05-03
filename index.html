@@ -864,10 +864,10 @@ function showDetail(t) {
   let labelKeterangan = "Keterangan";
   let displayValue = t.ket || '-';
 
-  if (t.kat === 'Penjualan') {
+  if (t.kat === 'PENJUALAN') {
     labelKeterangan = "Pelanggan";
     displayValue = t.sub || '-';
-  } else if (t.kat === 'Pembelian') {
+  } else if (t.kat === 'PEMBELIAN') {
     labelKeterangan = "Supplier";
     displayValue = t.sub || '-';
   }
@@ -890,11 +890,11 @@ function showDetail(t) {
 
   if (items.length > 0) {
     detailHtml = `
-    <div class="mt-6 border rounded-xl overflow-hidden shadow-sm">
-      <div class="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
-          <p class="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Item & Rincian</p>
+    <div class="mt-4 border rounded-xl overflow-hidden shadow-sm">
+      <div class="bg-slate-50 px-3 py-1.5 border-b flex justify-between items-center">
+          <p class="font-bold text-[9px] text-slate-500 uppercase tracking-wider">Item & Rincian</p>
       </div>
-      <table class="w-full text-[10px]">
+      <table class="w-full text-[9px]">
         <thead class="bg-slate-50 border-b text-slate-400">
           <tr>
             <th class="p-2 text-left">Item</th>
@@ -909,10 +909,10 @@ function showDetail(t) {
             return `
             <tr class="bg-white">
               <td class="p-2">
-                <span class="font-medium text-slate-700 text-[10px]">${d.nama}</span>
+                <span class="font-medium text-slate-700">${d.nama}</span>
               </td>
-              <td class="p-2 text-center text-slate-500 text-[9px]">${d.qty}</td>
-              <td class="p-2 text-right font-mono text-slate-600 text-[10px]">${formatRupiah(lineTotal)}</td>
+              <td class="p-2 text-center text-slate-500">${d.qty}</td>
+              <td class="p-2 text-right font-mono text-slate-600">${formatRupiah(lineTotal)}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -924,67 +924,67 @@ function showDetail(t) {
   const totalSetelahDiskon = calculatedSubtotal - diskon;
 
   const rincianBiayaHtml = calculatedSubtotal > 0 ? `
-    <div class="mt-4 p-4 bg-slate-50 border rounded-xl space-y-1.5"> 
-        <div class="flex justify-between items-center text-[10px] text-slate-500">
+    <div class="mt-3 p-3 bg-slate-50 border rounded-xl space-y-1"> 
+        <div class="flex justify-between items-center text-[9px] text-slate-500">
           <span>Subtotal Kotor</span>
           <span>${formatRupiah(calculatedSubtotal)}</span>
         </div>
-        <div class="flex justify-between items-center text-[10px] text-red-500">
+        <div class="flex justify-between items-center text-[9px] text-red-500">
           <span>Potongan Diskon</span>
           <span>- ${formatRupiah(diskon)}</span>
         </div>
-        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200">
-          <span class="text-[9px] font-bold text-blue-600 uppercase">Total Tagihan Akhir</span>
-          <span class="text-sm font-bold text-blue-700">${formatRupiah(totalSetelahDiskon)}</span>
+        <div class="flex justify-between items-center pt-1 border-t border-slate-200">
+          <span class="text-[8px] font-bold text-blue-600 uppercase">Total Akhir</span>
+          <span class="text-[11px] font-bold text-blue-700">${formatRupiah(totalSetelahDiskon)}</span>
         </div>
     </div>
   ` : '';
 
   content.innerHTML = `
     <div class="flex items-center gap-3 mb-4">
-        <div class="p-3 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
-          <i data-lucide="${t.tipe === 'MASUK' ? 'trending-up' : 'trending-down'}"></i>
+        <div class="p-2.5 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
+          <i data-lucide="${t.tipe === 'MASUK' ? 'trending-up' : 'trending-down'}" class="w-5 h-5"></i>
         </div>
         <div>
-          <h2 class="text-lg font-bold">Detail ${t.kat}</h2>
-          <p class="text-xs text-gray-400 font-medium">${t.id}</p>
+          <h2 class="text-base font-bold leading-tight">Detail ${t.kat}</h2>
+          <p class="text-[9px] text-gray-400 font-mono tracking-tighter">${t.id}</p>
         </div>
     </div>
     
-    <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm bg-slate-50 p-4 rounded-xl border mb-4">
+    <div class="grid grid-cols-2 gap-y-2 gap-x-4 bg-slate-50 p-3 rounded-xl border mb-3">
       <div>
-        <p class="text-[10px] text-gray-500 font-bold uppercase">Waktu</p>
-        <p class="font-medium">${t.waktu}</p>
+        <p class="text-[8px] text-gray-400 font-bold uppercase tracking-tight">Waktu Transaksi</p>
+        <p class="text-[10px] font-semibold text-slate-700">${t.waktu}</p>
       </div>
       <div>
-        <p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p>
-        <p class="font-medium">${t.metode}</p>
+        <p class="text-[8px] text-gray-400 font-bold uppercase tracking-tight">Metode Pembayaran</p>
+        <p class="text-[10px] font-semibold text-slate-700">${t.metode}</p>
       </div>
-      <div class="col-span-2 pt-2 border-t">
-        <p class="text-[10px] text-gray-500 font-bold uppercase">${labelKeterangan}</p>
-        <p class="font-bold text-slate-800">${displayValue}</p>
+      <div class="col-span-2 pt-1.5 border-t border-slate-200">
+        <p class="text-[8px] text-gray-400 font-bold uppercase tracking-tight">${labelKeterangan}</p>
+        <p class="text-[11px] font-bold text-slate-800 leading-tight">${displayValue}</p>
       </div>
     </div>
 
     ${rincianBiayaHtml}
 
-    <div class="mt-4 p-3 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
+    <div class="mt-3 p-2.5 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
         <div class="flex flex-col">
-           <span class="text-[9px] font-bold text-slate-400 uppercase">Kas ${t.tipe === 'MASUK' ? 'Diterima' : 'Dibayar'}</span>
-           ${totalSetelahDiskon > (t.masuk || t.keluar) ? '<span class="text-[8px] text-orange-500 font-bold italic leading-none">Dibayar Sebagian (DP)</span>' : ''}
+           <span class="text-[8px] font-bold text-slate-400 uppercase">Total ${t.tipe === 'MASUK' ? 'Diterima' : 'Dibayar'}</span>
+           ${totalSetelahDiskon > (t.masuk || t.keluar) ? '<span class="text-[7px] text-orange-500 font-bold italic leading-none">Status: DP/Sebagian</span>' : ''}
         </div>
-        <span class="text-base font-black text-slate-800">${formatRupiah(t.masuk > 0 ? t.masuk : t.keluar)}</span>
+        <span class="text-sm font-black text-slate-800">${formatRupiah(t.masuk > 0 ? t.masuk : t.keluar)}</span>
     </div>
     
     ${detailHtml}
     
-    <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
-        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+    <div class="mt-5 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-2">
+        <button onclick="closeModal()" class="py-2.5 bg-slate-100 text-slate-600 text-[11px] font-bold rounded-lg hover:bg-slate-200 transition">
           Tutup
         </button>
         ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
-          <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-             <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+          <button onclick="shareNotaJPG('${t.id}', event)" class="py-2.5 bg-green-600 text-white text-[11px] font-bold rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-1.5">
+             <i data-lucide="share-2" class="w-3.5 h-3.5"></i> Nota (JPG)
           </button>
         ` : ''}
     </div>
