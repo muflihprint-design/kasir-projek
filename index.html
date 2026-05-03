@@ -818,29 +818,25 @@ async function checkManualDateChange() {
       renderTransactions();
     }
 
-   function showDetail(t) {
-  // 1. Sinkronisasi ID Modal sesuai fungsi closeModal Anda
+function showDetail(t) {
   const overlay = document.getElementById('general-modal');
   const content = document.getElementById('modalContent');
-     
-  
+
   if (!overlay || !content) {
     console.error("Elemen modal tidak ditemukan!");
     return;
   }
 
   isDetailChanged = false;
-content.style.opacity = "0";
+  content.style.opacity = "0";
+  content.scrollTop = 0;
 
-    // LANGKAH 2: Reset scroll saat modal masih belum terlihat
-    content.scrollTop = 0;
-    
+  // Ubah label "Keterangan" secara dinamis berdasarkan kategori
+  let labelKeterangan = "Keterangan";
+  if (t.kat === 'PENJUALAN') labelKeterangan = "Pelanggan";
+  if (t.kat === 'PEMBELIAN') labelKeterangan = "Supplier";
 
-  let labelSub = "Sub-keterangan";
-  if (t.kat === 'PENJUALAN') labelSub = "Nama Pelanggan";
-  if (t.kat === 'PEMBELIAN') labelSub = "Nama Supplier";
-
-  // 2. Proteksi & Parsing Detail (Mencegah error .map is not a function)
+  // Proteksi & Parsing Detail
   let items = [];
   try {
     if (Array.isArray(t.detail)) {
@@ -856,8 +852,8 @@ content.style.opacity = "0";
   let detailHtml = '';
   let calculatedSubtotal = 0;
 
- if (items.length > 0) {
-  detailHtml = `
+  if (items.length > 0) {
+    detailHtml = `
     <div class="mt-6 border rounded-xl overflow-hidden shadow-sm">
       <div class="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
           <p class="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Item & Rincian</p>
@@ -874,26 +870,26 @@ content.style.opacity = "0";
           ${items.map((d, index) => {
             const lineTotal = (parseFloat(d.qty) || 0) * (parseFloat(d.harga) || 0);
             calculatedSubtotal += lineTotal;
-
             return `
-<tr class="bg-white">
-  <td class="p-2">
-    <span class="font-medium text-slate-700 text-[10px]">${d.nama}</span>
-  </td>
-  <td class="p-2 text-center text-slate-500 text-[9px]">${d.qty}</td>
-  <td class="p-2 text-right font-mono text-slate-600 text-[10px]">${formatRupiah(lineTotal)}</td>
-</tr>`;
+            <tr class="bg-white">
+              <td class="p-2">
+                <span class="font-medium text-slate-700 text-[10px]">${d.nama}</span>
+              </td>
+              <td class="p-2 text-center text-slate-500 text-[9px]">${d.qty}</td>
+              <td class="p-2 text-right font-mono text-slate-600 text-[10px]">${formatRupiah(lineTotal)}</td>
+            </tr>`;
           }).join('')}
         </tbody>
       </table>
     </div>`;
-}
+  }
 
   const diskon = parseFloat(t.diskon) || 0;
   const totalSetelahDiskon = calculatedSubtotal - diskon;
 
- const rincianBiayaHtml = calculatedSubtotal > 0 ? `
-    <div class="mt-4 p-4 bg-slate-50 border rounded-xl space-y-1.5"> <div class="flex justify-between items-center text-[10px] text-slate-500">
+  const rincianBiayaHtml = calculatedSubtotal > 0 ? `
+    <div class="mt-4 p-4 bg-slate-50 border rounded-xl space-y-1.5"> 
+        <div class="flex justify-between items-center text-[10px] text-slate-500">
           <span>Subtotal Kotor</span>
           <span>${formatRupiah(calculatedSubtotal)}</span>
         </div>
@@ -928,23 +924,10 @@ content.style.opacity = "0";
         <p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p>
         <p class="font-medium">${t.metode}</p>
       </div>
+      <!-- Bagian Sub-keterangan dihapus, diganti langsung fokus ke Keterangan/Pelanggan/Supplier -->
       <div class="col-span-2 pt-2 border-t">
-        <label class="text-[10px] font-bold text-slate-400 uppercase block mb-1">${labelSub}</label>
-        <div class="flex items-center gap-2 w-full">
-          <input id="edit_sub_input" type="text" 
-            value="${t.sub !== '-' ? t.sub : ''}" 
-            class="min-w-0 flex-1 p-2 border rounded-lg text-sm font-bold bg-white outline-none focus:ring-2 focus:ring-blue-100"
-            placeholder="Input sub...">
-          <button onclick="updateSub('${t.id}')" 
-            class="flex-shrink-0 bg-blue-600 text-white p-2 md:px-4 md:py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2">
-            <i data-lucide="save" class="w-4 h-4"></i>
-            <span class="hidden md:inline">Simpan</span>
-          </button>
-        </div>
-      </div>
-      <div class="col-span-2 pt-2 border-t">
-        <p class="text-[10px] text-gray-500 font-bold uppercase">Keterangan</p>
-        <p class="font-medium">${t.ket}</p>
+        <p class="text-[10px] text-gray-500 font-bold uppercase">${labelKeterangan}</p>
+        <p class="font-bold text-slate-800">${t.ket || '-'}</p>
       </div>
     </div>
 
@@ -953,44 +936,36 @@ content.style.opacity = "0";
     <div class="mt-4 p-3 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
         <div class="flex flex-col">
            <span class="text-[9px] font-bold text-slate-400 uppercase">Kas ${t.tipe === 'MASUK' ? 'Diterima' : 'Dibayar'}</span>
-           
            ${totalSetelahDiskon > (t.masuk || t.keluar) ? '<span class="text-[8px] text-orange-500 font-bold italic leading-none">Dibayar Sebagian (DP)</span>' : ''}
         </div>
-        
         <span class="text-base font-black text-slate-800">${formatRupiah(t.masuk > 0 ? t.masuk : t.keluar)}</span>
     </div>
     
     ${detailHtml}
     
     <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
-       <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
-         Tutup
-       </button>
-       ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
-         <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-            <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+          Tutup
+        </button>
+        ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
+          <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+             <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
           </button>
         ` : ''}
     </div>
   `;
- // LANGKAH 4: Tampilkan modal
-    overlay.classList.remove('hidden');
-    overlay.style.display = 'flex';
 
-    // LANGKAH 5: Tampilkan kembali konten secara instan
-    content.style.opacity = "1";
-    
-    // Reset sekali lagi untuk memastikan (instan karena scroll-behavior: auto)
-    content.scrollTo(0, 0);
-     document.body.style.overflow = 'hidden';
-     setTimeout(() => {
-        const content = document.getElementById('modalContent');
-        handleModalScroll(content);
-    }, 100);
+  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
+  content.style.opacity = "1";
+  content.scrollTo(0, 0);
+  document.body.style.overflow = 'hidden';
+
+  setTimeout(() => {
+    handleModalScroll(content);
+  }, 100);
   if (window.lucide) lucide.createIcons();
 }
- 
-
     
 
     // Halaman placeholder untuk contoh integrasi
