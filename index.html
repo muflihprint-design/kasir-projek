@@ -831,10 +831,17 @@ function showDetail(t) {
   content.style.opacity = "0";
   content.scrollTop = 0;
 
-  // Ubah label "Keterangan" secara dinamis berdasarkan kategori
+  // MODIFIKASI: Gunakan t.sub untuk Penjualan/Pembelian, t.ket untuk kategori lainnya
   let labelKeterangan = "Keterangan";
-  if (t.kat === 'PENJUALAN') labelKeterangan = "Pelanggan";
-  if (t.kat === 'PEMBELIAN') labelKeterangan = "Supplier";
+  let displayValue = t.ket || '-';
+
+  if (t.kat === 'PENJUALAN') {
+    labelKeterangan = "Pelanggan";
+    displayValue = t.sub || '-';
+  } else if (t.kat === 'PEMBELIAN') {
+    labelKeterangan = "Supplier";
+    displayValue = t.sub || '-';
+  }
 
   // Proteksi & Parsing Detail
   let items = [];
@@ -924,10 +931,9 @@ function showDetail(t) {
         <p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p>
         <p class="font-medium">${t.metode}</p>
       </div>
-      <!-- Bagian Sub-keterangan dihapus, diganti langsung fokus ke Keterangan/Pelanggan/Supplier -->
       <div class="col-span-2 pt-2 border-t">
         <p class="text-[10px] text-gray-500 font-bold uppercase">${labelKeterangan}</p>
-        <p class="font-bold text-slate-800">${t.ket || '-'}</p>
+        <p class="font-bold text-slate-800">${displayValue}</p>
       </div>
     </div>
 
