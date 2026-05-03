@@ -325,7 +325,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwkxmiwl6GNQCurp9-JdxRCMHv4jOB1CS6bzfobbPI64OxT35z6D9rBpaDSmbpioTrl3g/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwX3RQGZi5-mKpp-5mxK3FF5Bqy-OKBpjV4keoZi5DmG3j_a5QcDpES-g-9r3W0u9eTHA/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -1673,22 +1673,25 @@ function savePenjualan() {
     return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
   }
 
-  // --- AMBIL OPSI KETERANGAN CEPAT (Tambahan Baru) ---
+  // --- VALIDASI & AMBIL OPSI KETERANGAN CEPAT (Wajib Pilih) ---
   const selectedKetOpt = document.querySelector('input[name="p_ket_opt"]:checked');
-  const ketPilihan = selectedKetOpt ? selectedKetOpt.value : ""; 
-  // ---------------------------------------------------
+  
+  // Menghilangkan fallback "Penjualan Ke" dan mewajibkan pilihan
+  if (!selectedKetOpt) {
+    return alert("Silahkan pilih Keterangan (Blangko, Cetak Undangan, atau Lain-lain) terlebih dahulu!");
+  }
+  
+  const ketPilihan = selectedKetOpt.value; 
+  // ------------------------------------------------------------
 
   const shopInitial = currentShop.nama ? currentShop.nama.charAt(0).toUpperCase() : '?';
   const inputPelanggan = (document.getElementById('p_cust').value || 'UMUM').toUpperCase();
   const pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
   
-  // LOGIKA KETERANGAN: 
-  // Gunakan template "OPSI - PELANGGAN" jika radio dipilih, jika tidak pakai format standar.
-  let keteranganOtomatis = ketPilihan 
-    ? `${ketPilihan} - ${pelangganFormatted}` 
-    : `Penjualan Ke ${pelangganFormatted}`;
+  // Kirim nilai pilihan ke payload agar diproses server menjadi "Pelanggan - Keterangan"
+  let keteranganOtomatis = ketPilihan;
 
-  // OVERRIDE UNTUK SHOPEE: Pembayaran Shopee tidak menambah kas baru
+  // OVERRIDE UNTUK SHOPEE: Menyesuaikan aturan pelunasan piutang Shopee
   const shopee1 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee1");
   const shopee2 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee2");
 
@@ -1712,7 +1715,6 @@ function savePenjualan() {
   payload.total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
   runScript('processTransaction', payload, 'penjualan');
 }
-    
 
  function savePembelian() {
   const items = collectItems();
