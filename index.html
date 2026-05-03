@@ -60,6 +60,18 @@
 .action-btn-active .icon-box {
   transform: scale(1.1);
 }
+
+    .qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Menghilangkan tombol naik/turun di Firefox */
+.qty-input[type=number] {
+  -moz-appearance: textfield;
+}
+    
     
     #loading-overlay {
       display: none;
