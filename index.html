@@ -1070,6 +1070,30 @@ content.style.opacity = "0";
             class="w-full p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium">
         </div>
 
+        <div class="mt-3">
+  <label class="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-2 block">Keterangan Cepat</label>
+  <div class="grid grid-cols-3 gap-2">
+    <label class="cursor-pointer group">
+      <input type="radio" name="p_ket_opt" value="BLANGKO" class="hidden peer">
+      <div class="flex items-center justify-center p-2.5 rounded-xl border-2 border-slate-100 bg-white transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
+        <span class="text-[10px] font-bold text-slate-600 peer-checked:text-blue-700 uppercase">Blangko</span>
+      </div>
+    </label>
+    <label class="cursor-pointer group">
+      <input type="radio" name="p_ket_opt" value="CETAK UNDANGAN" class="hidden peer">
+      <div class="flex items-center justify-center p-2.5 rounded-xl border-2 border-slate-100 bg-white transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
+        <span class="text-[10px] font-bold text-slate-600 peer-checked:text-blue-700 uppercase text-center">Cetak Undangan</span>
+      </div>
+    </label>
+    <label class="cursor-pointer group">
+      <input type="radio" name="p_ket_opt" value="LAIN-LAIN" class="hidden peer">
+      <div class="flex items-center justify-center p-2.5 rounded-xl border-2 border-slate-100 bg-white transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
+        <span class="text-[10px] font-bold text-slate-600 peer-checked:text-blue-700 uppercase">Lain-lain</span>
+      </div>
+    </label>
+  </div>
+</div>
+
         <div class="py-2"> 
           <div class="border-t border-b border-slate-200 py-3">
             <p class="text-[10px] font-bold mb-3 text-slate-400 uppercase tracking-widest text-center">Daftar Barang</p>
@@ -1643,19 +1667,28 @@ function savePenjualan() {
   }
   // ----------------------------------------
 
-  // --- VALIDASI METODE PEMBAYARAN (Update Baru) ---
+  // --- VALIDASI METODE PEMBAYARAN ---
   const selectedRadio = document.querySelector('input[name="payment-method"]:checked');
   if (!selectedRadio) {
     return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
   }
-  // ------------------------------------------------
+
+  // --- AMBIL OPSI KETERANGAN CEPAT (Tambahan Baru) ---
+  const selectedKetOpt = document.querySelector('input[name="p_ket_opt"]:checked');
+  const ketPilihan = selectedKetOpt ? selectedKetOpt.value : ""; 
+  // ---------------------------------------------------
 
   const shopInitial = currentShop.nama ? currentShop.nama.charAt(0).toUpperCase() : '?';
   const inputPelanggan = (document.getElementById('p_cust').value || 'UMUM').toUpperCase();
   const pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
   
-  let keteranganOtomatis = `Penjualan Ke ${pelangganFormatted}`;
+  // LOGIKA KETERANGAN: 
+  // Gunakan template "OPSI - PELANGGAN" jika radio dipilih, jika tidak pakai format standar.
+  let keteranganOtomatis = ketPilihan 
+    ? `${ketPilihan} - ${pelangganFormatted}` 
+    : `Penjualan Ke ${pelangganFormatted}`;
 
+  // OVERRIDE UNTUK SHOPEE: Pembayaran Shopee tidak menambah kas baru
   const shopee1 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee1");
   const shopee2 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee2");
 
@@ -1673,7 +1706,6 @@ function savePenjualan() {
     items: items,
     diskon: unmask(document.getElementById('p_disc').value),
     dp: unmask(document.getElementById('p_dp').value),
-    // Mengambil nilai dari radio yang terpilih
     metode: selectedRadio.value 
   };
   
