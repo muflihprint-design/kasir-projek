@@ -1238,8 +1238,10 @@ else if (tab === 'pembelian') {
 
         <div>
           <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Keterangan</label>
-          <textarea id="op_ket" placeholder="Tulis rincian pengeluaran..." 
-                    class="w-full p-4 bg-slate-50 border-none rounded-2xl h-32 focus:ring-4 focus:ring-slate-100 outline-none font-medium"></textarea>
+          <textarea id="op_ket" 
+          placeholder="Tulis rincian pengeluaran..." 
+          onkeypress="return event.charCode != 44"
+          class="w-full p-4 bg-slate-50 border-none rounded-2xl h-32 focus:ring-4 focus:ring-slate-100 outline-none font-medium"></textarea>
         </div>
 
         <button onclick="saveOperasional()" class="w-full bg-slate-800 text-white p-4 rounded-2xl font-extrabold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
@@ -1543,7 +1545,7 @@ window.selectProduct = selectProduct;
     const inputNama = el.querySelector('.item-name');
     if (!inputNama) return;
     
-    const nama = inputNama.value.toUpperCase();
+    const nama = inputNama.value.replace(/,/g, '').toUpperCase();
     const harga = unmask(el.querySelector('.item-price').value);
     
     // 1. Ambil nilai Qty mentah dari input
@@ -1555,7 +1557,7 @@ window.selectProduct = selectProduct;
     // 3. Konversi ke angka desimal murni
     let qtyFinal = parseFloat(qtyClean) || 0;
 
-    const kategori = el.querySelector('.item-category').value.toUpperCase() || "-";
+    const kategori = (el.querySelector('.item-category').value.replace(/,/g, '').toUpperCase()) || "-";
 
     if (nama && nama !== "PILIH BARANG STOK...") {
       itemsData.push({
