@@ -327,7 +327,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyPCVPO286u3kfCWNed2IsM6AGP29CjjLaTCtjrx8F2RJTL0kkBqmwblZuYnmBmXhzaDw/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbycERMDpjIezKuhHJ57aPV5TsYXSJXOtiYgu0b5nEpvxYxWhNIv-7JZSCGR0r-3ZHHTjA/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -2530,8 +2530,8 @@ async function shareNotaJPG(id, event) {
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
         files: [file],
-        title: 'Nota Blimi',
-        text: `Nota transaksi #${t.id} - Blimi`
+        title: `Nota ${currentShop.nama}`,
+        text: `Nota transaksi #${t.id} - ${currentShop.nama}`
       });
     } else {
       // Fallback: Jika tidak bisa share, maka download otomatis
