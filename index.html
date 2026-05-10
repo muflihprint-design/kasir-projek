@@ -327,7 +327,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyPCVPO286u3kfCWNed2IsM6AGP29CjjLaTCtjrx8F2RJTL0kkBqmwblZuYnmBmXhzaDw/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbycERMDpjIezKuhHJ57aPV5TsYXSJXOtiYgu0b5nEpvxYxWhNIv-7JZSCGR0r-3ZHHTjA/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -340,7 +340,6 @@ let currentShop = {
   nama: localStorage.getItem('shopName') || '',
   alamat: localStorage.getItem('shopAddress') || ''
 };
-    let readyToShareFile = null; // Menampung file gambar yang sudah jadi
 
 // Fungsi saat toko dipilih
 function selectShop(nama, alamat) {
@@ -855,6 +854,161 @@ async function checkManualDateChange() {
       renderTransactions();
     }
 
+function showDetail(t) {
+  const overlay = document.getElementById('general-modal');
+  const content = document.getElementById('modalContent');
+
+  if (!overlay || !content) {
+    console.error("Elemen modal tidak ditemukan!");
+    return;
+  }
+
+  isDetailChanged = false;
+  content.style.opacity = "0";
+  content.scrollTop = 0;
+
+  // MODIFIKASI: Gunakan t.sub untuk Penjualan/Pembelian, t.ket untuk kategori lainnya
+  let labelKeterangan = "Keterangan";
+  let displayValue = t.ket || '-';
+
+  if (t.kat === 'Penjualan') {
+    labelKeterangan = "Pelanggan";
+    displayValue = t.sub || '-';
+  } else if (t.kat === 'Pembelian') {
+    labelKeterangan = "Supplier";
+    displayValue = t.sub || '-';
+  }
+
+  // Proteksi & Parsing Detail
+  let items = [];
+  try {
+    if (Array.isArray(t.detail)) {
+      items = t.detail;
+    } else if (typeof t.detail === 'string' && t.detail.trim() !== '') {
+      items = JSON.parse(t.detail);
+    }
+  } catch (e) {
+    console.error("Gagal parse detail:", e);
+    items = [];
+  }
+
+  let detailHtml = '';
+  let calculatedSubtotal = 0;
+
+  if (items.length > 0) {
+    detailHtml = `
+    <div class="mt-6 border rounded-xl overflow-hidden shadow-sm">
+      <div class="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
+          <p class="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Item & Rincian</p>
+      </div>
+      <table class="w-full text-[10px]">
+        <thead class="bg-slate-50 border-b text-slate-400">
+          <tr>
+            <th class="p-2 text-left">Item</th>
+            <th class="p-2 text-center">Qty</th>
+            <th class="p-2 text-right">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          ${items.map((d, index) => {
+            const lineTotal = (parseFloat(d.qty) || 0) * (parseFloat(d.harga) || 0);
+            calculatedSubtotal += lineTotal;
+            return `
+            <tr class="bg-white">
+              <td class="p-2">
+                <span class="font-medium text-slate-700 text-[10px]">${d.nama}</span>
+              </td>
+              <td class="p-2 text-center text-slate-500 text-[9px]">${d.qty}</td>
+              <td class="p-2 text-right font-mono text-slate-600 text-[10px]">${formatRupiah(lineTotal)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  const diskon = parseFloat(t.diskon) || 0;
+  const totalSetelahDiskon = calculatedSubtotal - diskon;
+
+  const rincianBiayaHtml = calculatedSubtotal > 0 ? `
+    <div class="mt-4 p-4 bg-slate-50 border rounded-xl space-y-1.5"> 
+        <div class="flex justify-between items-center text-[10px] text-slate-500">
+          <span>Subtotal Kotor</span>
+          <span>${formatRupiah(calculatedSubtotal)}</span>
+        </div>
+        <div class="flex justify-between items-center text-[10px] text-red-500">
+          <span>Potongan Diskon</span>
+          <span>- ${formatRupiah(diskon)}</span>
+        </div>
+        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200">
+          <span class="text-[9px] font-bold text-blue-600 uppercase">Total Tagihan Akhir</span>
+          <span class="text-sm font-bold text-blue-700">${formatRupiah(totalSetelahDiskon)}</span>
+        </div>
+    </div>
+  ` : '';
+
+  content.innerHTML = `
+    <div class="flex items-center gap-3 mb-4">
+        <div class="p-3 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
+          <i data-lucide="${t.tipe === 'MASUK' ? 'trending-up' : 'trending-down'}"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold">Detail ${t.kat}</h2>
+          <p class="text-xs text-gray-400 font-medium">${t.id}</p>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm bg-slate-50 p-4 rounded-xl border mb-4">
+      <div>
+        <p class="text-[10px] text-gray-500 font-bold uppercase">Waktu</p>
+        <p class="font-medium">${t.waktu}</p>
+      </div>
+      <div>
+        <p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p>
+        <p class="font-medium">${t.metode}</p>
+      </div>
+      <div class="col-span-2 pt-2 border-t">
+        <p class="text-[10px] text-gray-500 font-bold uppercase">${labelKeterangan}</p>
+        <p class="font-bold text-slate-800">${displayValue}</p>
+      </div>
+    </div>
+
+    ${rincianBiayaHtml}
+
+    <div class="mt-4 p-3 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
+        <div class="flex flex-col">
+           <span class="text-[9px] font-bold text-slate-400 uppercase">Kas ${t.tipe === 'MASUK' ? 'Diterima' : 'Dibayar'}</span>
+           ${totalSetelahDiskon > (t.masuk || t.keluar) ? '<span class="text-[8px] text-orange-500 font-bold italic leading-none">Dibayar Sebagian (DP)</span>' : ''}
+        </div>
+        <span class="text-base font-black text-slate-800">${formatRupiah(t.masuk > 0 ? t.masuk : t.keluar)}</span>
+    </div>
+    
+    ${detailHtml}
+    
+    <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
+        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+          Tutup
+        </button>
+        ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
+          <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+             <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+          </button>
+        ` : ''}
+    </div>
+  `;
+
+  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
+  content.style.opacity = "1";
+  content.scrollTo(0, 0);
+  document.body.style.overflow = 'hidden';
+
+  setTimeout(() => {
+    handleModalScroll(content);
+  }, 100);
+  if (window.lucide) lucide.createIcons();
+}
+    
 
     // Halaman placeholder untuk contoh integrasi
     function renderPenjualanPage() {
@@ -2333,271 +2487,81 @@ isFullDataLoaded = false;
   }
 }
     
-async function canvasToFile(canvas, fileName) {
-    return new Promise((resolve) => {
-        canvas.toBlob((blob) => {
-            resolve(new File([blob], fileName, { type: "image/jpeg" }));
-        }, 'image/jpeg', 0.8); // Kualitas 0.8 (sangat cukup dan ringan)
-    });
-}
     
+
 async function shareNotaJPG(id, event) {
+ // 1. Pastikan mencari di variabel yang benar (allTransactions atau currentTransactions)
+  const t = (typeof allTransactions !== 'undefined' ? allTransactions : currentTransactions).find(item => item.id === id);
+  if (!t) return alert("Data transaksi tidak ditemukan!");
+
+  // 2. Ambil referensi tombol secara aman
   const btn = event ? event.currentTarget : null;
-  const originalContent = btn ? btn.innerHTML : '';
-
-  // 1. Fungsi untuk mengembalikan tampilan tombol
-  const restoreButton = () => {
-    if (btn) {
-      btn.innerHTML = originalContent;
-      btn.disabled = false;
-      if (window.lucide) lucide.createIcons();
-    }
-  };
-
-  // 2. Jika file sudah siap dari pre-render, langsung share
-  if (readyToShareFile) {
-    try {
-      if (navigator.canShare && navigator.canShare({ files: [readyToShareFile] })) {
-        await navigator.share({
-          files: [readyToShareFile],
-          title: `Nota`,
-          text: `Nota #${id}`
-        });
-        return;
-      }
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error("Share error:", err);
-    }
-  }
-
-  // 3. Jika belum siap, tampilkan Loading Spinner pada tombol Share
-  // Catatan: Tombol "Tutup" tidak kita sentuh agar tetap bisa diklik
+  const originalText = btn ? btn.innerHTML : '';
+  
   if (btn) {
+    btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white mr-2 inline-block animate-spin"></div> Memproses';
     btn.disabled = true;
-    btn.innerHTML = `
-      <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      <span>Proses...</span>
-    `;
   }
+  const printArea = document.getElementById('printArea');
+  printArea.innerHTML = generateNotaHTML(t);
+  printArea.classList.remove('hidden');
 
   try {
-    // Tunggu maksimal 3 detik jika pre-render sedang berjalan
-    let attempts = 0;
-    while (!readyToShareFile && attempts < 30) {
-      await new Promise(r => setTimeout(r, 100));
-      attempts++;
-    }
+    // Beri waktu browser merender font & layout
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Jika setelah ditunggu tetap belum ada, buat manual (Fallback)
-    if (!readyToShareFile) {
-      const printArea = document.getElementById('printArea');
-      const canvas = await html2canvas(printArea, { scale: 2, useCORS: true });
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-      readyToShareFile = new File([blob], `Nota_${id}.jpg`, { type: "image/jpeg" });
-    }
+    const canvas = await html2canvas(printArea, {
+      scale: 3, // Skala 3 agar gambar sangat tajam saat di-zoom di WA
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      width: 380,
+      windowWidth: 380,
+      logging: false
+    });
 
-    // Eksekusi Share
-    if (navigator.canShare && navigator.canShare({ files: [readyToShareFile] })) {
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    const blob = await (await fetch(dataUrl)).blob();
+    
+    // Memberikan nama file yang unik agar tidak tertukar di cache HP
+    const fileName = `Nota_${t.id}_${Date.now()}.jpg`;
+    const file = new File([blob], fileName, { type: "image/jpeg" });
+
+    // Cek apakah browser mendukung sharing file
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
-        files: [readyToShareFile],
-        title: `Nota`,
-        text: `Nota #${id}`
+        files: [file],
+        title: `Nota ${currentShop.nama}`,
+        text: `Nota transaksi #${t.id} - ${currentShop.nama}`
       });
     } else {
-      // Fallback Download
+      // Fallback: Jika tidak bisa share, maka download otomatis
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(readyToShareFile);
-      link.download = readyToShareFile.name;
+      link.download = fileName;
+      link.href = dataUrl;
       link.click();
+      alert("Browser Anda tidak mendukung share langsung. File telah diunduh.");
     }
   } catch (err) {
-    if (err.name !== 'AbortError') alert("Gagal memproses nota.");
+    console.error("Gagal share:", err);
+    alert("Maaf, terjadi kesalahan saat memproses gambar.");
   } finally {
-    restoreButton();
-  }
-}
-    
-async function showDetail(t) {
-  const overlay = document.getElementById('general-modal');
-  const content = document.getElementById('modalContent');
-
-  if (!overlay || !content) {
-    console.error("Elemen modal tidak ditemukan!");
-    return;
-  }
-
-  // 1. Inisialisasi State Modal
-  isDetailChanged = false;
-  content.scrollTop = 0;
-  content.style.opacity = "0";
-
-  // 2. Logika Label & Data
-  let labelKeterangan = "Keterangan";
-  let displayValue = t.ket || '-';
-  if (t.kat === 'Penjualan') {
-    labelKeterangan = "Pelanggan";
-    displayValue = t.sub || '-';
-  } else if (t.kat === 'Pembelian') {
-    labelKeterangan = "Supplier";
-    displayValue = t.sub || '-';
-  }
-
-  // 3. Parsing Detail Item
-  let items = [];
-  try {
-    items = Array.isArray(t.detail) ? t.detail : (t.detail ? JSON.parse(t.detail) : []);
-  } catch (e) {
-    console.error("Gagal parse detail:", e);
-  }
-
-  let detailHtml = '';
-  let calculatedSubtotal = 0;
-
-  if (items.length > 0) {
-    detailHtml = `
-    <div class="mt-6 border rounded-xl overflow-hidden shadow-sm">
-      <div class="bg-slate-50 px-4 py-2 border-b">
-          <p class="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Item & Rincian</p>
-      </div>
-      <table class="w-full text-[10px]">
-        <thead class="bg-slate-50 border-b text-slate-400">
-          <tr>
-            <th class="p-2 text-left">Item</th>
-            <th class="p-2 text-center">Qty</th>
-            <th class="p-2 text-right">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y">
-          ${items.map((d) => {
-            const lineTotal = (parseFloat(d.qty) || 0) * (parseFloat(d.harga) || 0);
-            calculatedSubtotal += lineTotal;
-            return `
-            <tr class="bg-white">
-              <td class="p-2"><span class="font-medium text-slate-700">${d.nama}</span></td>
-              <td class="p-2 text-center text-slate-500">${d.qty}</td>
-              <td class="p-2 text-right font-mono text-slate-600">${formatRupiah(lineTotal)}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
-  }
-
-  const diskon = parseFloat(t.diskon) || 0;
-  const totalSetelahDiskon = calculatedSubtotal - diskon;
-  const paidAmount = t.masuk > 0 ? t.masuk : (t.keluar || 0);
-
-  const rincianBiayaHtml = calculatedSubtotal > 0 ? `
-    <div class="mt-4 p-4 bg-slate-50 border rounded-xl space-y-1.5"> 
-        <div class="flex justify-between items-center text-[10px] text-slate-500">
-          <span>Subtotal Kotor</span>
-          <span>${formatRupiah(calculatedSubtotal)}</span>
-        </div>
-        <div class="flex justify-between items-center text-[10px] text-red-500">
-          <span>Potongan Diskon</span>
-          <span>- ${formatRupiah(diskon)}</span>
-        </div>
-        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200">
-          <span class="text-[9px] font-bold text-blue-600 uppercase">Total Tagihan Akhir</span>
-          <span class="text-sm font-bold text-blue-700">${formatRupiah(totalSetelahDiskon)}</span>
-        </div>
-    </div>
-  ` : '';
-
-  // 4. Render HTML ke Modal
-  content.innerHTML = `
-    <div class="flex items-center gap-3 mb-4">
-        <div class="p-3 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
-          <i data-lucide="${t.tipe === 'MASUK' ? 'trending-up' : 'trending-down'}"></i>
-        </div>
-        <div>
-          <h2 class="text-lg font-bold">Detail ${t.kat}</h2>
-          <p class="text-xs text-gray-400 font-medium">${t.id}</p>
-        </div>
-    </div>
-    
-    <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm bg-slate-50 p-4 rounded-xl border mb-4">
-      <div><p class="text-[10px] text-gray-500 font-bold uppercase">Waktu</p><p class="font-medium">${t.waktu}</p></div>
-      <div><p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p><p class="font-medium">${t.metode}</p></div>
-      <div class="col-span-2 pt-2 border-t">
-        <p class="text-[10px] text-gray-500 font-bold uppercase">${labelKeterangan}</p>
-        <p class="font-bold text-slate-800">${displayValue}</p>
-      </div>
-    </div>
-
-    ${rincianBiayaHtml}
-
-    <div class="mt-4 p-3 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
-        <div class="flex flex-col">
-           <span class="text-[9px] font-bold text-slate-400 uppercase">Kas ${t.tipe === 'MASUK' ? 'Diterima' : 'Dibayar'}</span>
-           ${totalSetelahDiskon > paidAmount + 1 ? '<span class="text-[8px] text-orange-500 font-bold italic leading-none">Dibayar Sebagian (DP)</span>' : ''}
-        </div>
-        <span class="text-base font-black text-slate-800">${formatRupiah(paidAmount)}</span>
-    </div>
-    
-    ${detailHtml}
-    
-    <div class="mt-6 grid ${t.kat === 'Penjualan' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
-        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
-          Tutup
-        </button>
-        ${t.kat === 'Penjualan' ? `
-          <button id="btnShareNota" onclick="shareNotaJPG('${t.id}', event)" 
-                  class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-              <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
-          </button>
-        ` : ''}
-    </div>
-  `;
-
-  // 5. Animasi & Tampilkan Modal
-  overlay.classList.remove('hidden');
-  overlay.style.display = 'flex';
-  setTimeout(() => content.style.opacity = "1", 50);
-  document.body.style.overflow = 'hidden';
-
-  if (window.lucide) lucide.createIcons();
-
-  // 6. PROSES PRE-RENDER (Dijalankan di background dengan jeda aman)
-  if (t.kat === 'Penjualan') {
-    readyToShareFile = null; 
-    const printArea = document.getElementById('printArea');
-    
-    if (printArea) {
-      // Tunggu 300ms agar modal selesai muncul (mencegah lag saat animasi modal)
-      setTimeout(async () => {
-        printArea.innerHTML = generateNotaHTML(t);
-        printArea.style.display = 'block';
-        printArea.style.position = 'fixed';
-        printArea.style.left = '-9999px';
-
-        try {
-          const canvas = await html2canvas(printArea, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: "#ffffff",
-            logging: false
-          });
-          
-          canvas.toBlob((blob) => {
-            readyToShareFile = new File([blob], `Nota_${t.id}.jpg`, { type: "image/jpeg" });
-            console.log("Nota background process: OK");
-          }, 'image/jpeg', 0.85);
-          
-          printArea.style.display = 'none';
-        } catch (err) {
-          console.error("Gagal menyiapkan nota di background:", err);
-        }
-      }, 300); 
-    }
+    // Kembalikan tombol ke semula
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+    printArea.classList.add('hidden');
   }
 }
 
+function resetShop() {
+  localStorage.removeItem('shopName');
+  localStorage.removeItem('shopAddress');
+  location.reload(); // Segarkan halaman untuk menampilkan layar pilihan lagi
+}
     
-    function generateNotaHTML(t) {
+  /** * FUNGSI CETAK NOTA 
+ * Menggabungkan desain UI modern dengan logika data transaksi
+ **/
+function generateNotaHTML(t) {
   let subtotal = 0;
   const diskon = Number(t.diskon) || 0;
   let rowsHtml = '';
@@ -2719,17 +2683,6 @@ async function showDetail(t) {
   </div>
 `;
 }
-
-function resetShop() {
-  localStorage.removeItem('shopName');
-  localStorage.removeItem('shopAddress');
-  location.reload(); // Segarkan halaman untuk menampilkan layar pilihan lagi
-}
-    
-  /** * FUNGSI CETAK NOTA 
- * Menggabungkan desain UI modern dengan logika data transaksi
- **/
-
     
 function printNota(id) {
   const t = currentTransactions.find(item => item.id === id);
