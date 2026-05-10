@@ -2342,55 +2342,82 @@ async function canvasToFile(canvas, fileName) {
 }
     
 async function shareNotaJPG(id, event) {
-    const btn = event ? event.currentTarget : null;
-    const originalText = btn ? btn.innerHTML : '';
+  const btn = event ? event.currentTarget : null;
+  const originalContent = btn ? btn.innerHTML : '';
 
-    // 1. Eksekusi Instan jika file sudah siap
-    if (readyToShareFile) {
-        try {
-            if (navigator.canShare && navigator.canShare({ files: [readyToShareFile] })) {
-                await navigator.share({
-                    files: [readyToShareFile],
-                    title: `Nota`,
-                    text: `Nota #${id}`
-                });
-                return; // Berhenti di sini jika sukses
-            }
-        } catch (err) {
-            if (err.name === 'AbortError') return; // User membatalkan share
-            console.error("Share error:", err);
-        }
-        
-        // Fallback Download jika share gagal/tidak didukung
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(readyToShareFile);
-        link.download = readyToShareFile.name;
-        link.click();
-        return;
-    }
-
-    // 2. Fallback: Jika user klik terlalu cepat sebelum pre-render selesai
+  // 1. Fungsi untuk mengembalikan tampilan tombol
+  const restoreButton = () => {
     if (btn) {
-        btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>';
-        btn.disabled = true;
+      btn.innerHTML = originalContent;
+      btn.disabled = false;
+      if (window.lucide) lucide.createIcons();
+    }
+  };
+
+  // 2. Jika file sudah siap dari pre-render, langsung share
+  if (readyToShareFile) {
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [readyToShareFile] })) {
+        await navigator.share({
+          files: [readyToShareFile],
+          title: `Nota`,
+          text: `Nota #${id}`
+        });
+        return;
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') console.error("Share error:", err);
+    }
+  }
+
+  // 3. Jika belum siap, tampilkan Loading Spinner pada tombol Share
+  // Catatan: Tombol "Tutup" tidak kita sentuh agar tetap bisa diklik
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `
+      <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <span>Proses...</span>
+    `;
+  }
+
+  try {
+    // Tunggu maksimal 3 detik jika pre-render sedang berjalan
+    let attempts = 0;
+    while (!readyToShareFile && attempts < 30) {
+      await new Promise(r => setTimeout(r, 100));
+      attempts++;
     }
 
-    try {
-        const printArea = document.getElementById('printArea');
-        const canvas = await html2canvas(printArea, { scale: 2, useCORS: true });
-        const file = await canvasToFile(canvas, `Nota_${id}.jpg`);
-        
-        await navigator.share({ files: [file] });
-    } catch (err) {
-        console.error("Fallback share failed:", err);
-        alert("Gagal memproses nota. Silakan coba lagi.");
-    } finally {
-        if (btn) {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            if (window.lucide) lucide.createIcons();
-        }
+    // Jika setelah ditunggu tetap belum ada, buat manual (Fallback)
+    if (!readyToShareFile) {
+      const printArea = document.getElementById('printArea');
+      const canvas = await html2canvas(printArea, { scale: 2, useCORS: true });
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+      readyToShareFile = new File([blob], `Nota_${id}.jpg`, { type: "image/jpeg" });
     }
+
+    // Eksekusi Share
+    if (navigator.canShare && navigator.canShare({ files: [readyToShareFile] })) {
+      await navigator.share({
+        files: [readyToShareFile],
+        title: `Nota`,
+        text: `Nota #${id}`
+      });
+    } else {
+      // Fallback Download
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(readyToShareFile);
+      link.download = readyToShareFile.name;
+      link.click();
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') alert("Gagal memproses nota.");
+  } finally {
+    restoreButton();
+  }
 }
     
 async function showDetail(t) {
