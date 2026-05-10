@@ -985,13 +985,22 @@ function showDetail(t) {
     
     ${detailHtml}
     
-    <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
-        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
-          Tutup
-        </button>
-        ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
-          <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-             <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+<div class="mt-6 flex flex-col gap-3">
+        <div class="grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
+            <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+              Tutup
+            </button>
+            ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
+              <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+                 <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+              </button>
+            ` : ''}
+        </div>
+        
+        ${/* Tombol Cetak Kartu Stok: Muncul hanya jika Penjualan & Ada item non-TTH */
+          t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
+          <button onclick='printStockCard(${JSON.stringify(t)})' class="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition flex items-center justify-center gap-2">
+             <i data-lucide="printer" class="w-4 h-4"></i> Cetak Kartu Stok Keluar
           </button>
         ` : ''}
     </div>
@@ -1008,7 +1017,87 @@ function showDetail(t) {
   }, 100);
   if (window.lucide) lucide.createIcons();
 }
-    
+
+    function printStockCard(t) {
+  let items = [];
+  try {
+    items = Array.isArray(t.detail) ? t.detail : JSON.parse(t.detail || '[]');
+  } catch (e) {
+    console.error("Gagal parse items:", e);
+  }
+
+  // Filter: Jangan masukkan kategori TTH
+  const filteredItems = items.filter(item => item.kategori !== "TTH");
+
+  if (filteredItems.length === 0) {
+    alert("Tidak ada item stok fisik (non-TTH) untuk dicetak.");
+    return;
+  }
+
+  const printWindow = window.open('', '_blank');
+  
+  let tableRows = filteredItems.map((item, index) => `
+    <tr>
+      <td style="border: 1px solid #000; padding: 8px; text-align: center;">${index + 1}</td>
+      <td style="border: 1px solid #000; padding: 8px;">${item.nama}</td>
+      <td style="border: 1px solid #000; padding: 8px; text-align: center;">${item.qty}</td>
+      <td style="border: 1px solid #000; padding: 8px; width: 100px;"></td> <td style="border: 1px solid #000; padding: 8px; width: 120px;"></td> </tr>
+  `).join('');
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Kartu Stok - ${t.id}</title>
+        <style>
+          body { font-family: sans-serif; padding: 30px; font-size: 12px; }
+          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; }
+          th { border: 1px solid #000; background: #f2f2f2; padding: 8px; }
+          .footer { margin-top: 40px; display: flex; justify-content: space-between; }
+          .sig { text-align: center; width: 150px; }
+          @media print { .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2 style="margin:0">KARTU PENGELUARAN BARANG (GUDANG)</h2>
+          <p style="margin:5px 0">No. Ref: ${t.id} | Tgl: ${t.waktu}</p>
+          <p style="margin:0">Tujuan: <strong>${t.sub || '-'}</strong></p>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Nama Barang</th>
+              <th>Qty Sistem</th>
+              <th>Qty Real</th>
+              <th>Ceklis</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+
+        <div class="footer">
+          <div class="sig">
+            <p>Admin Gudang,</p>
+            <br><br><br>
+            <p>( .................... )</p>
+          </div>
+          <div class="sig">
+            <p>Sopir / Kurir,</p>
+            <br><br><br>
+            <p>( .................... )</p>
+          </div>
+        </div>
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        <\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
 
     // Halaman placeholder untuk contoh integrasi
     function renderPenjualanPage() {
