@@ -2429,11 +2429,12 @@ async function showDetail(t) {
     return;
   }
 
+  // 1. Inisialisasi State Modal
   isDetailChanged = false;
-  content.style.opacity = "0";
   content.scrollTop = 0;
+  content.style.opacity = "0";
 
-  // 1. Logika Label Keterangan
+  // 2. Logika Label & Data
   let labelKeterangan = "Keterangan";
   let displayValue = t.ket || '-';
   if (t.kat === 'Penjualan') {
@@ -2444,17 +2445,12 @@ async function showDetail(t) {
     displayValue = t.sub || '-';
   }
 
-  // 2. Parsing Detail Item
+  // 3. Parsing Detail Item
   let items = [];
   try {
-    if (Array.isArray(t.detail)) {
-      items = t.detail;
-    } else if (typeof t.detail === 'string' && t.detail.trim() !== '') {
-      items = JSON.parse(t.detail);
-    }
+    items = Array.isArray(t.detail) ? t.detail : (t.detail ? JSON.parse(t.detail) : []);
   } catch (e) {
     console.error("Gagal parse detail:", e);
-    items = [];
   }
 
   let detailHtml = '';
@@ -2511,7 +2507,7 @@ async function showDetail(t) {
     </div>
   ` : '';
 
-  // 3. Render Modal Content
+  // 4. Render HTML ke Modal
   content.innerHTML = `
     <div class="flex items-center gap-3 mb-4">
         <div class="p-3 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
@@ -2524,14 +2520,8 @@ async function showDetail(t) {
     </div>
     
     <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm bg-slate-50 p-4 rounded-xl border mb-4">
-      <div>
-        <p class="text-[10px] text-gray-500 font-bold uppercase">Waktu</p>
-        <p class="font-medium">${t.waktu}</p>
-      </div>
-      <div>
-        <p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p>
-        <p class="font-medium">${t.metode}</p>
-      </div>
+      <div><p class="text-[10px] text-gray-500 font-bold uppercase">Waktu</p><p class="font-medium">${t.waktu}</p></div>
+      <div><p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p><p class="font-medium">${t.metode}</p></div>
       <div class="col-span-2 pt-2 border-t">
         <p class="text-[10px] text-gray-500 font-bold uppercase">${labelKeterangan}</p>
         <p class="font-bold text-slate-800">${displayValue}</p>
@@ -2551,43 +2541,42 @@ async function showDetail(t) {
     ${detailHtml}
     
     <div class="mt-6 grid ${t.kat === 'Penjualan' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
-    <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
-      Tutup
-    </button>
-    
-    ${t.kat === 'Penjualan' ? `
-      <button id="btnShareNota" onclick="shareNotaJPG('${t.id}', event)" 
-              class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-          <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
-      </button>
-    ` : ''}
-</div>
-
+        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+          Tutup
+        </button>
+        ${t.kat === 'Penjualan' ? `
+          <button id="btnShareNota" onclick="shareNotaJPG('${t.id}', event)" 
+                  class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+              <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+          </button>
+        ` : ''}
+    </div>
   `;
 
-  // 4. Tampilkan Modal
+  // 5. Animasi & Tampilkan Modal
   overlay.classList.remove('hidden');
   overlay.style.display = 'flex';
-  content.style.opacity = "1";
+  setTimeout(() => content.style.opacity = "1", 50);
   document.body.style.overflow = 'hidden';
 
-  // 5. Inisialisasi Ikon & Pre-render Nota
   if (window.lucide) lucide.createIcons();
-  
-  if (t.kat === 'Penjualan') {
-    readyToShareFile = null; // Reset file lama
-    const printArea = document.getElementById('printArea');
-    if (printArea) {
-      printArea.innerHTML = generateNotaHTML(t);
-      printArea.style.display = 'block';
-      printArea.style.position = 'fixed';
-      printArea.style.left = '-9999px';
 
-      // Jalankan render di background
+  // 6. PROSES PRE-RENDER (Dijalankan di background dengan jeda aman)
+  if (t.kat === 'Penjualan') {
+    readyToShareFile = null; 
+    const printArea = document.getElementById('printArea');
+    
+    if (printArea) {
+      // Tunggu 300ms agar modal selesai muncul (mencegah lag saat animasi modal)
       setTimeout(async () => {
+        printArea.innerHTML = generateNotaHTML(t);
+        printArea.style.display = 'block';
+        printArea.style.position = 'fixed';
+        printArea.style.left = '-9999px';
+
         try {
           const canvas = await html2canvas(printArea, {
-            scale: 2, 
+            scale: 2,
             useCORS: true,
             backgroundColor: "#ffffff",
             logging: false
@@ -2595,18 +2584,19 @@ async function showDetail(t) {
           
           canvas.toBlob((blob) => {
             readyToShareFile = new File([blob], `Nota_${t.id}.jpg`, { type: "image/jpeg" });
-            console.log("Nota siap (Pre-rendered)");
+            console.log("Nota background process: OK");
           }, 'image/jpeg', 0.85);
           
           printArea.style.display = 'none';
         } catch (err) {
-          console.error("Gagal pre-render:", err);
+          console.error("Gagal menyiapkan nota di background:", err);
         }
-      }, 100);
+      }, 300); 
     }
   }
 }
 
+    
     function generateNotaHTML(t) {
   let subtotal = 0;
   const diskon = Number(t.diskon) || 0;
