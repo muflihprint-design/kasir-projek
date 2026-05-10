@@ -340,6 +340,7 @@ let currentShop = {
   nama: localStorage.getItem('shopName') || '',
   alamat: localStorage.getItem('shopAddress') || ''
 };
+    let readyToShareFile = null; // Menampung file gambar yang sudah jadi
 
 // Fungsi saat toko dipilih
 function selectShop(nama, alamat) {
@@ -854,170 +855,6 @@ async function checkManualDateChange() {
       renderTransactions();
     }
 
-async function showDetail(t) {
-  const overlay = document.getElementById('general-modal');
-  const content = document.getElementById('modalContent');
-
-  if (!overlay || !content) {
-    console.error("Elemen modal tidak ditemukan!");
-    return;
-  }
-
-  isDetailChanged = false;
-  content.style.opacity = "0";
-  content.scrollTop = 0;
-
-  // 1. Logika Label Keterangan
-  let labelKeterangan = "Keterangan";
-  let displayValue = t.ket || '-';
-
-  if (t.kat === 'Penjualan') {
-    labelKeterangan = "Pelanggan";
-    displayValue = t.sub || '-';
-  } else if (t.kat === 'Pembelian') {
-    labelKeterangan = "Supplier";
-    displayValue = t.sub || '-';
-  }
-
-  // 2. Parsing Detail Item
-  let items = [];
-  try {
-    if (Array.isArray(t.detail)) {
-      items = t.detail;
-    } else if (typeof t.detail === 'string' && t.detail.trim() !== '') {
-      items = JSON.parse(t.detail);
-    }
-  } catch (e) {
-    console.error("Gagal parse detail:", e);
-    items = [];
-  }
-
-  let detailHtml = '';
-  let calculatedSubtotal = 0;
-
-  if (items.length > 0) {
-    detailHtml = `
-    <div class="mt-6 border rounded-xl overflow-hidden shadow-sm">
-      <div class="bg-slate-50 px-4 py-2 border-b">
-          <p class="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Item & Rincian</p>
-      </div>
-      <table class="w-full text-[10px]">
-        <thead class="bg-slate-50 border-b text-slate-400">
-          <tr>
-            <th class="p-2 text-left">Item</th>
-            <th class="p-2 text-center">Qty</th>
-            <th class="p-2 text-right">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y">
-          ${items.map((d) => {
-            const lineTotal = (parseFloat(d.qty) || 0) * (parseFloat(d.harga) || 0);
-            calculatedSubtotal += lineTotal;
-            return `
-            <tr class="bg-white">
-              <td class="p-2"><span class="font-medium text-slate-700">${d.nama}</span></td>
-              <td class="p-2 text-center text-slate-500">${d.qty}</td>
-              <td class="p-2 text-right font-mono text-slate-600">${formatRupiah(lineTotal)}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
-  }
-
-  const diskon = parseFloat(t.diskon) || 0;
-  const totalSetelahDiskon = calculatedSubtotal - diskon;
-  const paidAmount = t.masuk > 0 ? t.masuk : (t.keluar || 0);
-
-  const rincianBiayaHtml = calculatedSubtotal > 0 ? `
-    <div class="mt-4 p-4 bg-slate-50 border rounded-xl space-y-1.5"> 
-        <div class="flex justify-between items-center text-[10px] text-slate-500">
-          <span>Subtotal Kotor</span>
-          <span>${formatRupiah(calculatedSubtotal)}</span>
-        </div>
-        <div class="flex justify-between items-center text-[10px] text-red-500">
-          <span>Potongan Diskon</span>
-          <span>- ${formatRupiah(diskon)}</span>
-        </div>
-        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200">
-          <span class="text-[9px] font-bold text-blue-600 uppercase">Total Tagihan Akhir</span>
-          <span class="text-sm font-bold text-blue-700">${formatRupiah(totalSetelahDiskon)}</span>
-        </div>
-    </div>
-  ` : '';
-
-  // 3. Render Modal Content
-  content.innerHTML = `
-    <div class="flex items-center gap-3 mb-4">
-        <div class="p-3 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
-          <i data-lucide="${t.tipe === 'MASUK' ? 'trending-up' : 'trending-down'}"></i>
-        </div>
-        <div>
-          <h2 class="text-lg font-bold">Detail ${t.kat}</h2>
-          <p class="text-xs text-gray-400 font-medium">${t.id}</p>
-        </div>
-    </div>
-    
-    <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm bg-slate-50 p-4 rounded-xl border mb-4">
-      <div>
-        <p class="text-[10px] text-gray-500 font-bold uppercase">Waktu</p>
-        <p class="font-medium">${t.waktu}</p>
-      </div>
-      <div>
-        <p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p>
-        <p class="font-medium">${t.metode}</p>
-      </div>
-      <div class="col-span-2 pt-2 border-t">
-        <p class="text-[10px] text-gray-500 font-bold uppercase">${labelKeterangan}</p>
-        <p class="font-bold text-slate-800">${displayValue}</p>
-      </div>
-    </div>
-
-    ${rincianBiayaHtml}
-
-    <div class="mt-4 p-3 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
-        <div class="flex flex-col">
-           <span class="text-[9px] font-bold text-slate-400 uppercase">Kas ${t.tipe === 'MASUK' ? 'Diterima' : 'Dibayar'}</span>
-           ${totalSetelahDiskon > paidAmount + 1 ? '<span class="text-[8px] text-orange-500 font-bold italic leading-none">Dibayar Sebagian (DP)</span>' : ''}
-        </div>
-        <span class="text-base font-black text-slate-800">${formatRupiah(paidAmount)}</span>
-    </div>
-    
-    ${detailHtml}
-    
-    <div class="mt-6 grid ${t.kat === 'Penjualan' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
-        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
-          Tutup
-        </button>
-        ${t.kat === 'Penjualan' ? `
-          <button id="btnShareNota" onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-             <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
-          </button>
-        ` : ''}
-    </div>
-  `;
-
-  // 4. Tampilkan Modal
-  overlay.classList.remove('hidden');
-  overlay.style.display = 'flex';
-  content.style.opacity = "1";
-  document.body.style.overflow = 'hidden';
-
-  // 5. Inisialisasi Ikon & Pre-render Nota (PENTING)
-  if (window.lucide) lucide.createIcons();
-  
-  if (t.kat === 'Penjualan') {
-    // Siapkan konten nota di elemen tersembunyi SEGERA setelah modal terbuka
-    const printArea = document.getElementById('printArea');
-    if (printArea) {
-      printArea.innerHTML = generateNotaHTML(t);
-      // Biarkan browser melakukan kalkulasi layout di background
-      printArea.style.display = 'block';
-      printArea.style.position = 'fixed';
-      printArea.style.left = '-9999px';
-    }
-  }
-}
 
     // Halaman placeholder untuk contoh integrasi
     function renderPenjualanPage() {
@@ -2496,107 +2333,251 @@ isFullDataLoaded = false;
   }
 }
     
-    
-// Variabel global untuk menyimpan file sementara
-let tempShareFile = null;
-
-async function prepareNotaImage(t) {
-    const printArea = document.getElementById('printArea');
-    printArea.innerHTML = generateNotaHTML(t);
-    printArea.style.display = 'block';
-    printArea.style.position = 'fixed';
-    printArea.style.left = '-9999px';
-
-    const canvas = await html2canvas(printArea, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff"
+async function canvasToFile(canvas, fileName) {
+    return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+            resolve(new File([blob], fileName, { type: "image/jpeg" }));
+        }, 'image/jpeg', 0.8); // Kualitas 0.8 (sangat cukup dan ringan)
     });
-
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-    tempShareFile = new File([blob], `Nota_${t.id}.jpg`, { type: "image/jpeg" });
-    printArea.style.display = 'none';
-    return canvas.toDataURL("image/jpeg");
 }
-
+    
 async function shareNotaJPG(id, event) {
-  // 1. Ambil data transaksi
-  const t = (typeof allTransactions !== 'undefined' ? allTransactions : currentTransactions).find(item => item.id === id);
-  if (!t) return alert("Data transaksi tidak ditemukan!");
+    const btn = event ? event.currentTarget : null;
+    const originalText = btn ? btn.innerHTML : '';
 
-  const btn = event ? event.currentTarget : null;
-  const originalText = btn ? btn.innerHTML : '';
-  
-  if (btn) {
-    btn.innerHTML = '...'; // Gunakan teks singkat agar tidak berat
-    btn.disabled = true;
-  }
-
-  const printArea = document.getElementById('printArea');
-  
-  /* Catatan: Kita asumsikan printArea sudah diisi oleh showDetail() 
-     agar tidak perlu innerHTML ulang yang memakan waktu render.
-  */
-
-  try {
-    // 2. Langsung eksekusi html2canvas tanpa setTimeout
-    // Gunakan scale 2 (sudah sangat cukup tajam) untuk kecepatan maksimal
-    const canvas = await html2canvas(printArea, {
-      scale: 2, 
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      // Penting: Abaikan elemen yang tidak perlu
-      ignoreElements: (el) => el.tagName === 'SCRIPT' || el.tagName === 'STYLE'
-    });
-
-    // 3. Gunakan toBlob langsung (Jauh lebih cepat daripada fetch dataUrl)
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-    const fileName = `Nota_${t.id}.jpg`;
-    const file = new File([blob], fileName, { type: "image/jpeg" });
-
-    // 4. Eksekusi Navigator Share SECEPAT MUNGKIN
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: `Nota ${currentShop.nama}`,
-        text: `Nota #${t.id} - ${currentShop.nama}`
-      });
-    } else {
-      // Fallback: Download jika share ditolak/tidak didukung
-      const dataUrl = canvas.toDataURL("image/jpeg");
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = fileName;
-      link.click();
-      alert("Browser tidak mendukung share langsung. File diunduh.");
+    // 1. Eksekusi Instan jika file sudah siap
+    if (readyToShareFile) {
+        try {
+            if (navigator.canShare && navigator.canShare({ files: [readyToShareFile] })) {
+                await navigator.share({
+                    files: [readyToShareFile],
+                    title: `Nota`,
+                    text: `Nota #${id}`
+                });
+                return; // Berhenti di sini jika sukses
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return; // User membatalkan share
+            console.error("Share error:", err);
+        }
+        
+        // Fallback Download jika share gagal/tidak didukung
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(readyToShareFile);
+        link.download = readyToShareFile.name;
+        link.click();
+        return;
     }
-  } catch (err) {
-    console.error("Gagal share:", err);
-    // Jika user membatalkan (AbortError), jangan tampilkan alert
-    if (err.name !== 'AbortError') {
-      alert("Gagal membagikan nota. Coba lagi atau gunakan screenshot.");
-    }
-  } finally {
+
+    // 2. Fallback: Jika user klik terlalu cepat sebelum pre-render selesai
     if (btn) {
-      btn.innerHTML = originalText;
-      btn.disabled = false;
+        btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>';
+        btn.disabled = true;
     }
-    // Sembunyikan kembali printArea
-    printArea.style.display = 'none';
-  }
-}
 
-function resetShop() {
-  localStorage.removeItem('shopName');
-  localStorage.removeItem('shopAddress');
-  location.reload(); // Segarkan halaman untuk menampilkan layar pilihan lagi
+    try {
+        const printArea = document.getElementById('printArea');
+        const canvas = await html2canvas(printArea, { scale: 2, useCORS: true });
+        const file = await canvasToFile(canvas, `Nota_${id}.jpg`);
+        
+        await navigator.share({ files: [file] });
+    } catch (err) {
+        console.error("Fallback share failed:", err);
+        alert("Gagal memproses nota. Silakan coba lagi.");
+    } finally {
+        if (btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            if (window.lucide) lucide.createIcons();
+        }
+    }
 }
     
-  /** * FUNGSI CETAK NOTA 
- * Menggabungkan desain UI modern dengan logika data transaksi
- **/
-function generateNotaHTML(t) {
+async function showDetail(t) {
+  const overlay = document.getElementById('general-modal');
+  const content = document.getElementById('modalContent');
+
+  if (!overlay || !content) {
+    console.error("Elemen modal tidak ditemukan!");
+    return;
+  }
+
+  isDetailChanged = false;
+  content.style.opacity = "0";
+  content.scrollTop = 0;
+
+  // 1. Logika Label Keterangan
+  let labelKeterangan = "Keterangan";
+  let displayValue = t.ket || '-';
+  if (t.kat === 'Penjualan') {
+    labelKeterangan = "Pelanggan";
+    displayValue = t.sub || '-';
+  } else if (t.kat === 'Pembelian') {
+    labelKeterangan = "Supplier";
+    displayValue = t.sub || '-';
+  }
+
+  // 2. Parsing Detail Item
+  let items = [];
+  try {
+    if (Array.isArray(t.detail)) {
+      items = t.detail;
+    } else if (typeof t.detail === 'string' && t.detail.trim() !== '') {
+      items = JSON.parse(t.detail);
+    }
+  } catch (e) {
+    console.error("Gagal parse detail:", e);
+    items = [];
+  }
+
+  let detailHtml = '';
+  let calculatedSubtotal = 0;
+
+  if (items.length > 0) {
+    detailHtml = `
+    <div class="mt-6 border rounded-xl overflow-hidden shadow-sm">
+      <div class="bg-slate-50 px-4 py-2 border-b">
+          <p class="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Item & Rincian</p>
+      </div>
+      <table class="w-full text-[10px]">
+        <thead class="bg-slate-50 border-b text-slate-400">
+          <tr>
+            <th class="p-2 text-left">Item</th>
+            <th class="p-2 text-center">Qty</th>
+            <th class="p-2 text-right">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          ${items.map((d) => {
+            const lineTotal = (parseFloat(d.qty) || 0) * (parseFloat(d.harga) || 0);
+            calculatedSubtotal += lineTotal;
+            return `
+            <tr class="bg-white">
+              <td class="p-2"><span class="font-medium text-slate-700">${d.nama}</span></td>
+              <td class="p-2 text-center text-slate-500">${d.qty}</td>
+              <td class="p-2 text-right font-mono text-slate-600">${formatRupiah(lineTotal)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  const diskon = parseFloat(t.diskon) || 0;
+  const totalSetelahDiskon = calculatedSubtotal - diskon;
+  const paidAmount = t.masuk > 0 ? t.masuk : (t.keluar || 0);
+
+  const rincianBiayaHtml = calculatedSubtotal > 0 ? `
+    <div class="mt-4 p-4 bg-slate-50 border rounded-xl space-y-1.5"> 
+        <div class="flex justify-between items-center text-[10px] text-slate-500">
+          <span>Subtotal Kotor</span>
+          <span>${formatRupiah(calculatedSubtotal)}</span>
+        </div>
+        <div class="flex justify-between items-center text-[10px] text-red-500">
+          <span>Potongan Diskon</span>
+          <span>- ${formatRupiah(diskon)}</span>
+        </div>
+        <div class="flex justify-between items-center pt-1.5 border-t border-slate-200">
+          <span class="text-[9px] font-bold text-blue-600 uppercase">Total Tagihan Akhir</span>
+          <span class="text-sm font-bold text-blue-700">${formatRupiah(totalSetelahDiskon)}</span>
+        </div>
+    </div>
+  ` : '';
+
+  // 3. Render Modal Content
+  content.innerHTML = `
+    <div class="flex items-center gap-3 mb-4">
+        <div class="p-3 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
+          <i data-lucide="${t.tipe === 'MASUK' ? 'trending-up' : 'trending-down'}"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold">Detail ${t.kat}</h2>
+          <p class="text-xs text-gray-400 font-medium">${t.id}</p>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm bg-slate-50 p-4 rounded-xl border mb-4">
+      <div>
+        <p class="text-[10px] text-gray-500 font-bold uppercase">Waktu</p>
+        <p class="font-medium">${t.waktu}</p>
+      </div>
+      <div>
+        <p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p>
+        <p class="font-medium">${t.metode}</p>
+      </div>
+      <div class="col-span-2 pt-2 border-t">
+        <p class="text-[10px] text-gray-500 font-bold uppercase">${labelKeterangan}</p>
+        <p class="font-bold text-slate-800">${displayValue}</p>
+      </div>
+    </div>
+
+    ${rincianBiayaHtml}
+
+    <div class="mt-4 p-3 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
+        <div class="flex flex-col">
+           <span class="text-[9px] font-bold text-slate-400 uppercase">Kas ${t.tipe === 'MASUK' ? 'Diterima' : 'Dibayar'}</span>
+           ${totalSetelahDiskon > paidAmount + 1 ? '<span class="text-[8px] text-orange-500 font-bold italic leading-none">Dibayar Sebagian (DP)</span>' : ''}
+        </div>
+        <span class="text-base font-black text-slate-800">${formatRupiah(paidAmount)}</span>
+    </div>
+    
+    ${detailHtml}
+    
+    <div class="mt-6 grid ${t.kat === 'Penjualan' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
+        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+          Tutup
+        </button>
+        ${t.kat === 'Penjualan' ? `
+          <button id="btnShareNota" onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+             <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+          </button>
+        ` : ''}
+    </div>
+  `;
+
+  // 4. Tampilkan Modal
+  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
+  content.style.opacity = "1";
+  document.body.style.overflow = 'hidden';
+
+  // 5. Inisialisasi Ikon & Pre-render Nota
+  if (window.lucide) lucide.createIcons();
+  
+  if (t.kat === 'Penjualan') {
+    readyToShareFile = null; // Reset file lama
+    const printArea = document.getElementById('printArea');
+    if (printArea) {
+      printArea.innerHTML = generateNotaHTML(t);
+      printArea.style.display = 'block';
+      printArea.style.position = 'fixed';
+      printArea.style.left = '-9999px';
+
+      // Jalankan render di background
+      setTimeout(async () => {
+        try {
+          const canvas = await html2canvas(printArea, {
+            scale: 2, 
+            useCORS: true,
+            backgroundColor: "#ffffff",
+            logging: false
+          });
+          
+          canvas.toBlob((blob) => {
+            readyToShareFile = new File([blob], `Nota_${t.id}.jpg`, { type: "image/jpeg" });
+            console.log("Nota siap (Pre-rendered)");
+          }, 'image/jpeg', 0.85);
+          
+          printArea.style.display = 'none';
+        } catch (err) {
+          console.error("Gagal pre-render:", err);
+        }
+      }, 100);
+    }
+  }
+}
+
+    function generateNotaHTML(t) {
   let subtotal = 0;
   const diskon = Number(t.diskon) || 0;
   let rowsHtml = '';
@@ -2718,6 +2699,17 @@ function generateNotaHTML(t) {
   </div>
 `;
 }
+
+function resetShop() {
+  localStorage.removeItem('shopName');
+  localStorage.removeItem('shopAddress');
+  location.reload(); // Segarkan halaman untuk menampilkan layar pilihan lagi
+}
+    
+  /** * FUNGSI CETAK NOTA 
+ * Menggabungkan desain UI modern dengan logika data transaksi
+ **/
+
     
 function printNota(id) {
   const t = currentTransactions.find(item => item.id === id);
