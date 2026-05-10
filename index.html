@@ -2520,32 +2520,71 @@ async function prepareNotaImage(t) {
 }
 
 async function shareNotaJPG(id, event) {
-    // Jika file belum siap, kita buat dulu (tapi ini berisiko NotAllowedError)
-    // Sebaiknya panggil prepareNotaImage() saat modal detail terbuka
-    if (!tempShareFile) {
-        const t = allTransactions.find(item => item.id === id);
-        await prepareNotaImage(t);
-    }
+  // 1. Ambil data transaksi
+  const t = (typeof allTransactions !== 'undefined' ? allTransactions : currentTransactions).find(item => item.id === id);
+  if (!t) return alert("Data transaksi tidak ditemukan!");
 
-    try {
-        if (navigator.canShare && navigator.canShare({ files: [tempShareFile] })) {
-            await navigator.share({
-                files: [tempShareFile],
-                title: `Nota`,
-                text: `Nota Transaksi #${id}`
-            });
-        } else {
-            throw new Error("Not supported");
-        }
-    } catch (err) {
-        if (err.name !== 'AbortError') {
-            // Fallback download
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(tempShareFile);
-            link.download = tempShareFile.name;
-            link.click();
-        }
+  const btn = event ? event.currentTarget : null;
+  const originalText = btn ? btn.innerHTML : '';
+  
+  if (btn) {
+    btn.innerHTML = '...'; // Gunakan teks singkat agar tidak berat
+    btn.disabled = true;
+  }
+
+  const printArea = document.getElementById('printArea');
+  
+  /* Catatan: Kita asumsikan printArea sudah diisi oleh showDetail() 
+     agar tidak perlu innerHTML ulang yang memakan waktu render.
+  */
+
+  try {
+    // 2. Langsung eksekusi html2canvas tanpa setTimeout
+    // Gunakan scale 2 (sudah sangat cukup tajam) untuk kecepatan maksimal
+    const canvas = await html2canvas(printArea, {
+      scale: 2, 
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      // Penting: Abaikan elemen yang tidak perlu
+      ignoreElements: (el) => el.tagName === 'SCRIPT' || el.tagName === 'STYLE'
+    });
+
+    // 3. Gunakan toBlob langsung (Jauh lebih cepat daripada fetch dataUrl)
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    const fileName = `Nota_${t.id}.jpg`;
+    const file = new File([blob], fileName, { type: "image/jpeg" });
+
+    // 4. Eksekusi Navigator Share SECEPAT MUNGKIN
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: `Nota ${currentShop.nama}`,
+        text: `Nota #${t.id} - ${currentShop.nama}`
+      });
+    } else {
+      // Fallback: Download jika share ditolak/tidak didukung
+      const dataUrl = canvas.toDataURL("image/jpeg");
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = fileName;
+      link.click();
+      alert("Browser tidak mendukung share langsung. File diunduh.");
     }
+  } catch (err) {
+    console.error("Gagal share:", err);
+    // Jika user membatalkan (AbortError), jangan tampilkan alert
+    if (err.name !== 'AbortError') {
+      alert("Gagal membagikan nota. Coba lagi atau gunakan screenshot.");
+    }
+  } finally {
+    if (btn) {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }
+    // Sembunyikan kembali printArea
+    printArea.style.display = 'none';
+  }
 }
 
 function resetShop() {
