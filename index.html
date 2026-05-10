@@ -6,7 +6,7 @@
   <title>Kasir & Arus Kas Modern</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image-more/2.8.0/dom-to-image-more.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   
   <style>
@@ -2490,66 +2490,72 @@ isFullDataLoaded = false;
     
 
 async function shareNotaJPG(id, event) {
- // 1. Pastikan mencari di variabel yang benar (allTransactions atau currentTransactions)
-  const t = (typeof allTransactions !== 'undefined' ? allTransactions : currentTransactions).find(item => item.id === id);
-  if (!t) return alert("Data transaksi tidak ditemukan!");
+    const t = (typeof allTransactions !== 'undefined' ? allTransactions : currentTransactions).find(item => item.id === id);
+    if (!t) return alert("Data transaksi tidak ditemukan!");
 
-  // 2. Ambil referensi tombol secara aman
-  const btn = event ? event.currentTarget : null;
-  const originalText = btn ? btn.innerHTML : '';
-  
-  if (btn) {
-    btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white mr-2 inline-block animate-spin"></div> Memproses';
-    btn.disabled = true;
-  }
-  const printArea = document.getElementById('printArea');
-  printArea.innerHTML = generateNotaHTML(t);
-  printArea.classList.remove('hidden');
-
-  try {
-    // Beri waktu browser merender font & layout
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    const canvas = await html2canvas(printArea, {
-      scale: 3, // Skala 3 agar gambar sangat tajam saat di-zoom di WA
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      width: 380,
-      windowWidth: 380,
-      logging: false
-    });
-
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    const blob = await (await fetch(dataUrl)).blob();
+    const btn = event ? event.currentTarget : null;
+    const originalText = btn ? btn.innerHTML : '';
     
-    // Memberikan nama file yang unik agar tidak tertukar di cache HP
-    const fileName = `Nota_${t.id}_${Date.now()}.jpg`;
-    const file = new File([blob], fileName, { type: "image/jpeg" });
-
-    // Cek apakah browser mendukung sharing file
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: `Nota ${currentShop.nama}`,
-        text: `Nota transaksi #${t.id} - ${currentShop.nama}`
-      });
-    } else {
-      // Fallback: Jika tidak bisa share, maka download otomatis
-      const link = document.createElement('a');
-      link.download = fileName;
-      link.href = dataUrl;
-      link.click();
-      alert("Browser Anda tidak mendukung share langsung. File telah diunduh.");
+    if (btn) {
+        btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white mr-2 inline-block animate-spin"></div> Memproses';
+        btn.disabled = true;
     }
-  } catch (err) {
-    console.error("Gagal share:", err);
-    alert("Maaf, terjadi kesalahan saat memproses gambar.");
-  } finally {
-    // Kembalikan tombol ke semula
-    btn.innerHTML = originalText;
-    btn.disabled = false;
-    printArea.classList.add('hidden');
-  }
+
+    const printArea = document.getElementById('printArea');
+    printArea.innerHTML = generateNotaHTML(t);
+    printArea.classList.remove('hidden');
+
+    // Mengambil elemen kontainer nota yang baru saja dibuat
+    const node = document.getElementById('nota-container');
+
+    try {
+        // Beri sedikit jeda agar DOM benar-benar siap
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        // Pengaturan dom-to-image-more
+        const options = {
+            quality: 0.95,
+            bgcolor: '#ffffff',
+            width: 380, // Sesuai lebar nota di fungsi generateNotaHTML
+            style: {
+                'transform-origin': 'top left',
+                'margin': '0'
+            }
+        };
+
+        // dom-to-image-more menghasilkan DataURL secara langsung
+        const dataUrl = await domtoimage.toJpeg(node, options);
+        
+        // Konversi DataURL ke Blob
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        
+        const fileName = `Nota_${t.id}_${Date.now()}.jpg`;
+        const file = new File([blob], fileName, { type: "image/jpeg" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: `Nota ${currentShop.nama || 'Toko'}`,
+                text: `Nota transaksi #${t.id}`
+            });
+        } else {
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = dataUrl;
+            link.click();
+            alert("File telah diunduh (Browser tidak mendukung share langsung).");
+        }
+    } catch (err) {
+        console.error("Gagal share menggunakan dom-to-image:", err);
+        alert("Maaf, terjadi kesalahan saat memproses gambar.");
+    } finally {
+        if (btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+        printArea.classList.add('hidden');
+    }
 }
 
 function resetShop() {
