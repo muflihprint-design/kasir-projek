@@ -327,7 +327,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbycERMDpjIezKuhHJ57aPV5TsYXSJXOtiYgu0b5nEpvxYxWhNIv-7JZSCGR0r-3ZHHTjA/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyPCVPO286u3kfCWNed2IsM6AGP29CjjLaTCtjrx8F2RJTL0kkBqmwblZuYnmBmXhzaDw/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -2490,71 +2490,65 @@ isFullDataLoaded = false;
     
 
 async function shareNotaJPG(id, event) {
-  // 1. Cari data transaksi
+ // 1. Pastikan mencari di variabel yang benar (allTransactions atau currentTransactions)
   const t = (typeof allTransactions !== 'undefined' ? allTransactions : currentTransactions).find(item => item.id === id);
   if (!t) return alert("Data transaksi tidak ditemukan!");
 
-  // 2. Ambil referensi tombol & siapkan UI
+  // 2. Ambil referensi tombol secara aman
   const btn = event ? event.currentTarget : null;
   const originalText = btn ? btn.innerHTML : '';
   
   if (btn) {
-    btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white mr-2 inline-block animate-spin"></div>';
+    btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white mr-2 inline-block animate-spin"></div> Memproses';
     btn.disabled = true;
   }
-
   const printArea = document.getElementById('printArea');
-  // Isi konten nota
   printArea.innerHTML = generateNotaHTML(t);
-  // PENTING: Jangan gunakan 'hidden', gunakan opacity/position agar tetap ter-render tapi tidak merusak layout
-  printArea.style.display = 'block';
-  printArea.style.position = 'fixed';
-  printArea.style.left = '-9999px';
+  printArea.classList.remove('hidden');
 
   try {
-    // 3. Proses HTML ke Canvas
-    // Gunakan scale 2 saja agar proses cepat & tidak memicu timeout 'user gesture'
+    // Beri waktu browser merender font & layout
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     const canvas = await html2canvas(printArea, {
-      scale: 2,
+      scale: 3, // Skala 3 agar gambar sangat tajam saat di-zoom di WA
       useCORS: true,
       backgroundColor: "#ffffff",
+      width: 380,
+      windowWidth: 380,
       logging: false
     });
 
-    // 4. Konversi ke Blob secara langsung (Lebih cepat daripada DataURL)
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-    const fileName = `Nota_${t.id}.jpg`;
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    const blob = await (await fetch(dataUrl)).blob();
+    
+    // Memberikan nama file yang unik agar tidak tertukar di cache HP
+    const fileName = `Nota_${t.id}_${Date.now()}.jpg`;
     const file = new File([blob], fileName, { type: "image/jpeg" });
 
-    // 5. Eksekusi Share SEGERA
+    // Cek apakah browser mendukung sharing file
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      // Browser harus melihat ini sebagai kelanjutan langsung dari klik 'event'
       await navigator.share({
         files: [file],
-        title: `Nota ${currentShop.nama}`,
-        text: `Nota #${t.id}`
+        title: 'Nota',
+        text: `Nota transaksi #${t.id}`
       });
     } else {
-      // Fallback: Jika browser tidak dukung share file (misal Chrome Desktop)
-      const dataUrl = canvas.toDataURL("image/jpeg");
+      // Fallback: Jika tidak bisa share, maka download otomatis
       const link = document.createElement('a');
-      link.href = dataUrl;
       link.download = fileName;
+      link.href = dataUrl;
       link.click();
-      alert("Format tidak didukung, nota otomatis diunduh.");
+      alert("Browser Anda tidak mendukung share langsung. File telah diunduh.");
     }
   } catch (err) {
-    console.error("Detail Error:", err);
-    if (err.name !== 'AbortError') {
-      alert("Gagal membagikan nota. Pastikan koneksi HTTPS aktif.");
-    }
+    console.error("Gagal share:", err);
+    alert("Maaf, terjadi kesalahan saat memproses gambar.");
   } finally {
-    // Kembalikan UI
-    if (btn) {
-      btn.innerHTML = originalText;
-      btn.disabled = false;
-    }
-    printArea.style.display = 'none';
+    // Kembalikan tombol ke semula
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+    printArea.classList.add('hidden');
   }
 }
 
