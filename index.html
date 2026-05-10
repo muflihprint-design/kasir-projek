@@ -867,6 +867,7 @@ function showDetail(t) {
   content.style.opacity = "0";
   content.scrollTop = 0;
 
+  // MODIFIKASI: Gunakan t.sub untuk Penjualan/Pembelian, t.ket untuk kategori lainnya
   let labelKeterangan = "Keterangan";
   let displayValue = t.ket || '-';
 
@@ -878,6 +879,7 @@ function showDetail(t) {
     displayValue = t.sub || '-';
   }
 
+  // Proteksi & Parsing Detail
   let items = [];
   try {
     if (Array.isArray(t.detail)) {
@@ -908,14 +910,13 @@ function showDetail(t) {
           </tr>
         </thead>
         <tbody class="divide-y">
-          ${items.map((d) => {
+          ${items.map((d, index) => {
             const lineTotal = (parseFloat(d.qty) || 0) * (parseFloat(d.harga) || 0);
             calculatedSubtotal += lineTotal;
             return `
             <tr class="bg-white">
               <td class="p-2">
                 <span class="font-medium text-slate-700 text-[10px]">${d.nama}</span>
-                ${d.kategori && d.kategori !== '-' ? `<br><span class="text-[8px] text-slate-400 italic">${d.kategori}</span>` : ''}
               </td>
               <td class="p-2 text-center text-slate-500 text-[9px]">${d.qty}</td>
               <td class="p-2 text-right font-mono text-slate-600 text-[10px]">${formatRupiah(lineTotal)}</td>
@@ -984,20 +985,15 @@ function showDetail(t) {
     
     ${detailHtml}
     
-    <div class="mt-6 flex flex-col gap-2">
-        ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2 text-sm">
-                <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
-            </button>
-            <button onclick='printStockCard(${JSON.stringify(t)})' class="py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition flex items-center justify-center gap-2 text-sm">
-                <i data-lucide="package" class="w-4 h-4"></i> Kartu Stok
-            </button>
-          </div>
-        ` : ''}
+    <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
         <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
           Tutup
         </button>
+        ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
+          <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+             <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+          </button>
+        ` : ''}
     </div>
   `;
 
@@ -1007,83 +1003,12 @@ function showDetail(t) {
   content.scrollTo(0, 0);
   document.body.style.overflow = 'hidden';
 
-  setTimeout(() => { handleModalScroll(content); }, 100);
+  setTimeout(() => {
+    handleModalScroll(content);
+  }, 100);
   if (window.lucide) lucide.createIcons();
 }
-// FUNGSI KHUSUS CETAK KARTU STOK (DENGAN FILTER TTH)
-function printStockCard(t) {
-    let items = [];
-    try {
-        const rawItems = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail;
-        // Filter: Hanya ambil yang kategorinya BUKAN 'TTH'
-        items = rawItems.filter(item => item.kategori !== 'TTH');
-    } catch (e) {
-        alert("Gagal memproses data barang.");
-        return;
-    }
-
-    if (items.length === 0) {
-        alert("Tidak ada barang fisik (Non-TTH) dalam transaksi ini.");
-        return;
-    }
-
-    const printArea = document.getElementById('printArea');
-    const [tgl] = t.waktu.split(' ');
     
-    printArea.innerHTML = `
-        <div style="padding: 20px; font-family: sans-serif; color: #000; background: #fff;">
-            <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
-                <h2 style="margin: 0; font-size: 16px; text-transform: uppercase;">Kartu Pengeluaran Barang</h2>
-                <div style="font-size: 12px;">${currentShop.nama || 'Gudang'}</div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 15px;">
-                <div>
-                    <div>No: <b>${t.id}</b></div>
-                    <div>Tgl: <b>${tgl}</b></div>
-                </div>
-                <div style="text-align: right;">
-                    <div>Penerima/Pelanggan:</div>
-                    <div style="font-weight: bold;">${t.sub || '-'}</div>
-                </div>
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                <thead>
-                    <tr style="border-bottom: 1px solid #000; background: #f1f5f9;">
-                        <th style="text-align: left; padding: 8px;">Nama Barang</th>
-                        <th style="text-align: center; padding: 8px; width: 60px;">Qty Jual</th>
-                        <th style="text-align: center; padding: 8px; width: 80px; background: #e2e8f0;">Qty Real</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${items.map(item => `
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 10px 8px;"><b>${item.nama}</b></td>
-                            <td style="padding: 10px 8px; text-align: center;">${item.qty}</td>
-                            <td style="padding: 10px 8px; text-align: center; border-left: 1px solid #cbd5e1;">. . . . .</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-
-            <div style="margin-top: 40px; display: flex; justify-content: space-between; text-align: center; font-size: 10px;">
-                <div style="width: 120px;">
-                    <p>Hormat Kami,</p>
-                    <br><br><br>
-                    <p>( .................... )</p>
-                </div>
-                <div style="width: 120px;">
-                    <p>Penerima,</p>
-                    <br><br><br>
-                    <p>( .................... )</p>
-                </div>
-            </div>
-        </div>
-    `;
-
-    window.print();
-}
 
     // Halaman placeholder untuk contoh integrasi
     function renderPenjualanPage() {
@@ -2947,7 +2872,8 @@ function formatRupiahExcel(worksheet, cols, dataStartRow = 1) {
         });
     }
 }    
-  
+
+    
     
   </script>
   <div id="modalOverlay" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-end sm:items-center justify-center p-4 backdrop-blur-sm transition-all">
