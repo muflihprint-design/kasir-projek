@@ -2551,15 +2551,18 @@ async function showDetail(t) {
     ${detailHtml}
     
     <div class="mt-6 grid ${t.kat === 'Penjualan' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
-        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
-          Tutup
-        </button>
-        ${t.kat === 'Penjualan' ? `
-          <button id="btnShareNota" onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-             <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
-          </button>
-        ` : ''}
-    </div>
+    <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+      Tutup
+    </button>
+    
+    ${t.kat === 'Penjualan' ? `
+      <button id="btnShareNota" onclick="shareNotaJPG('${t.id}', event)" 
+              class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+          <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+      </button>
+    ` : ''}
+</div>
+
   `;
 
   // 4. Tampilkan Modal
