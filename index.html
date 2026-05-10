@@ -2490,11 +2490,11 @@ isFullDataLoaded = false;
     
 
 async function shareNotaJPG(id, event) {
- // 1. Pastikan mencari di variabel yang benar (allTransactions atau currentTransactions)
+  // 1. Cari data transaksi
   const t = (typeof allTransactions !== 'undefined' ? allTransactions : currentTransactions).find(item => item.id === id);
   if (!t) return alert("Data transaksi tidak ditemukan!");
 
-  // 2. Ambil referensi tombol secara aman
+  // 2. Ambil referensi tombol & siapkan UI
   const btn = event ? event.currentTarget : null;
   const originalText = btn ? btn.innerHTML : '';
   
@@ -2502,16 +2502,17 @@ async function shareNotaJPG(id, event) {
     btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white mr-2 inline-block animate-spin"></div> Memproses';
     btn.disabled = true;
   }
+
   const printArea = document.getElementById('printArea');
   printArea.innerHTML = generateNotaHTML(t);
   printArea.classList.remove('hidden');
 
   try {
-    // Beri waktu browser merender font & layout
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Kurangi waktu tunggu agar "User Gesture" tidak kadaluwarsa (Maksimal 100-200ms)
+    await new Promise(resolve => setTimeout(resolve, 150));
 
     const canvas = await html2canvas(printArea, {
-      scale: 3, // Skala 3 agar gambar sangat tajam saat di-zoom di WA
+      scale: 2, // Skala 2 sudah cukup tajam untuk WA dan lebih cepat prosesnya
       useCORS: true,
       backgroundColor: "#ffffff",
       width: 380,
@@ -2519,35 +2520,41 @@ async function shareNotaJPG(id, event) {
       logging: false
     });
 
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    const blob = await (await fetch(dataUrl)).blob();
-    
-    // Memberikan nama file yang unik agar tidak tertukar di cache HP
-    const fileName = `Nota_${t.id}_${Date.now()}.jpg`;
+    // Langsung konversi ke Blob tanpa melalui DataURL untuk efisiensi memori & waktu
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    const fileName = `Nota_${t.id}.jpg`;
     const file = new File([blob], fileName, { type: "image/jpeg" });
 
-    // Cek apakah browser mendukung sharing file
+    // 3. Eksekusi Share
+    // PENTING: navigator.share harus dipanggil secepat mungkin setelah klik
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: `Nota ${currentShop.nama}`,
-        text: `Nota transaksi #${t.id} - ${currentShop.nama}`
-      });
+      try {
+        await navigator.share({
+          files: [file],
+          title: `Nota ${currentShop.nama}`,
+          text: `Nota transaksi #${t.id} - ${currentShop.nama}`
+        });
+      } catch (shareErr) {
+        // Jika user membatalkan share, jangan tampilkan error sebagai alert
+        if (shareErr.name !== 'AbortError') throw shareErr;
+      }
     } else {
-      // Fallback: Jika tidak bisa share, maka download otomatis
+      // Fallback: Download jika API Share tidak didukung
+      const dataUrl = canvas.toDataURL("image/jpeg");
       const link = document.createElement('a');
       link.download = fileName;
       link.href = dataUrl;
       link.click();
-      alert("Browser Anda tidak mendukung share langsung. File telah diunduh.");
+      alert("Browser tidak mendukung share langsung. Nota telah diunduh.");
     }
   } catch (err) {
     console.error("Gagal share:", err);
-    alert("Maaf, terjadi kesalahan saat memproses gambar.");
+    alert("Gagal memproses nota: " + err.message);
   } finally {
-    // Kembalikan tombol ke semula
-    btn.innerHTML = originalText;
-    btn.disabled = false;
+    if (btn) {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }
     printArea.classList.add('hidden');
   }
 }
