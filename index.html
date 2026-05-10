@@ -6,7 +6,7 @@
   <title>Kasir & Arus Kas Modern</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image-more/2.8.0/dom-to-image-more.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@2.8.0/dist/dom-to-image-more.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   
   <style>
@@ -2490,6 +2490,13 @@ isFullDataLoaded = false;
     
 
 async function shareNotaJPG(id, event) {
+    // 1. Cek keberadaan library domtoimage
+    if (typeof domtoimage === 'undefined') {
+        console.error("Library domtoimage tidak ditemukan.");
+        alert("Sistem sedang memuat komponen gambar, mohon tunggu 3 detik dan coba lagi.");
+        return;
+    }
+
     const t = (typeof allTransactions !== 'undefined' ? allTransactions : currentTransactions).find(item => item.id === id);
     if (!t) return alert("Data transaksi tidak ditemukan!");
 
@@ -2497,7 +2504,7 @@ async function shareNotaJPG(id, event) {
     const originalText = btn ? btn.innerHTML : '';
     
     if (btn) {
-        btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white mr-2 inline-block animate-spin"></div> Memproses';
+        btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white mr-2 inline-block animate-spin rounded-full"></div> Memproses';
         btn.disabled = true;
     }
 
@@ -2505,34 +2512,32 @@ async function shareNotaJPG(id, event) {
     printArea.innerHTML = generateNotaHTML(t);
     printArea.classList.remove('hidden');
 
-    // Mengambil elemen kontainer nota yang baru saja dibuat
+    // Ambil element nota yang baru dibuat
     const node = document.getElementById('nota-container');
 
     try {
-        // Beri sedikit jeda agar DOM benar-benar siap
-        await new Promise(resolve => setTimeout(resolve, 150));
+        // Beri waktu sejenak untuk rendering CSS/Font
+        await new Promise(resolve => setTimeout(resolve, 200));
 
-        // Pengaturan dom-to-image-more
+        // Konfigurasi dom-to-image-more
         const options = {
             quality: 0.95,
             bgcolor: '#ffffff',
-            width: 380, // Sesuai lebar nota di fungsi generateNotaHTML
-            style: {
-                'transform-origin': 'top left',
-                'margin': '0'
-            }
+            width: 380,
+            // Memastikan font eksternal (seperti Inter) ikut terbawa
+            cacheBust: true 
         };
 
-        // dom-to-image-more menghasilkan DataURL secara langsung
+        // Proses konversi
         const dataUrl = await domtoimage.toJpeg(node, options);
         
-        // Konversi DataURL ke Blob
         const res = await fetch(dataUrl);
         const blob = await res.blob();
         
-        const fileName = `Nota_${t.id}_${Date.now()}.jpg`;
+        const fileName = `Nota_${t.id}.jpg`;
         const file = new File([blob], fileName, { type: "image/jpeg" });
 
+        // Fitur Share
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({
                 files: [file],
@@ -2540,15 +2545,16 @@ async function shareNotaJPG(id, event) {
                 text: `Nota transaksi #${t.id}`
             });
         } else {
+            // Fallback Download
             const link = document.createElement('a');
             link.download = fileName;
             link.href = dataUrl;
             link.click();
-            alert("File telah diunduh (Browser tidak mendukung share langsung).");
+            alert("Browser tidak mendukung share langsung, file telah diunduh.");
         }
     } catch (err) {
-        console.error("Gagal share menggunakan dom-to-image:", err);
-        alert("Maaf, terjadi kesalahan saat memproses gambar.");
+        console.error("Gagal membuat gambar:", err);
+        alert("Gagal memproses gambar. Pastikan koneksi internet stabil untuk memuat library.");
     } finally {
         if (btn) {
             btn.innerHTML = originalText;
@@ -2557,7 +2563,7 @@ async function shareNotaJPG(id, event) {
         printArea.classList.add('hidden');
     }
 }
-
+    
 function resetShop() {
   localStorage.removeItem('shopName');
   localStorage.removeItem('shopAddress');
