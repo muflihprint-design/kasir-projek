@@ -1060,7 +1060,7 @@ function showDetail(t) {
       </head>
       <body>
         <div class="header">
-          <h2 style="margin:0">KARTU PENGELUARAN BARANG (GUDANG)</h2>
+          <h2 style="margin:0">KARTU PENGELUARAN BARANG</h2>
           <p style="margin:5px 0">No. Ref: ${t.id} | Tgl: ${t.waktu}</p>
           <p style="margin:0">Tujuan: <strong>${t.sub || '-'}</strong></p>
         </div>
@@ -1072,24 +1072,11 @@ function showDetail(t) {
               <th>Nama Barang</th>
               <th>Qty Sistem</th>
               <th>Qty Real</th>
-              <th>Ceklis</th>
-            </tr>
+             </tr>
           </thead>
           <tbody>${tableRows}</tbody>
         </table>
-
-        <div class="footer">
-          <div class="sig">
-            <p>Admin Gudang,</p>
-            <br><br><br>
-            <p>( .................... )</p>
-          </div>
-          <div class="sig">
-            <p>Sopir / Kurir,</p>
-            <br><br><br>
-            <p>( .................... )</p>
-          </div>
-        </div>
+        
         <script>
           window.onload = function() { window.print(); window.close(); }
         <\/script>
