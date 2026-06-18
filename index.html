@@ -327,7 +327,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbycERMDpjIezKuhHJ57aPV5TsYXSJXOtiYgu0b5nEpvxYxWhNIv-7JZSCGR0r-3ZHHTjA/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxwO1r0yJkeTpgmdqNLWhzNimEAsR74RvIuMzXm6N9OsCwFRtAVxoYeqyOFZKqXQ_KK6w/exec";
 
     let allTransactions = [];
     let isDataLoaded = false;
@@ -569,7 +569,10 @@ function initRiwayatStructure() {
               <button onclick="setFilter('today')" id="f-today" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Hari Ini</button>
               <button onclick="setFilter('month')" id="f-month" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Bulan Ini</button>
               <button onclick="setFilter('all')" id="f-all" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Semua</button>
-            </div>
+            <button id="filter-revisi" onclick="setFilter('revisi')" class="px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-colors flex items-center">
+     <span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-1.5 animate-pulse"></span> Revisi
+  </button>
+              </div>
             
             <!-- Tombol Excel Hanya Ikon -->
             <button onclick="downloadExcel()" class="w-8 h-8 flex items-center justify-center bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-all shadow-sm shrink-0" title="Ekspor Excel">
@@ -672,6 +675,13 @@ async function fetchTransactions() {
   container.innerHTML = '';
 
   const filtered = allTransactions.filter(t => {
+// --- TAMBAHAN LOGIKA REVISI ---
+    if (currentFilter === 'revisi') {
+      const isNeedRevisi = t.revisi && t.revisi.trim() !== "" && (!t.ketSelesai || t.ketSelesai.trim() === "");
+      if (!isNeedRevisi) return false;
+    }
+    // ------------------------------
+
     if (currentView !== 'Semua' && t.metode !== currentView) return false;
     if (currentCategory !== 'SEMUA' && t.tipe !== currentCategory) return false;
     
@@ -774,24 +784,31 @@ async function fetchTransactions() {
   lucide.createIcons();
 }
     
-  async  function setFilter(f) {
+  async function setFilter(f) {
   currentFilter = f;
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
   const date = String(now.getDate()).padStart(2, '0');
   const monthStr = String(month + 1).padStart(2, '0');
-
-  // String untuk tanggal hari ini (YYYY-MM-DD)
   const todayStr = `${year}-${monthStr}-${date}`;
 
-  // 1. Update UI Tombol (Toggle Warna)
-  ['today', 'month', 'all'].forEach(type => {
+  // 1. Update UI Tombol
+  // Tambahkan 'revisi' ke list
+  ['today', 'month', 'all', 'revisi'].forEach(type => {
     const el = document.getElementById('f-' + type);
     if (el) {
-      el.className = (f === type) ? 
-        'px-3 py-1 bg-blue-600 text-white rounded-full transition' : 
-        'px-3 py-1 bg-gray-100 rounded-full hover:bg-gray-200 transition';
+      // Styling khusus untuk revisi agar tetap orange
+      const isActive = (f === type);
+      if (type === 'revisi') {
+        el.className = isActive ? 
+          'px-3 py-1 bg-orange-500 text-white rounded-full transition' : 
+          'px-3 py-1 bg-orange-100 text-orange-600 rounded-full hover:bg-orange-200 transition';
+      } else {
+        el.className = isActive ? 
+          'px-3 py-1 bg-blue-600 text-white rounded-full transition' : 
+          'px-3 py-1 bg-gray-100 rounded-full hover:bg-gray-200 transition';
+      }
     }
   });
 
@@ -802,13 +819,15 @@ async function fetchTransactions() {
   } else if (f === 'month') {
     document.getElementById('f-date-start').value = `${year}-${monthStr}-01`;
     document.getElementById('f-date-end').value = todayStr;
-  } else if (f === 'all') {
+  } else if (f === 'all' || f === 'revisi') {
+    // Kosongkan filter tanggal untuk 'all' dan 'revisi' agar data muncul semua
     document.getElementById('f-date-start').value = '';
     document.getElementById('f-date-end').value = '';
   }
-// 3. LOGIKA TARIK DATA OTOMATIS
-  // Jika pilih 'month' atau 'all' DAN belum pernah tarik data penuh
-  if ((f === 'month' || f === 'all') && !isFullDataLoaded) {
+
+  // 3. Logika Tarik Data
+  // Tambahkan 'revisi' agar aplikasi menarik data lengkap jika belum ada
+  if ((f === 'month' || f === 'all' || f === 'revisi') && !isFullDataLoaded) {
     await fetchFullTransactions();
   } else {
     renderTransactions();
@@ -854,6 +873,41 @@ async function checkManualDateChange() {
       renderTransactions();
     }
 
+function setLoading(buttonElement, isLoading) {
+    if (isLoading) {
+        buttonElement.disabled = true;
+        buttonElement.classList.add('opacity-50', 'cursor-not-allowed');
+        // Simpan teks asli
+        buttonElement.dataset.originalText = buttonElement.innerHTML;
+        // Ubah tampilan
+        buttonElement.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 animate-spin mr-1"></i> Proses...';
+    } else {
+        buttonElement.disabled = false;
+        buttonElement.classList.remove('opacity-50', 'cursor-not-allowed');
+        // Kembalikan teks asli
+        buttonElement.innerHTML = buttonElement.dataset.originalText;
+    }
+    // Refresh ikon Lucide
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function toggleModalButtons(enabled) {
+    const content = document.getElementById('modalContent');
+    if (!content) return;
+    
+    // Cari semua tombol di dalam konten modal
+    const buttons = content.querySelectorAll('button');
+    
+    buttons.forEach(btn => {
+        btn.disabled = !enabled;
+        if (!enabled) {
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    });
+}
+
 function showDetail(t) {
   const overlay = document.getElementById('general-modal');
   const content = document.getElementById('modalContent');
@@ -867,7 +921,7 @@ function showDetail(t) {
   content.style.opacity = "0";
   content.scrollTop = 0;
 
-  // MODIFIKASI: Gunakan t.sub untuk Penjualan/Pembelian, t.ket untuk kategori lainnya
+  // Variabel Label Keterangan
   let labelKeterangan = "Keterangan";
   let displayValue = t.ket || '-';
 
@@ -879,7 +933,7 @@ function showDetail(t) {
     displayValue = t.sub || '-';
   }
 
-  // Proteksi & Parsing Detail
+  // --- Parsing Detail ---
   let items = [];
   try {
     if (Array.isArray(t.detail)) {
@@ -947,6 +1001,44 @@ function showDetail(t) {
     </div>
   ` : '';
 
+  // --- Logika Catatan Revisi ---
+  let revisiHtml = `
+    <div class="mt-4 pt-4 border-t-2 border-dashed border-gray-200" id="revisi-section-${t.id}">
+      <h3 class="text-[10px] font-bold text-slate-700 mb-2 flex items-center uppercase tracking-wider">
+        <i data-lucide="file-edit" class="w-3 h-3 mr-2 text-blue-600"></i> Catatan Revisi
+      </h3>
+  `;
+
+if (t.revisi && t.revisi.trim() !== '') {
+    revisiHtml += `
+        <div class="bg-orange-50 text-orange-800 p-3 rounded-lg border border-orange-200 text-[10px] mb-3 leading-relaxed">
+            ${t.revisi}
+        </div>
+    `;
+    
+    // Tombol aksi tetap ditampilkan jika belum selesai
+    if (!t.ketSelesai || t.ketSelesai.trim() === '') {
+        revisiHtml += `
+            <div class="flex gap-2">
+                <button onclick="handleRevisiAction('edit', '${t.id}', '${(t.revisi || '').replace(/'/g, "\\'")}', event)" class="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-lg text-[10px] font-semibold hover:bg-gray-50 flex justify-center items-center shadow-sm">
+                    <i data-lucide="edit-3" class="w-3 h-3 mr-1"></i> Edit
+                </button>
+                <button onclick="handleRevisiAction('selesai', '${t.id}', '', event)" class="flex-1 bg-green-500 text-white py-2 rounded-lg text-[10px] font-semibold hover:bg-green-600 shadow-sm flex justify-center items-center">
+                    <i data-lucide="check-circle-2" class="w-3 h-3 mr-1"></i> Selesai
+                </button>
+            </div>
+        `;
+    }
+} else {
+    revisiHtml += `
+        <button onclick="handleRevisiAction('tambah', '${t.id}', '', event)" class="w-full bg-blue-50 border border-dashed border-blue-300 text-blue-600 py-2 rounded-lg text-[10px] font-semibold hover:bg-blue-100 flex justify-center items-center">
+            <i data-lucide="plus" class="w-3 h-3 mr-1"></i> Tambah Revisi
+        </button>
+    `;
+}
+  revisiHtml += `</div>`;
+
+  // --- Rendering Utama ---
   content.innerHTML = `
     <div class="flex items-center gap-3 mb-4">
         <div class="p-3 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
@@ -961,19 +1053,21 @@ function showDetail(t) {
     <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm bg-slate-50 p-4 rounded-xl border mb-4">
       <div>
         <p class="text-[10px] text-gray-500 font-bold uppercase">Waktu</p>
-        <p class="font-medium">${t.waktu}</p>
+        <p class="font-medium text-xs">${t.waktu}</p>
       </div>
       <div>
         <p class="text-[10px] text-gray-500 font-bold uppercase">Metode</p>
-        <p class="font-medium">${t.metode}</p>
+        <p class="font-medium text-xs">${t.metode}</p>
       </div>
       <div class="col-span-2 pt-2 border-t">
         <p class="text-[10px] text-gray-500 font-bold uppercase">${labelKeterangan}</p>
-        <p class="font-bold text-slate-800">${displayValue}</p>
+        <p class="font-bold text-slate-800 text-xs">${displayValue}</p>
       </div>
     </div>
 
     ${rincianBiayaHtml}
+    ${detailHtml}
+    ${revisiHtml}
 
     <div class="mt-4 p-3 bg-white border-2 border-slate-100 rounded-xl flex justify-between items-center shadow-sm">
         <div class="flex flex-col">
@@ -983,15 +1077,13 @@ function showDetail(t) {
         <span class="text-base font-black text-slate-800">${formatRupiah(t.masuk > 0 ? t.masuk : t.keluar)}</span>
     </div>
     
-    ${detailHtml}
-    
     <div class="mt-6 grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
-        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">
+        <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition text-sm">
           Tutup
         </button>
         ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? `
-          <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-             <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
+          <button onclick="shareNotaJPG('${t.id}', event)" class="py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2 text-sm">
+              <i data-lucide="share-2" class="w-4 h-4"></i> Nota (JPG)
           </button>
         ` : ''}
     </div>
@@ -1009,6 +1101,84 @@ function showDetail(t) {
   if (window.lucide) lucide.createIcons();
 }
     
+// --- HTTP Request Logic (Mutasi Revisi) ---
+window.handleRevisiAction = async function(type, trxId, oldNote = '', event) {
+    const btn = event.currentTarget;
+    let action = '';
+    let payload = {};
+
+    // 1. Logika Input
+    if (type === 'tambah' || type === 'edit') {
+        const promptMsg = type === 'tambah' ? "Masukkan Catatan Revisi:" : "Edit Catatan Revisi:";
+        const note = prompt(promptMsg, oldNote);
+        if (note === null || note.trim() === '' || note.trim() === oldNote) return;
+        
+        action = 'updateRevisi';
+        payload = { catatanRevisi: note.trim() };
+    } else if (type === 'selesai') {
+        action = 'selesaiRevisi';
+        payload = { keteranganSelesai: 'Selesai' };
+    }
+
+    // 2. KUNCI SEMUA TOMBOL MODAL
+    toggleModalButtons(false); 
+    setLoading(btn, true); // Animasi spinner pada tombol yang diklik
+
+    const sectionEl = document.getElementById(`revisi-section-${trxId}`);
+    if (sectionEl) sectionEl.style.opacity = '0.5';
+
+    try {
+        const bodyPayload = { action: action, trxId: trxId, ...payload };
+        
+        // Simulasi/Fetch API
+        if (typeof WEB_APP_URL === 'undefined' || WEB_APP_URL.trim() === "") {
+            console.warn("WEB_APP_URL belum diset.");
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            updateStateAndRenderUI(action, trxId, payload);
+        } else {
+            const response = await fetch(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify(bodyPayload)
+            });
+            const result = await response.json();
+            if (result.success || result.status === 'success') {
+                updateStateAndRenderUI(action, trxId, payload);
+            } else {
+                alert("Gagal memproses revisi: " + (result.message || "Unknown Error"));
+            }
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Terjadi kesalahan jaringan.");
+    } finally {
+        // 3. BUKA KUNCI SEMUA TOMBOL
+        if (sectionEl) sectionEl.style.opacity = '1';
+        setLoading(btn, false);
+        toggleModalButtons(true);
+    }
+}
+
+// Mutasi State & Reactivity2
+function updateStateAndRenderUI(action, trxId, payload) {
+    // Ubah transactions menjadi allTransactions
+    const trxIndex = allTransactions.findIndex(t => t.id === trxId);
+    
+    if (trxIndex !== -1) {
+        // Update data di array allTransactions lokal
+        if (action === 'updateRevisi') {
+            allTransactions[trxIndex].revisi = payload.catatanRevisi;
+        } else if (action === 'selesaiRevisi') {
+            allTransactions[trxIndex].ketSelesai = payload.keteranganSelesai;
+        }
+        
+        // Segera Re-Render UI (List Riwayat & Detail) tanpa harus reload
+        renderTransactions();
+        
+        // Update Modal Detail (Mengirim objek transaksi yang sudah terupdate)
+        showDetail(allTransactions[trxIndex]); 
+    }
+}
+
 
     // Halaman placeholder untuk contoh integrasi
     function renderPenjualanPage() {
