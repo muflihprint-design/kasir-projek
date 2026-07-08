@@ -341,6 +341,9 @@ let currentShop = {
   alamat: localStorage.getItem('shopAddress') || ''
 };
 
+let currentPage = 1;
+let itemsPerPage = 20; // Angka 20 atau string 'all'
+
 // Fungsi saat toko dipilih
 function selectShop(nama, alamat) {
   currentShop.nama = nama.toUpperCase();
@@ -555,32 +558,26 @@ window.addEventListener('click', function(event) {
 function initRiwayatStructure() {
   const container = document.getElementById('riwayat-container');
   container.innerHTML = `
-    <div class="overflow-hidden bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50">
-      <!-- Header Section -->
+    <div class="overflow-hidden bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col">
       <div class="p-4 bg-white border-b border-slate-50 flex flex-col gap-3">
         
-        <!-- Row: Combined Filters & Date Picker -->
-        <!-- md:flex-row akan membuat semua jadi satu baris di layar desktop -->
         <div class="flex flex-col md:flex-row items-center gap-2">
           
-          <!-- Group 1: Time Filters & Excel Icon -->
           <div class="flex items-center gap-1 p-1 bg-slate-100 rounded-full w-full md:w-auto">
             <div class="flex items-center gap-1 flex-1 md:flex-none">
               <button onclick="setFilter('today')" id="f-today" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Hari Ini</button>
               <button onclick="setFilter('month')" id="f-month" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Bulan Ini</button>
               <button onclick="setFilter('all')" id="f-all" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Semua</button>
-            <button id="filter-revisi" onclick="setFilter('revisi')" class="px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-colors flex items-center">
-     <span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-1.5 animate-pulse"></span> Revisi
-  </button>
-              </div>
+              <button id="filter-revisi" onclick="setFilter('revisi')" class="px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-colors flex items-center">
+                <span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-1.5 animate-pulse"></span> Revisi
+              </button>
+            </div>
             
-            <!-- Tombol Excel Hanya Ikon -->
             <button onclick="downloadExcel()" class="w-8 h-8 flex items-center justify-center bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-all shadow-sm shrink-0" title="Ekspor Excel">
               <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
             </button>
           </div>
 
-          <!-- Group 2: Date Picker Range (Wider for Year) -->
           <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus-within:border-blue-300 transition-all justify-center w-full md:w-auto">
             <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
             <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
@@ -593,18 +590,16 @@ function initRiwayatStructure() {
           </div>
         </div>
 
-        <!-- Row: Search Input -->
         <div class="relative w-full group">
           <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
             <i data-lucide="search" class="w-4 h-4"></i>
           </span>
-          <input type="text" id="searchInput" oninput="renderTransactions()" 
+          <input type="text" id="searchInput" oninput="currentPage=1; renderTransactions()" 
             placeholder="Cari ID, Keterangan, Nama Produk" 
             class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200 transition-all">
         </div>
       </div>
 
-      <!-- Rest of the UI (Tabs, List Container, etc.) tetap sama -->
       <div class="bg-slate-50/50 flex border-b border-slate-100">
         <button onclick="setView('Cash')" id="v-cash" class="flex-1 py-3 text-[10px] font-black text-slate-400 border-b-2 border-transparent tracking-tighter">CASH</button>
         <button onclick="setView('Rekening')" id="v-bank" class="flex-1 py-3 text-[10px] font-black text-slate-400 border-b-2 border-transparent tracking-tighter">REKENING</button>
@@ -617,7 +612,9 @@ function initRiwayatStructure() {
         <button onclick="setCategory('KELUAR')" id="cat-keluar" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Keluar</button>
       </div>
 
-      <div id="listContainer" class="bg-slate-50/20 divide-y divide-slate-50 max-h-[550px] overflow-y-auto pb-10 custom-scrollbar"></div>
+      <div id="listContainer" class="bg-slate-50/20 divide-y divide-slate-50 max-h-[550px] overflow-y-auto custom-scrollbar flex-1"></div>
+      
+      <div id="paginationContainer" class="bg-white border-t border-slate-100 p-3"></div>
     </div>
   `;
   lucide.createIcons();
@@ -653,6 +650,7 @@ async function fetchTransactions() {
 
 
     function setCategory(cat) {
+      currentPage = 1;
       currentCategory = cat;
       const categories = ['SEMUA', 'MASUK', 'KELUAR'];
       categories.forEach(c => {
@@ -674,13 +672,12 @@ async function fetchTransactions() {
   
   container.innerHTML = '';
 
+  // 1. Lakukan Filtering seperti biasa
   const filtered = allTransactions.filter(t => {
-// --- TAMBAHAN LOGIKA REVISI ---
     if (currentFilter === 'revisi') {
       const isNeedRevisi = t.revisi && t.revisi.trim() !== "" && (!t.ketSelesai || t.ketSelesai.trim() === "");
       if (!isNeedRevisi) return false;
     }
-    // ------------------------------
 
     if (currentView !== 'Semua' && t.metode !== currentView) return false;
     if (currentCategory !== 'SEMUA' && t.tipe !== currentCategory) return false;
@@ -707,6 +704,7 @@ async function fetchTransactions() {
            productNames.includes(searchTerm);
   });
 
+  // Jika Kosong
   if (filtered.length === 0) {
     container.innerHTML = `
       <div class="py-16 text-center">
@@ -716,18 +714,35 @@ async function fetchTransactions() {
         <p class="text-slate-500 font-medium">Tidak ada transaksi ditemukan</p>
         <p class="text-slate-400 text-xs mt-1">Coba sesuaikan filter atau kata kunci pencarian Anda</p>
       </div>`;
+    document.getElementById('paginationContainer').innerHTML = ''; // Kosongkan pagination
     lucide.createIcons();
     return;
   }
 
-  // Render Item
-  filtered.forEach(t => {
+  // 2. Logika Pagination
+  const totalItems = filtered.length;
+  let totalPages = 1;
+  let paginatedData = filtered;
+
+  if (itemsPerPage !== 'all') {
+    totalPages = Math.ceil(totalItems / itemsPerPage);
+    // Mencegah error jika filter menyebabkan currentPage melebihi total halaman baru
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage);
+  } else {
+    currentPage = 1; // Paksa ke halaman 1 jika menampilkan semua
+  }
+
+  // 3. Render Item (Menggunakan data paginatedData, bukan filtered)
+  paginatedData.forEach(t => {
     const isMasuk = t.tipe === 'MASUK';
     const amount = isMasuk ? t.masuk : t.keluar;
     const [tgl, wkt] = t.waktu.split(' ');
     const jamMenit = wkt.substring(0, 5);
 
-    // Badge styling based on category
     const getKatColor = (kat) => {
       const k = kat.toUpperCase();
       if (k === 'PENJUALAN') return 'bg-blue-50 text-blue-600 ring-blue-500/20';
@@ -736,7 +751,6 @@ async function fetchTransactions() {
     };
 
     const div = document.createElement('div');
-    // Card Container: Subtle shadow, border, and nice spacing
     div.className = `group mx-4 my-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200 transition-all duration-200 cursor-pointer active:scale-[0.98]`;
     
     div.onclick = () => showDetail(t);
@@ -781,10 +795,84 @@ async function fetchTransactions() {
     container.appendChild(div);
   });
   
+  // 4. Panggil render Pagination UI di bawah
+  renderPagination(totalItems, totalPages);
   lucide.createIcons();
 }
+
+
+function renderPagination(totalItems, totalPages) {
+  const container = document.getElementById('paginationContainer');
+  if (!container) return;
+
+  // Dropdown pilihan limit
+  const limitSelector = `
+    <div class="flex items-center gap-2">
+      <span class="text-[11px] font-medium text-slate-500">Tampilkan:</span>
+      <select onchange="updateItemsPerPage(this.value)" class="bg-slate-50 border border-slate-200 text-slate-600 text-[11px] rounded-lg px-2 py-1 outline-none focus:border-blue-300 font-medium cursor-pointer">
+        <option value="20" ${itemsPerPage === 20 ? 'selected' : ''}>20 Data</option>
+        <option value="all" ${itemsPerPage === 'all' ? 'selected' : ''}>Semua</option>
+      </select>
+    </div>
+  `;
+
+  // Tombol Kontrol Halaman (Hanya tampil jika bukan 'all' dan halaman > 1)
+  let paginationControls = '';
+  if (itemsPerPage !== 'all' && totalPages > 1) {
+    paginationControls = `
+      <div class="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-100">
+        <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} 
+          class="p-1 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-all shadow-sm">
+          <i data-lucide="chevron-left" class="w-4 h-4"></i>
+        </button>
+        
+        <span class="text-[11px] font-bold text-slate-600 px-2">
+          Hal ${currentPage} / ${totalPages}
+        </span>
+        
+        <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} 
+          class="p-1 rounded-md bg-white border border-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-all shadow-sm">
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+    `;
+  }
+
+  const info = `<div class="text-[11px] font-medium text-slate-400">Total: <span class="text-slate-600 font-bold">${totalItems}</span> Transaksi</div>`;
+
+  // Gabungkan ke container (Responsive layout)
+  container.innerHTML = `
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      ${limitSelector}
+      ${paginationControls}
+      ${info}
+    </div>
+  `;
+}
+
+// Helper: Ubah Items Per Page
+window.updateItemsPerPage = function(val) {
+  itemsPerPage = val === 'all' ? 'all' : parseInt(val);
+  currentPage = 1; // Reset halaman saat mengubah limit
+  renderTransactions();
+}
+
+// Helper: Ubah Halaman
+window.changePage = function(page) {
+  currentPage = page;
+  
+  // Gulir ke bagian atas daftar agar user langsung melihat item paling atas dari halaman baru
+  const listContainer = document.getElementById('listContainer');
+  if(listContainer) {
+    listContainer.scrollTop = 0; 
+  }
+  
+  renderTransactions();
+}
+// ------------------------------------
     
   async function setFilter(f) {
+    currentPage = 1;
   currentFilter = f;
   const now = new Date();
   const year = now.getFullYear();
@@ -863,6 +951,7 @@ async function checkManualDateChange() {
 }
     
     function setView(v) {
+      currentPage = 1;
       currentView = v;
       ['v-cash', 'v-bank', 'v-all'].forEach(id => {
         const el = document.getElementById(id);
