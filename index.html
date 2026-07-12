@@ -3000,8 +3000,15 @@ function downloadExcel() {
         let excelRows = [];
         let summaryMap = {};
         
-        // --- DEKLARASI TRACKER OMSET JENIS ORDERAN ---
+        // --- DEKLARASI TRACKER OMSET JENIS ORDERAN GLOBAL ---
         let orderTypeSummary = {
+            'UNDANGAN': 0,
+            'BLANGKO': 0,
+            'LAIN-LAIN': 0
+        };
+
+        // --- DEKLARASI TRACKER OMSET KHUSUS KASIR VI PRINTING ---
+        let viPrintingSummary = {
             'UNDANGAN': 0,
             'BLANGKO': 0,
             'LAIN-LAIN': 0
@@ -3082,8 +3089,14 @@ function downloadExcel() {
                     summaryMap[kategori].Net += netRow;
 
                     // Akumulasi Omset Jenis Orderan (Khusus Kategori Penjualan)
-                    if (kategori === "PENJUALAN" && orderTypeSummary[jenisOrderan] !== undefined) {
-                        orderTypeSummary[jenisOrderan] += netRow;
+                    if (kategori === "PENJUALAN") {
+                        if (orderTypeSummary[jenisOrderan] !== undefined) {
+                            orderTypeSummary[jenisOrderan] += netRow;
+                        }
+                        // Akumulasi khusus kasir Vi Printing untuk semua jenis orderan
+                        if (petugasKasir === "Vi Printing" && viPrintingSummary[jenisOrderan] !== undefined) {
+                            viPrintingSummary[jenisOrderan] += netRow;
+                        }
                     }
                 });
             } else {
@@ -3111,8 +3124,14 @@ function downloadExcel() {
                 summaryMap[kategori].Net += netRow;
 
                 // Akumulasi Omset Jenis Orderan (Khusus Kategori Penjualan)
-                if (kategori === "PENJUALAN" && orderTypeSummary[jenisOrderan] !== undefined) {
-                    orderTypeSummary[jenisOrderan] += netRow;
+                if (kategori === "PENJUALAN") {
+                    if (orderTypeSummary[jenisOrderan] !== undefined) {
+                        orderTypeSummary[jenisOrderan] += netRow;
+                    }
+                    // Akumulasi khusus kasir Vi Printing untuk semua jenis orderan
+                    if (petugasKasir === "Vi Printing" && viPrintingSummary[jenisOrderan] !== undefined) {
+                        viPrintingSummary[jenisOrderan] += netRow;
+                    }
                 }
             }
         });
@@ -3126,7 +3145,7 @@ function downloadExcel() {
             'Total Bersih (Net)': summaryMap[kat].Net
         }));
 
-        // --- SUSUN DATA UNTUK TABEL BONUS & JENIS ORDERAN ---
+        // --- SUSUN DATA UNTUK TABEL BONUS & JENIS ORDERAN GLOBAL ---
         const omsetUndangan = orderTypeSummary['UNDANGAN'];
         const omsetBlangko = orderTypeSummary['BLANGKO'];
         const omsetLain = orderTypeSummary['LAIN-LAIN'];
@@ -3141,6 +3160,23 @@ function downloadExcel() {
             { 'Jenis Orderan': 'BLANGKO', 'Total Omset': omsetBlangko, 'Skema Bonus': '1%', 'Bonus Penjualan': bonusBlangko },
             { 'Jenis Orderan': 'LAIN-LAIN', 'Total Omset': omsetLain, 'Skema Bonus': '0%', 'Bonus Penjualan': 0 },
             { 'Jenis Orderan': 'TOTAL PENJUALAN', 'Total Omset': totalOmsetPenjualan, 'Skema Bonus': '-', 'Bonus Penjualan': totalBonus }
+        ];
+
+        // --- SUSUN DATA UNTUK TABEL BONUS KHUSUS PETUGAS KASIR VI PRINTING ---
+        const viOmsetUndangan = viPrintingSummary['UNDANGAN'];
+        const viOmsetBlangko = viPrintingSummary['BLANGKO'];
+        const viOmsetLain = viPrintingSummary['LAIN-LAIN'];
+        const viTotalOmset = viOmsetUndangan + viOmsetBlangko + viOmsetLain;
+
+        // Hitung bonus (Hanya Undangan yang mendapatkan bonus 3%, Blangko & Lain-lain bernilai 0)
+        const viBonusUndangan = viOmsetUndangan * 0.03; 
+        const viTotalBonus = viBonusUndangan; // Total bonus Vi Printing hanya dari Undangan
+
+        let viPrintingRows = [
+            { 'Jenis Orderan (Vi Printing)': 'UNDANGAN', 'Total Omset': viOmsetUndangan, 'Skema Bonus': '3%', 'Bonus Penjualan': viBonusUndangan },
+            { 'Jenis Orderan (Vi Printing)': 'BLANGKO', 'Total Omset': viOmsetBlangko, 'Skema Bonus': '0%', 'Bonus Penjualan': 0 },
+            { 'Jenis Orderan (Vi Printing)': 'LAIN-LAIN', 'Total Omset': viOmsetLain, 'Skema Bonus': '0%', 'Bonus Penjualan': 0 },
+            { 'Jenis Orderan (Vi Printing)': 'TOTAL PENJUALAN (Vi)', 'Total Omset': viTotalOmset, 'Skema Bonus': '-', 'Bonus Penjualan': viTotalBonus }
         ];
 
         const labelKategori = currentCategory === 'SEMUA' ? 'SEMUA TRANSAKSI' : currentCategory;
@@ -3173,23 +3209,39 @@ function downloadExcel() {
         
         // Tambahkan Title Tabel 2
         XLSX.utils.sheet_add_aoa(wsSummary, [
-            [`TOTAL OMSET PENJUALAN JENIS ORDERAN & BONUS`],
+            [`TOTAL OMSET PENJUALAN JENIS ORDERAN & BONUS GLOBAL`],
             []
         ], { origin: "A" + startRowOrderType });
         
-        // Tambahkan data Tabel 2 (Header ditaruh otomatis oleh sheet_add_json)
+        // Tambahkan data Tabel 2
         XLSX.utils.sheet_add_json(wsSummary, orderTypeRows, { origin: "A" + (startRowOrderType + 1) });
 
+        // Tentukan posisi awal untuk tabel 3 (Beri jarak 3 baris setelah tabel 2)
+        const startRowViPrinting = (startRowOrderType + 1) + orderTypeRows.length + 3;
+
+        // Tambahkan Title Tabel 3 (Khusus Kasir Vi Printing)
+        XLSX.utils.sheet_add_aoa(wsSummary, [
+            [`RINCIAN OMSET & HITUNGAN BONUS KASIR VI PRINTING`],
+            []
+        ], { origin: "A" + startRowViPrinting });
+
+        // Tambahkan data Tabel 3
+        XLSX.utils.sheet_add_json(wsSummary, viPrintingRows, { origin: "A" + (startRowViPrinting + 1) });
+
         // Pengaturan Lebar Kolom dan Format Mata Uang Rupiah
-        autoFitColumns(wsSummary, [...summaryRows, ...orderTypeRows]);
+        autoFitColumns(wsSummary, [...summaryRows, ...orderTypeRows, ...viPrintingRows]);
         
         // Format Rupiah Tabel 1 (Kolom B, C, D, E mulai baris ke-4)
         formatRupiahExcel(wsSummary, [1, 2, 3, 4], 4); 
         
-        // Format Rupiah Tabel 2 (Kolom B/Total Omset dan Kolom D/Bonus Penjualan, mulai data baris setelah header)
+        // Format Rupiah Tabel 2 (Kolom B/Total Omset dan Kolom D/Bonus Penjualan)
         formatRupiahExcel(wsSummary, [1, 3], startRowOrderType + 2); 
 
-        XLSX.utils.book_append_sheet(workbook, wsSummary, "Ringkasan Kategori");
+        // Format Rupiah Tabel 3 (Kolom B/Total Omset dan Kolom D/Bonus Penjualan)
+        formatRupiahExcel(wsSummary, [1, 3], startRowViPrinting + 2); 
+
+        // Menyimpan sheet dengan nama "Ringkasan"
+        XLSX.utils.book_append_sheet(workbook, wsSummary, "Ringkasan");
 
         XLSX.writeFile(workbook, fileName);
 
