@@ -2999,12 +2999,48 @@ function downloadExcel() {
 
         let excelRows = [];
         let summaryMap = {};
+        
+        // --- DEKLARASI TRACKER OMSET JENIS ORDERAN ---
+        let orderTypeSummary = {
+            'UNDANGAN': 0,
+            'BLANGKO': 0,
+            'LAIN-LAIN': 0
+        };
 
         // 4. Susun Baris Data
         filteredData.forEach(t => {
             const diskonTotal = parseFloat(t.diskon) || 0;
             const kategori = (t.kat || 'LAIN-LAIN').toUpperCase().trim();
+            const ketString = t.ket || "";
             
+            // --- PROSES EKSTRAKSI PETUGAS KASIR ---
+            let petugasKasir = "-";
+            if (/\(V\)/i.test(ketString)) {
+                petugasKasir = "Vi Printing";
+            } else if (/\(M\)/i.test(ketString)) {
+                petugasKasir = "Muflih Print";
+            }
+
+            // --- PROSES EKSTRAKSI JENIS ORDERAN ---
+            let jenisOrderan = "-"; // Default dikosongkan (diisi "-")
+            
+            // Cek apakah kategori transaksi adalah "PENJUALAN"
+            if (kategori === "PENJUALAN") {
+                jenisOrderan = "LAIN-LAIN"; // Fallback khusus untuk penjualan jika teks tidak terdeteksi
+                
+                const splitKet = ketString.split('-');
+                if (splitKet.length > 1) {
+                    const teksSetelahStrip = splitKet.slice(1).join('-'); 
+                    
+                    if (/UNDANGAN/i.test(teksSetelahStrip)) {
+                        jenisOrderan = "UNDANGAN";
+                    } else if (/BLANGKO/i.test(teksSetelahStrip)) {
+                        jenisOrderan = "BLANGKO";
+                    }
+                }
+            }
+            // ---------------------------------------------------
+
             if (!summaryMap[kategori]) {
                 summaryMap[kategori] = { Masuk: 0, Keluar: 0, Diskon: 0, Net: 0 };
             }
@@ -3024,28 +3060,60 @@ function downloadExcel() {
                     const netRow = subItem - dRow;
 
                     excelRows.push({
-                        'Waktu': t.waktu, 'ID': t.id, 'Kategori': t.kat, 'Pelanggan': t.sub, 'Barang': item.nama,
-                        'Qty': parseFloat(item.qty), 'Harga Satuan': parseFloat(item.harga), 'Subtotal': subItem,
-                        'Diskon': dRow, 'Total Net': netRow, 'Metode': t.metode, 'Ket': t.ket
+                        'Waktu': t.waktu, 
+                        'ID': t.id, 
+                        'Kategori': t.kat, 
+                        'Pelanggan': t.sub, 
+                        'Jenis Orderan': jenisOrderan,     
+                        'Petugas Kasir': petugasKasir,     
+                        'Barang': item.nama,
+                        'Qty': parseFloat(item.qty), 
+                        'Harga Satuan': parseFloat(item.harga), 
+                        'Subtotal': subItem,
+                        'Diskon': dRow, 
+                        'Total Net': netRow, 
+                        'Metode': t.metode, 
+                        'Ket': t.ket
                     });
 
                     if (t.tipe === 'MASUK') summaryMap[kategori].Masuk += subItem;
                     else summaryMap[kategori].Keluar += subItem;
                     summaryMap[kategori].Diskon += dRow;
                     summaryMap[kategori].Net += netRow;
+
+                    // Akumulasi Omset Jenis Orderan (Khusus Kategori Penjualan)
+                    if (kategori === "PENJUALAN" && orderTypeSummary[jenisOrderan] !== undefined) {
+                        orderTypeSummary[jenisOrderan] += netRow;
+                    }
                 });
             } else {
                 const nom = parseFloat(t.masuk || t.keluar) || 0;
                 const netRow = nom - diskonTotal;
                 excelRows.push({
-                    'Waktu': t.waktu, 'ID': t.id, 'Kategori': t.kat, 'Pelanggan': t.sub, 'Barang': '-',
-                    'Qty': 1, 'Harga Satuan': nom, 'Subtotal': nom, 'Diskon': diskonTotal, 'Total Net': netRow,
-                    'Metode': t.metode, 'Ket': t.ket
+                    'Waktu': t.waktu, 
+                    'ID': t.id, 
+                    'Kategori': t.kat, 
+                    'Pelanggan': t.sub, 
+                    'Jenis Orderan': jenisOrderan,     
+                    'Petugas Kasir': petugasKasir,     
+                    'Barang': '-',
+                    'Qty': 1, 
+                    'Harga Satuan': nom, 
+                    'Subtotal': nom, 
+                    'Diskon': diskonTotal, 
+                    'Total Net': netRow,
+                    'Metode': t.metode, 
+                    'Ket': t.ket
                 });
                 if (t.tipe === 'MASUK') summaryMap[kategori].Masuk += nom;
                 else summaryMap[kategori].Keluar += nom;
                 summaryMap[kategori].Diskon += diskonTotal;
                 summaryMap[kategori].Net += netRow;
+
+                // Akumulasi Omset Jenis Orderan (Khusus Kategori Penjualan)
+                if (kategori === "PENJUALAN" && orderTypeSummary[jenisOrderan] !== undefined) {
+                    orderTypeSummary[jenisOrderan] += netRow;
+                }
             }
         });
 
@@ -3057,6 +3125,23 @@ function downloadExcel() {
             'Total Diskon': summaryMap[kat].Diskon,
             'Total Bersih (Net)': summaryMap[kat].Net
         }));
+
+        // --- SUSUN DATA UNTUK TABEL BONUS & JENIS ORDERAN ---
+        const omsetUndangan = orderTypeSummary['UNDANGAN'];
+        const omsetBlangko = orderTypeSummary['BLANGKO'];
+        const omsetLain = orderTypeSummary['LAIN-LAIN'];
+        const totalOmsetPenjualan = omsetUndangan + omsetBlangko + omsetLain;
+
+        const bonusUndangan = omsetUndangan * 0.03;
+        const bonusBlangko = omsetBlangko * 0.01;
+        const totalBonus = bonusUndangan + bonusBlangko;
+
+        let orderTypeRows = [
+            { 'Jenis Orderan': 'UNDANGAN', 'Total Omset': omsetUndangan, 'Skema Bonus': '3%', 'Bonus Penjualan': bonusUndangan },
+            { 'Jenis Orderan': 'BLANGKO', 'Total Omset': omsetBlangko, 'Skema Bonus': '1%', 'Bonus Penjualan': bonusBlangko },
+            { 'Jenis Orderan': 'LAIN-LAIN', 'Total Omset': omsetLain, 'Skema Bonus': '0%', 'Bonus Penjualan': 0 },
+            { 'Jenis Orderan': 'TOTAL PENJUALAN', 'Total Omset': totalOmsetPenjualan, 'Skema Bonus': '-', 'Bonus Penjualan': totalBonus }
+        ];
 
         const labelKategori = currentCategory === 'SEMUA' ? 'SEMUA TRANSAKSI' : currentCategory;
         const fileName = `Laporan_${labelKategori}_${ds || 'Awal'}_sd_${de || 'Akhir'}.xlsx`;
@@ -3070,7 +3155,7 @@ function downloadExcel() {
         ]);
         XLSX.utils.sheet_add_json(wsDetail, excelRows, { origin: "A4" });
         autoFitColumns(wsDetail, excelRows);
-        formatRupiahExcel(wsDetail, [5, 6, 7, 8, 9], 4);
+        formatRupiahExcel(wsDetail, [7, 8, 9, 10, 11], 4);
         XLSX.utils.book_append_sheet(workbook, wsDetail, "Detail Transaksi");
 
         /** SHEET 2: RINGKASAN **/
@@ -3079,9 +3164,31 @@ function downloadExcel() {
             [`Periode: ${ds || '-'} s/d ${de || '-'}`],
             []
         ]);
+        
+        // Tambahkan tabel 1 (Ringkasan Kategori Utama)
         XLSX.utils.sheet_add_json(wsSummary, summaryRows, { origin: "A4" });
-        autoFitColumns(wsSummary, summaryRows);
-        formatRupiahExcel(wsSummary, [1, 2, 3, 4], 4);
+        
+        // Tentukan posisi awal untuk tabel 2 (Beri jarak 3 baris setelah tabel 1)
+        const startRowOrderType = 4 + summaryRows.length + 3; 
+        
+        // Tambahkan Title Tabel 2
+        XLSX.utils.sheet_add_aoa(wsSummary, [
+            [`TOTAL OMSET PENJUALAN JENIS ORDERAN & BONUS`],
+            []
+        ], { origin: "A" + startRowOrderType });
+        
+        // Tambahkan data Tabel 2 (Header ditaruh otomatis oleh sheet_add_json)
+        XLSX.utils.sheet_add_json(wsSummary, orderTypeRows, { origin: "A" + (startRowOrderType + 1) });
+
+        // Pengaturan Lebar Kolom dan Format Mata Uang Rupiah
+        autoFitColumns(wsSummary, [...summaryRows, ...orderTypeRows]);
+        
+        // Format Rupiah Tabel 1 (Kolom B, C, D, E mulai baris ke-4)
+        formatRupiahExcel(wsSummary, [1, 2, 3, 4], 4); 
+        
+        // Format Rupiah Tabel 2 (Kolom B/Total Omset dan Kolom D/Bonus Penjualan, mulai data baris setelah header)
+        formatRupiahExcel(wsSummary, [1, 3], startRowOrderType + 2); 
+
         XLSX.utils.book_append_sheet(workbook, wsSummary, "Ringkasan Kategori");
 
         XLSX.writeFile(workbook, fileName);
