@@ -1962,7 +1962,9 @@ function savePenjualan() {
 
   const shopInitial = currentShop.nama ? currentShop.nama.charAt(0).toUpperCase() : '?';
   const inputPelanggan = (document.getElementById('p_cust').value || 'UMUM').toUpperCase();
-  const pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
+  
+  // UBAH DARI 'const' MENJADI 'let' agar bisa ditimpa untuk logika Shopee
+  let pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
   
   // Kirim nilai pilihan ke payload agar diproses server menjadi "Pelanggan - Keterangan"
   let keteranganOtomatis = ketPilihan;
@@ -1972,16 +1974,18 @@ function savePenjualan() {
   const shopee2 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee2");
 
   if (shopee1) {
-    keteranganOtomatis = "Tarik Dana Shopee1";
+    keteranganOtomatis = "Tarik Dana Shopee1"; // Keterangan diisi nama barang saja
+    pelangganFormatted = "-"; // Subjek diisi "-"
   } else if (shopee2) {
-    keteranganOtomatis = "Tarik Dana Shopee2";
+    keteranganOtomatis = "Tarik Dana Shopee2"; // Keterangan diisi nama barang saja
+    pelangganFormatted = "-"; // Subjek diisi "-"
   }
 
   const payload = {
     action: 'processTransaction',
     type: 'PENJUALAN',
-    pelanggan: pelangganFormatted,
-    ket: keteranganOtomatis,
+    pelanggan: pelangganFormatted, // Nilai ini akan masuk sebagai subjek/sub
+    ket: keteranganOtomatis,       // Nilai ini akan masuk sebagai keterangan/ket
     items: items,
     diskon: unmask(document.getElementById('p_disc').value),
     dp: unmask(document.getElementById('p_dp').value),
