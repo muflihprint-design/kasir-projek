@@ -577,9 +577,11 @@ function initRiwayatStructure() {
   <i data-lucide="layers" class="w-4 h-4"></i>
   <span class="hidden md:inline">Semua</span>
 </button>
-<button id="filter-revisi" onclick="setFilter('revisi')" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5">
+<button id="filter-revisi" onclick="setFilter('revisi')" class="relative flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5">
   <i data-lucide="file-edit" class="w-4 h-4"></i>
   <span class="hidden md:inline">Revisi</span>
+  <!-- Elemen Notifikasi Angka (Badge) -->
+  <span id="revisi-badge" class="hidden absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white shadow-sm">0</span>
 </button>
             </div>
             
@@ -808,6 +810,7 @@ async function fetchTransactions() {
   // 4. Panggil render Pagination UI di bawah
   renderPagination(totalItems, totalPages);
   lucide.createIcons();
+  updateRevisiBadge();
 }
 
 
@@ -900,8 +903,9 @@ window.changePage = function(page) {
       const isActive = (f === type);
       
       // Simpan class tata letak dasar agar tidak tertimpa
-      const baseLayout = 'flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5';
-      
+      // Di dalam fungsi setFilter(f) pada bagian // 1. Update UI Tombol
+const baseLayout = 'relative flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5';
+
       if (type === 'revisi') {
         el.className = isActive ? 
           `${baseLayout} bg-orange-500 text-white` : 
@@ -933,6 +937,28 @@ window.changePage = function(page) {
     await fetchFullTransactions();
   } else {
     renderTransactions();
+  }
+}
+
+function updateRevisiBadge() {
+  const badge = document.getElementById('revisi-badge');
+  if (!badge || typeof allTransactions === 'undefined') return;
+  
+  // Menghitung jumlah transaksi yang butuh revisi (belum selesai)
+  const count = allTransactions.filter(t => {
+    return t.revisi && t.revisi.trim() !== "" && (!t.ketSelesai || t.ketSelesai.trim() === "");
+  }).length;
+  
+  if (count > 0) {
+    // Tampilkan badge dan set angkanya (tampilkan '99+' jika lebih dari 99)
+    badge.innerText = count > 99 ? '99+' : count;
+    badge.classList.remove('hidden');
+    // Efek denyut (pulse) agar lebih menarik perhatian
+    badge.classList.add('animate-pulse'); 
+  } else {
+    // Sembunyikan badge jika tidak ada revisi
+    badge.classList.add('hidden');
+    badge.classList.remove('animate-pulse');
   }
 }
 
