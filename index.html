@@ -565,12 +565,22 @@ function initRiwayatStructure() {
           
           <div class="flex items-center gap-1 p-1 bg-slate-100 rounded-full w-full md:w-auto">
             <div class="flex items-center gap-1 flex-1 md:flex-none">
-              <button onclick="setFilter('today')" id="f-today" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Hari Ini</button>
-              <button onclick="setFilter('month')" id="f-month" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Bulan Ini</button>
-              <button onclick="setFilter('all')" id="f-all" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200">Semua</button>
-              <button id="filter-revisi" onclick="setFilter('revisi')" class="px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-colors flex items-center">
-                <span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-1.5 animate-pulse"></span> Revisi
-              </button>
+              <button onclick="setFilter('today')" id="f-today" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5">
+  <i data-lucide="calendar-clock" class="w-4 h-4"></i>
+  <span class="hidden md:inline">Hari Ini</span>
+</button>
+<button onclick="setFilter('month')" id="f-month" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5">
+  <i data-lucide="calendar-days" class="w-4 h-4"></i>
+  <span class="hidden md:inline">Bulan Ini</span>
+</button>
+<button onclick="setFilter('all')" id="f-all" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5">
+  <i data-lucide="layers" class="w-4 h-4"></i>
+  <span class="hidden md:inline">Semua</span>
+</button>
+<button id="filter-revisi" onclick="setFilter('revisi')" class="flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5">
+  <i data-lucide="file-edit" class="w-4 h-4"></i>
+  <span class="hidden md:inline">Revisi</span>
+</button>
             </div>
             
             <button onclick="downloadExcel()" class="w-8 h-8 flex items-center justify-center bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-all shadow-sm shrink-0" title="Ekspor Excel">
@@ -883,19 +893,23 @@ window.changePage = function(page) {
 
   // 1. Update UI Tombol
   // Tambahkan 'revisi' ke list
+  // 1. Update UI Tombol
   ['today', 'month', 'all', 'revisi'].forEach(type => {
     const el = document.getElementById('f-' + type);
     if (el) {
-      // Styling khusus untuk revisi agar tetap orange
       const isActive = (f === type);
+      
+      // Simpan class tata letak dasar agar tidak tertimpa
+      const baseLayout = 'flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5';
+      
       if (type === 'revisi') {
         el.className = isActive ? 
-          'px-3 py-1 bg-orange-500 text-white rounded-full transition' : 
-          'px-3 py-1 bg-orange-100 text-orange-600 rounded-full hover:bg-orange-200 transition';
+          `${baseLayout} bg-orange-500 text-white` : 
+          `${baseLayout} bg-orange-100 text-orange-600 hover:bg-orange-200 border border-orange-200`;
       } else {
         el.className = isActive ? 
-          'px-3 py-1 bg-blue-600 text-white rounded-full transition' : 
-          'px-3 py-1 bg-gray-100 rounded-full hover:bg-gray-200 transition';
+          `${baseLayout} bg-blue-600 text-white shadow-sm` : 
+          `${baseLayout} bg-gray-100 hover:bg-gray-200 text-slate-600`;
       }
     }
   });
@@ -1058,12 +1072,12 @@ function showDetail(t) {
             calculatedSubtotal += lineTotal;
             return `
             <tr class="bg-white">
-              <td class="p-2">
-                <span class="font-medium text-slate-700 text-[10px]">${d.nama}</span>
-              </td>
-              <td class="p-2 text-center text-slate-500 text-[9px]">${d.qty}</td>
-              <td class="p-2 text-right font-mono text-slate-600 text-[10px]">${formatRupiah(lineTotal)}</td>
-            </tr>`;
+  <td class="p-2">
+    <span class="font-medium text-slate-700 text-[10px]">${d.nama} @${formatRupiah(d.harga).replace('Rp ', 'Rp')}</span>
+  </td>
+  <td class="p-2 text-center text-slate-500 text-[9px]">${d.qty}</td>
+  <td class="p-2 text-right font-mono text-slate-600 text-[10px]">${formatRupiah(lineTotal)}</td>
+</tr>`;
           }).join('')}
         </tbody>
       </table>
