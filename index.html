@@ -577,7 +577,7 @@ function initRiwayatStructure() {
   <i data-lucide="layers" class="w-4 h-4"></i>
   <span class="hidden md:inline">Semua</span>
 </button>
-<button id="filter-revisi" onclick="setFilter('revisi')" class="relative flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5">
+<button id="f-revisi" onclick="setFilter('revisi')" class="relative flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5">
   <i data-lucide="file-edit" class="w-4 h-4"></i>
   <span class="hidden md:inline">Revisi</span>
   <!-- Elemen Notifikasi Angka (Badge) -->
@@ -602,26 +602,35 @@ function initRiwayatStructure() {
           </div>
         </div>
 
-        <div class="relative w-full group">
-          <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
-            <i data-lucide="search" class="w-4 h-4"></i>
-          </span>
-          <input type="text" id="searchInput" oninput="currentPage=1; renderTransactions()" 
-            placeholder="Cari ID, Keterangan, Nama Produk" 
-            class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200 transition-all">
+        <div class="flex flex-col w-full gap-2">
+          <div class="flex gap-2 w-full">
+            <div class="relative flex-1 group">
+              <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
+                <i data-lucide="search" class="w-4 h-4"></i>
+              </span>
+              <input type="text" id="searchInput" oninput="currentPage=1; renderTransactions()" 
+                placeholder="Cari ID, Ket, Nama Produk" 
+                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200 transition-all">
+            </div>
+            <!-- Tombol Filter Baru ala Shopee -->
+            <button onclick="openAdvancedFilter()" class="flex items-center justify-center px-3.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 active:scale-95 transition-all shadow-sm relative shrink-0">
+              <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+              <!-- Indikator merah jika ada filter yang aktif -->
+              <span id="filter-indicator" class="hidden absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+            </button>
+          </div>
+          
+          <!-- BARIS PEMBERITAHUAN FILTER AKTIF -->
+          <div id="active-filter-indicator" class="hidden items-center justify-between px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+            <div class="flex items-center gap-1.5 overflow-hidden">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-blue-500 shrink-0"></i>
+              <span id="active-filter-text" class="text-[10px] font-bold text-blue-700 truncate"></span>
+            </div>
+            <button onclick="clearAdvancedFilters()" class="text-[9px] font-black text-blue-500 hover:text-blue-700 ml-2 uppercase tracking-widest bg-blue-100/50 px-2 py-1 rounded-md active:scale-95 transition-all">
+              Reset
+            </button>
+          </div>
         </div>
-      </div>
-
-      <div class="bg-slate-50/50 flex border-b border-slate-100">
-        <button onclick="setView('Cash')" id="v-cash" class="flex-1 py-3 text-[10px] font-black text-slate-400 border-b-2 border-transparent tracking-tighter">CASH</button>
-        <button onclick="setView('Rekening')" id="v-bank" class="flex-1 py-3 text-[10px] font-black text-slate-400 border-b-2 border-transparent tracking-tighter">REKENING</button>
-        <button onclick="setView('Semua')" id="v-all" class="flex-1 py-3 text-[10px] font-black text-slate-400 border-b-2 border-transparent tracking-tighter">SEMUA</button>
-      </div>
-
-      <div class="flex bg-white border-b border-slate-100 p-1.5 gap-1.5">
-        <button onclick="setCategory('SEMUA')" id="cat-semua" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Semua</button>
-        <button onclick="setCategory('MASUK')" id="cat-masuk" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Masuk</button>
-        <button onclick="setCategory('KELUAR')" id="cat-keluar" class="flex-1 py-2 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all">Keluar</button>
       </div>
 
       <div id="listContainer" class="bg-slate-50/20 divide-y divide-slate-50 max-h-[550px] overflow-y-auto custom-scrollbar flex-1"></div>
@@ -633,7 +642,173 @@ function initRiwayatStructure() {
   setFilter('today');
   fetchTransactions();
 }
+ 
+// Variabel sementara agar filter tidak langsung berubah sebelum tombol "Terapkan" ditekan
+let tempView = 'Semua';
+let tempCategory = 'SEMUA';
+
+// Fungsi untuk membuka Modal Filter Tambahan
+window.openAdvancedFilter = function() {
+    tempView = currentView;
+    tempCategory = currentCategory;
     
+    const modal = document.getElementById('general-modal');
+    const content = document.getElementById('modalContent');
+    
+    content.innerHTML = `
+      <div class="flex flex-col h-full max-h-[80vh]">
+        
+        <!-- Header Modal -->
+        <div class="flex justify-between items-center pb-4 border-b border-slate-100 mb-4 shrink-0">
+          <h3 class="text-base font-black text-slate-800 flex items-center gap-2">
+            <div class="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+              <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+            </div>
+            Filter Tambahan
+          </h3>
+          <button onclick="closeModal()" class="w-8 h-8 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-700 active:scale-95 transition-all">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        
+        <!-- Area Konten Opsi (Scrollable) -->
+        <div class="space-y-6 overflow-y-auto pr-1 pb-2 flex-1 custom-scrollbar">
+            <!-- Filter Tipe Transaksi -->
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipe Transaksi</p>
+                </div>
+                <div class="grid grid-cols-3 gap-2.5">
+                    ${['SEMUA', 'MASUK', 'KELUAR'].map(cat => `
+                        <button onclick="selectTempCategory('${cat}')" id="btn-temp-cat-${cat}" 
+                          class="temp-cat-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 
+                          ${tempCategory === cat 
+                            ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]' 
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}">
+                            ${cat}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+
+            <!-- Filter Metode Pembayaran -->
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Metode Pembayaran</p>
+                </div>
+                <div class="grid grid-cols-3 gap-2.5">
+                    ${['Semua', 'Cash', 'Rekening'].map(v => `
+                        <button onclick="selectTempView('${v}')" id="btn-temp-view-${v}" 
+                          class="temp-view-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 
+                          ${tempView === v 
+                            ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]' 
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}">
+                            ${v}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Modal (Aksi) -->
+        <div class="pt-4 border-t border-slate-100 flex gap-3 mt-4 shrink-0 bg-white">
+            <button onclick="resetTempFilters()" class="flex-1 py-3.5 bg-white border-2 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 font-bold rounded-xl text-xs active:scale-95 transition-all">
+                Reset
+            </button>
+            <button onclick="applyAdvancedFilters()" class="flex-[2] py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 text-xs active:scale-95 transition-all flex items-center justify-center gap-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Terapkan
+            </button>
+        </div>
+        
+      </div>
+    `;
+    
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+window.applyAdvancedFilters = function() {
+    currentPage = 1; // Reset halaman ke 1
+    currentCategory = tempCategory;
+    currentView = tempView;
+    
+    // Ambil elemen-elemen yang dibutuhkan
+    const indicator = document.getElementById('filter-indicator');
+    const activeFilterBar = document.getElementById('active-filter-indicator');
+    const activeFilterText = document.getElementById('active-filter-text');
+    
+    const isFilterActive = currentCategory !== 'SEMUA' || currentView !== 'Semua';
+    
+    // 1. Logika untuk titik merah di tombol (Filter Indicator)
+    if (indicator) {
+        if (isFilterActive) {
+            indicator.classList.remove('hidden');
+        } else {
+            indicator.classList.add('hidden');
+        }
+    }
+    
+    // 2. Logika untuk Baris Pemberitahuan (Active Filter Indicator)
+    if (activeFilterBar && activeFilterText) {
+        if (isFilterActive) {
+            // Hapus class hidden, tambahkan class flex agar item sejajar (justify-between)
+            activeFilterBar.classList.remove('hidden');
+            activeFilterBar.classList.add('flex');
+            
+            // Buat teks pemberitahuan yang dinamis
+            let textData = [];
+            if (currentCategory !== 'SEMUA') textData.push(`Tipe: ${currentCategory}`);
+            if (currentView !== 'Semua') textData.push(`Metode: ${currentView}`);
+            
+            // Masukkan teks ke dalam span
+            activeFilterText.innerText = textData.join(' • ');
+        } else {
+            // Sembunyikan jika tidak ada filter aktif
+            activeFilterBar.classList.add('hidden');
+            activeFilterBar.classList.remove('flex');
+        }
+    }
+    
+    closeModal();
+    renderTransactions(); // Render ulang riwayat transaksi
+}
+
+// Fungsi untuk membatalkan semua filter tambahan dengan cepat
+window.clearAdvancedFilters = function() {
+    // Kembalikan variabel sementara ke default
+    tempCategory = 'SEMUA';
+    tempView = 'Semua';
+    // Terapkan filter default tersebut
+    applyAdvancedFilters();
+}
+
+// Interaksi saat opsi Tipe Transaksi diklik di dalam modal
+window.selectTempCategory = function(cat) {
+    tempCategory = cat;
+    document.querySelectorAll('.temp-cat-btn').forEach(btn => {
+        btn.className = 'temp-cat-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50';
+    });
+    document.getElementById(`btn-temp-cat-${cat}`).className = 'temp-cat-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]';
+}
+
+// Interaksi saat opsi Metode diklik di dalam modal
+window.selectTempView = function(v) {
+    tempView = v;
+    document.querySelectorAll('.temp-view-btn').forEach(btn => {
+        btn.className = 'temp-view-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50';
+    });
+    document.getElementById(`btn-temp-view-${v}`).className = 'temp-view-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]';
+}
+
+// Fungsi tombol Reset
+window.resetTempFilters = function() {
+    selectTempCategory('SEMUA');
+    selectTempView('Semua');
+}
+
+
+
 async function fetchTransactions() {
   if (isDataLoaded && allTransactions.length > 0) {
     renderTransactions();
@@ -813,6 +988,50 @@ async function fetchTransactions() {
   updateRevisiBadge();
 }
 
+function showFilterToast(filterId) {
+  // Hanya jalankan untuk tampilan mobile (di bawah ukuran 'md' Tailwind yaitu 768px)
+  if (window.innerWidth >= 768) return;
+
+  // Cari elemen toast, jika belum ada buat baru
+  let toast = document.getElementById('filter-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'filter-toast';
+    // Styling notifikasi melayang di atas navigasi bawah
+    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[11px] font-bold px-4 py-2 rounded-full shadow-2xl z-[9999] transition-all duration-300 opacity-0 translate-y-4 pointer-events-none flex items-center gap-2';
+    document.body.appendChild(toast);
+  }
+
+  // Tentukan ikon dan teks berdasarkan filter yang diklik
+  let iconName = '';
+  let textName = '';
+  
+  if (filterId === 'today') { iconName = 'calendar-clock'; textName = 'Hari Ini'; }
+  else if (filterId === 'month') { iconName = 'calendar-days'; textName = 'Bulan Ini'; }
+  else if (filterId === 'all') { iconName = 'layers'; textName = 'Semua Data'; }
+  else if (filterId === 'revisi') { iconName = 'file-edit'; textName = 'Daftar Revisi'; }
+
+  // Masukkan konten ke dalam toast
+  toast.innerHTML = `<i data-lucide="${iconName}" class="w-3.5 h-3.5"></i> Menampilkan: ${textName}`;
+  
+  // Render ikon lucide di dalam toast
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: toast });
+
+  // Tampilkan toast dengan animasi
+  requestAnimationFrame(() => {
+    toast.classList.remove('opacity-0', 'translate-y-4');
+    toast.classList.add('opacity-100', 'translate-y-0');
+  });
+
+  // Hapus timer lama jika tombol diklik berulang kali dengan cepat
+  clearTimeout(toast.hideTimeout);
+  
+  // Sembunyikan otomatis setelah 2 detik
+  toast.hideTimeout = setTimeout(() => {
+    toast.classList.remove('opacity-100', 'translate-y-0');
+    toast.classList.add('opacity-0', 'translate-y-4');
+  }, 2000);
+}
 
 function renderPagination(totalItems, totalPages) {
   const container = document.getElementById('paginationContainer');
@@ -918,6 +1137,7 @@ const baseLayout = 'relative flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bo
     }
   });
 
+  showFilterToast(f);
   // 2. Logika Pengisian Input Tanggal
   if (f === 'today') {
     document.getElementById('f-date-start').value = todayStr;
