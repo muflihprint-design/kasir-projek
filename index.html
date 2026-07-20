@@ -590,16 +590,18 @@ function initRiwayatStructure() {
             </button>
           </div>
 
-          <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus-within:border-blue-300 transition-all justify-center w-full md:w-auto">
-            <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
-            <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
-              <input type="date" id="f-date-start" onchange="checkManualDateChange()" 
-                  class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
-              <span class="text-slate-300 font-sans">—</span>
-              <input type="date" id="f-date-end" onchange="checkManualDateChange()" 
-                  class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
-            </div>
-          </div>
+          <!-- Tambahkan ID date-filter-container -->
+<div id="date-filter-container" class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 transition-all justify-center w-full md:w-auto">
+  <!-- Tambahkan ID date-filter-icon -->
+  <i id="date-filter-icon" data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
+  <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
+    <input type="date" id="f-date-start" onchange="checkManualDateChange()" 
+        class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
+    <span class="text-slate-300 font-sans">—</span>
+    <input type="date" id="f-date-end" onchange="checkManualDateChange()" 
+        class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
+  </div>
+</div>
         </div>
 
         <div class="flex flex-col w-full gap-2">
@@ -1114,30 +1116,46 @@ window.changePage = function(page) {
   const todayStr = `${year}-${monthStr}-${date}`;
 
 // 1. Update UI Tombol
+ // 1. Update UI Tombol Standar (Tidak ada perubahan, gunakan kode terakhir dari Anda)
   ['today', 'month', 'all', 'revisi'].forEach(type => {
     const el = document.getElementById('f-' + type);
     if (el) {
       const isActive = (f === type);
-      
-      // Simpan class tata letak dasar agar tidak tertimpa
       const baseLayout = 'relative flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5';
 
       if (type === 'revisi') {
         el.className = isActive ? 
           `${baseLayout} bg-orange-500 text-white shadow-sm` : 
-          // Hapus hover:bg-orange-100 agar benar-benar bersih di HP
           `${baseLayout} bg-transparent text-orange-600`; 
       } else {
         el.className = isActive ? 
           `${baseLayout} bg-blue-600 text-white shadow-sm` : 
-          // Hapus hover:bg-slate-200/50 agar tidak ada sisa bayangan abu-abu
           `${baseLayout} bg-transparent text-slate-500`;
       }
     }
   });
 
+  // [BARU] 2. Update UI Filter Tanggal Manual
+  const dateContainer = document.getElementById('date-filter-container');
+  const dateIcon = document.getElementById('date-filter-icon');
+  
+  if (dateContainer && dateIcon) {
+    if (f === 'custom') {
+      // Tampilan saat filter tanggal AKTIF (Background biru tipis, border biru)
+      dateContainer.className = "flex items-center gap-2 bg-blue-50 border border-blue-400 rounded-xl px-3 py-2 transition-all justify-center w-full md:w-auto shadow-sm";
+      dateIcon.classList.remove('text-slate-400');
+      dateIcon.classList.add('text-blue-600');
+    } else {
+      // Tampilan saat filter tanggal TIDAK AKTIF (Kembali normal)
+      dateContainer.className = "flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 transition-all justify-center w-full md:w-auto";
+      dateIcon.classList.remove('text-blue-600');
+      dateIcon.classList.add('text-slate-400');
+    }
+  }
+
   showFilterToast(f);
-  // 2. Logika Pengisian Input Tanggal
+  
+  // 3. Logika Pengisian Input Tanggal (Tetap seperti sebelumnya)
   if (f === 'today') {
     document.getElementById('f-date-start').value = todayStr;
     document.getElementById('f-date-end').value = todayStr;
@@ -1145,14 +1163,12 @@ window.changePage = function(page) {
     document.getElementById('f-date-start').value = `${year}-${monthStr}-01`;
     document.getElementById('f-date-end').value = todayStr;
   } else if (f === 'all' || f === 'revisi') {
-    // Kosongkan filter tanggal untuk 'all' dan 'revisi' agar data muncul semua
     document.getElementById('f-date-start').value = '';
     document.getElementById('f-date-end').value = '';
   }
 
-  // 3. Logika Tarik Data
-  // Tambahkan 'revisi' agar aplikasi menarik data lengkap jika belum ada
-  if ((f === 'month' || f === 'all' || f === 'revisi') && !isFullDataLoaded) {
+  // 4. Logika Tarik Data (TAMBAHKAN 'custom' ke dalam pengkondisian ini)
+  if ((f === 'month' || f === 'all' || f === 'revisi' || f === 'custom') && !isFullDataLoaded) {
     await fetchFullTransactions();
   } else {
     renderTransactions();
@@ -1202,11 +1218,7 @@ async function fetchFullTransactions() {
 
 async function checkManualDateChange() {
   // Jika user ubah tanggal manual dan data belum lengkap, tarik semua data
-  if (!isFullDataLoaded) {
-    await fetchFullTransactions();
-  } else {
-    renderTransactions();
-  }
+ await setFilter('custom');
 }
     
     function setView(v) {
