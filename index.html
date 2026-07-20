@@ -553,6 +553,52 @@ window.addEventListener('click', function(event) {
   }
 });
  
+async function shiftMonth(direction) {
+  const startInput = document.getElementById('f-date-start');
+  const endInput = document.getElementById('f-date-end');
+  
+  let startDate = new Date();
+  
+  // 1. Ambil tanggal dari input AWAL sebagai satu-satunya patokan utama
+  if (startInput && startInput.value) {
+    startDate = new Date(startInput.value);
+  }
+  
+  // Fungsi aman untuk menggeser bulan tanpa error di ujung bulan
+  const shiftDateSafe = (dateObj, months) => {
+    const result = new Date(dateObj);
+    const expectedDay = result.getDate();
+    result.setMonth(result.getMonth() + months);
+    if (result.getDate() !== expectedDay) {
+      result.setDate(0); 
+    }
+    return result;
+  };
+  
+  // 2. Tentukan Tanggal Awal yang baru (mundur/maju sesuai tombol panah)
+  let newStartDate = shiftDateSafe(startDate, direction);
+  
+  // 3. Tentukan Tanggal Akhir (Selalu persis 1 bulan dari Tanggal Awal yang baru)
+  let newEndDate = new Date(newStartDate);
+  newEndDate.setMonth(newEndDate.getMonth() + 1);
+  newEndDate.setDate(newEndDate.getDate() - 1); // Dikurangi 1 hari agar rentangnya pas (Misal 15 Mei s/d 14 Juni)
+  
+  // Fungsi format YYYY-MM-DD
+  const formatDate = (dateObj) => {
+    const yy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+  };
+  
+  // 4. Masukkan nilainya ke dalam form input
+  if (startInput) startInput.value = formatDate(newStartDate);
+  if (endInput) endInput.value = formatDate(newEndDate);
+  
+  // 5. Terapkan filter
+  await setFilter('custom');
+}
+
 
     /** HALAMAN RIWAYAT **/
 function initRiwayatStructure() {
@@ -591,16 +637,28 @@ function initRiwayatStructure() {
           </div>
 
           <!-- Tambahkan ID date-filter-container -->
-<div id="date-filter-container" class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 transition-all justify-center w-full md:w-auto">
-  <!-- Tambahkan ID date-filter-icon -->
-  <i id="date-filter-icon" data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
+<div id="date-filter-container" class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 transition-all justify-center w-full md:w-auto">
+  
+  <!-- Tombol Mundur 1 Bulan -->
+  <button onclick="shiftMonth(-1)" class="p-1 hover:bg-blue-100 hover:text-blue-600 text-slate-400 rounded-lg transition-colors active:scale-90" title="Bulan Sebelumnya">
+    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+  </button>
+
+  <i id="date-filter-icon" data-lucide="calendar" class="w-4 h-4 text-slate-400 hidden sm:block"></i>
+  
   <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
     <input type="date" id="f-date-start" onchange="checkManualDateChange('start')" 
-    class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
-<span class="text-slate-300 font-sans">—</span>
-<input type="date" id="f-date-end" onchange="checkManualDateChange('end')" 
-    class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
+        class="bg-transparent outline-none border-none w-[115px] cursor-pointer appearance-none text-center">
+    <span class="text-slate-300 font-sans">—</span>
+    <input type="date" id="f-date-end" onchange="checkManualDateChange('end')" 
+        class="bg-transparent outline-none border-none w-[115px] cursor-pointer appearance-none text-center">
   </div>
+
+  <!-- Tombol Maju 1 Bulan -->
+  <button onclick="shiftMonth(1)" class="p-1 hover:bg-blue-100 hover:text-blue-600 text-slate-400 rounded-lg transition-colors active:scale-90" title="Bulan Berikutnya">
+    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+  </button>
+
 </div>
         </div>
 
