@@ -195,7 +195,7 @@ display: block !important;
   top: 0;
   background: white;
   width: 380px;
-  z-index: -1; /
+  z-index: -1; 
 }
 
   </style>
@@ -371,33 +371,6 @@ window.addEventListener('DOMContentLoaded', () => {
 });
     // Inisialisasi
    
-   async function refreshData() {
-  showBalanceLoading(true);
-  
-  try {
-    const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
-    const data = await res.json();
-
-    // Hentikan loading - ini akan menulis ulang struktur HTML ke kondisi default (Rp 0)
-    showBalanceLoading(false);
-
-    // LANGSUNG isi dengan data asli agar tidak terlihat teks "Rp 0"
-    const totalBalanceEl = document.getElementById('total-balance');
-    const saldoCashEl = document.getElementById('saldo-cash');
-    const saldoRekeningEl = document.getElementById('saldo-rekening');
-
-    if (totalBalanceEl) totalBalanceEl.innerText = formatRupiah(data.cash + data.bank);
-    if (saldoCashEl) saldoCashEl.innerText = formatRupiah(data.cash);
-    if (saldoRekeningEl) saldoRekeningEl.innerText = formatRupiah(data.bank);
-
-  } catch (e) {
-    console.error("Gagal refresh data:", e);
-    showBalanceLoading(false);
-    
-    // Opsional: Jika gagal, coba hitung dari memori lokal (allTransactions) sebagai cadangan
-    if (typeof updateBalanceDisplay === 'function') updateBalanceDisplay();
-  }
-}
 
 function handleModalScroll() {
   const content = document.getElementById('modalContent');
@@ -883,6 +856,7 @@ async function fetchTransactions() {
     // Simpan semua data yang didapat ke memori
     allTransactions = newData;
     isDataLoaded = true;
+    isFullDataLoaded = true; // <--- TAMBAHKAN BARIS INI DI SINI
     
      renderTransactions();
     
@@ -2443,11 +2417,7 @@ function savePenjualan() {
       return "Rp " + new Intl.NumberFormat('id-ID').format(angka);
     }
 
-    function openModal() {
-      document.getElementById('general-modal').style.display = 'flex';
-    }
-
-  
+   
 // --- FUNGSI PEMBANTU MODAL ---
 function openModal() {
   const modal = document.getElementById('general-modal');
@@ -3636,9 +3606,6 @@ function formatRupiahExcel(worksheet, cols, dataStartRow = 1) {
     
     
   </script>
-  <div id="modalOverlay" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-end sm:items-center justify-center p-4 backdrop-blur-sm transition-all">
-  <div id="modalContent" class="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl page-transition">
-    </div>
-</div>
+  
 </body>
 </html>
