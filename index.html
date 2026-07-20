@@ -620,12 +620,12 @@ function initRiwayatStructure() {
   <i id="date-filter-icon" data-lucide="calendar" class="w-4 h-4 text-slate-400 hidden sm:block"></i>
   
   <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
-    <input type="date" id="f-date-start" onchange="checkManualDateChange('start')" 
-        class="bg-transparent outline-none border-none w-[115px] cursor-pointer appearance-none text-center">
-    <span class="text-slate-300 font-sans">—</span>
-    <input type="date" id="f-date-end" onchange="checkManualDateChange('end')" 
-        class="bg-transparent outline-none border-none w-[115px] cursor-pointer appearance-none text-center">
-  </div>
+<input type="date" id="f-date-start" onchange="checkManualDateChange('start')" 
+    class="bg-transparent outline-none border-none w-[135px] cursor-pointer appearance-none text-center">
+<span class="text-slate-300 font-sans">—</span>
+<input type="date" id="f-date-end" onchange="checkManualDateChange('end')" 
+    class="bg-transparent outline-none border-none w-[135px] cursor-pointer appearance-none text-center">    
+    </div>
 
   <!-- Tombol Maju 1 Bulan -->
   <button onclick="shiftMonth(1)" class="p-1 hover:bg-blue-100 hover:text-blue-600 text-slate-400 rounded-lg transition-colors active:scale-90" title="Bulan Berikutnya">
@@ -1025,6 +1025,8 @@ async function fetchTransactions() {
 function showFilterToast(filterId) {
   // Hanya jalankan untuk tampilan mobile (di bawah ukuran 'md' Tailwind yaitu 768px)
   if (window.innerWidth >= 768) return;
+
+  if (filterId === 'custom') return;
 
   // Cari elemen toast, jika belum ada buat baru
   let toast = document.getElementById('filter-toast');
