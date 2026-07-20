@@ -72,28 +72,25 @@
   -moz-appearance: textfield;
 }
 
-    /* Menghilangkan ikon kalender bawaan Chrome agar tidak bertumpuk */
- /* Menghilangkan ikon kalender, tombol clear, dan ruang kosongnya secara total */
+   /* Menghilangkan ikon kalender, tombol clear, dan ruang kosongnya secara total */
+    /* Menghilangkan ikon kalender dan tombol clear secara total */
     input[type="date"]::-webkit-clear-button,
     input[type="date"]::-webkit-inner-spin-button,
     input[type="date"]::-webkit-calendar-picker-indicator {
         display: none !important;
         -webkit-appearance: none !important;
         margin: 0 !important;
-        width: 0 !important;
-        padding: 0 !important;
     }
 
-    /* Memaksa teks tanggal mengisi ruang kosong dan benar-benar rata tengah */
+    /* Memaksa teks tanggal rata tengah tanpa merusak struktur aslinya */
     input[type="date"]::-webkit-datetime-edit {
         padding: 0 !important;
         margin: 0 !important;
+        text-align: center !important;
     }
+    
     input[type="date"]::-webkit-datetime-edit-fields-wrapper {
         padding: 0 !important;
-        display: flex;
-        justify-content: center;
-        width: 100%;
     }
     
     #loading-overlay {
@@ -642,10 +639,10 @@ function initRiwayatStructure() {
   
   <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
 <input type="date" id="f-date-start" onchange="checkManualDateChange('start')" 
-    class="bg-transparent outline-none border-none w-[95px] cursor-pointer appearance-none text-center px-0">
+    class="bg-transparent outline-none border-none w-[105px] cursor-pointer appearance-none text-center px-0">
 <span class="text-slate-300 font-sans">—</span>
 <input type="date" id="f-date-end" onchange="checkManualDateChange('end')" 
-    class="bg-transparent outline-none border-none w-[95px] cursor-pointer appearance-none text-center px-0">
+    class="bg-transparent outline-none border-none w-[105px] cursor-pointer appearance-none text-center px-0">
     </div>
 
   <!-- Tombol Maju 1 Bulan -->
