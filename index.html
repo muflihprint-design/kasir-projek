@@ -595,11 +595,11 @@ function initRiwayatStructure() {
   <!-- Tambahkan ID date-filter-icon -->
   <i id="date-filter-icon" data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
   <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
-    <input type="date" id="f-date-start" onchange="checkManualDateChange()" 
-        class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
-    <span class="text-slate-300 font-sans">—</span>
-    <input type="date" id="f-date-end" onchange="checkManualDateChange()" 
-        class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
+    <input type="date" id="f-date-start" onchange="checkManualDateChange('start')" 
+    class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
+<span class="text-slate-300 font-sans">—</span>
+<input type="date" id="f-date-end" onchange="checkManualDateChange('end')" 
+    class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center">
   </div>
 </div>
         </div>
@@ -1216,9 +1216,28 @@ async function fetchFullTransactions() {
   }
 }
 
-async function checkManualDateChange() {
-  // Jika user ubah tanggal manual dan data belum lengkap, tarik semua data
- await setFilter('custom');
+async function checkManualDateChange(source) {
+  const startInput = document.getElementById('f-date-start');
+  const endInput = document.getElementById('f-date-end');
+  
+  const startVal = startInput.value;
+  const endVal = endInput.value;
+
+  // Logika Penyesuaian Otomatis Tanggal
+  if (startVal && endVal) {
+    if (startVal > endVal) {
+      if (source === 'start') {
+        // Jika mengubah tanggal AWAL menjadi lebih besar dari tanggal akhir
+        endInput.value = startVal;
+      } else if (source === 'end') {
+        // Jika mengubah tanggal AKHIR menjadi lebih kecil dari tanggal awal
+        startInput.value = endVal;
+      }
+    }
+  }
+
+  // Langsung perintahkan sistem untuk berpindah ke status 'custom'
+  await setFilter('custom');
 }
     
     function setView(v) {
