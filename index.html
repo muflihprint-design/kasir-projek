@@ -72,29 +72,7 @@
   -moz-appearance: textfield;
 }
 
-  /* Menghilangkan tombol clear */
-    input[type="date"]::-webkit-clear-button {
-        display: none !important;
-    }
-    
-    /* Mengubah ikon kalender jadi transparan dan menutupi area agar tetap bisa diklik */
-    input[type="date"]::-webkit-calendar-picker-indicator {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0;
-        cursor: pointer;
-    }
-
-    /* Memastikan teks tanggal mengambil seluruh sisa ruang dan rata tengah */
-    input[type="date"]::-webkit-datetime-edit {
-        text-align: center;
-        padding: 0;
-        width: 100%;
-    }
-    
+ 
     #loading-overlay {
       display: none;
       position: fixed;
@@ -413,23 +391,6 @@ function handleModalScroll() {
     
 
 
-/** * Fungsi untuk mengupdate angka saldo secara real-time
- * Panggil ini setelah data transaksi berhasil dimuat
- */
-function updateBalanceUI(total, cash, bank) {
-  // Pastikan loading sudah dimatikan
-  const checkElement = document.getElementById('total-balance-value');
-  if (!checkElement) showBalanceLoading(false);
-
-  const totalEl = document.getElementById('total-balance-value');
-  const cashEl = document.getElementById('cash-balance-value');
-  const bankEl = document.getElementById('bank-balance-value');
-
-  if (totalEl) totalEl.innerText = formatRupiah(total);
-  if (cashEl) cashEl.innerText = formatRupiah(cash);
-  if (bankEl) bankEl.innerText = formatRupiah(bank);
-}
-
 function showBalanceLoading(isLoading) {
   const container = document.getElementById('balance-container');
   if (!container) return;
@@ -545,6 +506,27 @@ window.addEventListener('click', function(event) {
     closeModal();
   }
 });
+
+window.checkModalDateChange = function(source) {
+  const startInput = document.getElementById('modal-date-start');
+  const endInput = document.getElementById('modal-date-end');
+  
+  const startVal = startInput.value;
+  const endVal = endInput.value;
+
+  // Logika penyesuaian otomatis
+  if (startVal && endVal) {
+    if (startVal > endVal) {
+      if (source === 'start') {
+        // Jika mengubah tanggal AWAL menjadi lebih besar dari tanggal akhir, majukan tanggal akhir
+        endInput.value = startVal;
+      } else if (source === 'end') {
+        // Jika mengubah tanggal AKHIR menjadi lebih kecil dari tanggal awal, mundurkan tanggal awal
+        startInput.value = endVal;
+      }
+    }
+  }
+};
  
 async function shiftMonth(direction) {
   const startInput = document.getElementById('f-date-start');
@@ -630,7 +612,8 @@ function initRiwayatStructure() {
           </div>
 
           <!-- Tambahkan ID date-filter-container -->
-<div id="date-filter-container" class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 transition-all justify-center w-full md:w-auto">
+
+<div id="date-filter-container" class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 transition-all justify-center w-full md:w-auto">
   
   <!-- Tombol Mundur 1 Bulan -->
   <button onclick="shiftMonth(-1)" class="p-1 hover:bg-blue-100 hover:text-blue-600 text-slate-400 rounded-lg transition-colors active:scale-90" title="Bulan Sebelumnya">
@@ -639,13 +622,21 @@ function initRiwayatStructure() {
 
   <i id="date-filter-icon" data-lucide="calendar" class="w-4 h-4 text-slate-400 hidden sm:block"></i>
   
-  <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
-<input type="date" id="f-date-start" onchange="checkManualDateChange('start')" 
-    class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center px-0 relative">
-<span class="text-slate-300 font-sans">—</span>
-<input type="date" id="f-date-end" onchange="checkManualDateChange('end')" 
-    class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center px-0 relative">
-    </div>
+  <!-- Teks Rentang Tanggal yang Tampil -->
+  <div onclick="openDateModal()" class="flex items-center gap-1 cursor-pointer hover:bg-slate-200 px-2 py-1 rounded-lg transition-colors">
+    <span id="date-range-text" class="font-mono text-[11px] font-bold text-slate-700 min-w-[120px] text-center">
+      Memuat...
+    </span>
+  </div>
+
+  <!-- Input Tanggal Asli (Disembunyikan agar logika sistem tetap jalan) -->
+  <input type="hidden" id="f-date-start">
+  <input type="hidden" id="f-date-end">
+
+  <!-- Tombol Untuk Memilih Tanggal -->
+  <button onclick="openDateModal()" class="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-colors active:scale-90 ml-1 shadow-sm border border-blue-200" title="Pilih Rentang Tanggal">
+    <i data-lucide="calendar-search" class="w-4 h-4"></i>
+  </button>
 
   <!-- Tombol Maju 1 Bulan -->
   <button onclick="shiftMonth(1)" class="p-1 hover:bg-blue-100 hover:text-blue-600 text-slate-400 rounded-lg transition-colors active:scale-90" title="Bulan Berikutnya">
@@ -889,17 +880,6 @@ async function fetchTransactions() {
   }
 }
 
-
-    function setCategory(cat) {
-      currentPage = 1;
-      currentCategory = cat;
-      const categories = ['SEMUA', 'MASUK', 'KELUAR'];
-      categories.forEach(c => {
-        const el = document.getElementById(`cat-${c.toLowerCase()}`);
-        if (el) el.className = (c === cat) ? "flex-1 py-2 border-b-2 border-blue-500 text-blue-600 bg-white font-bold transition" : "flex-1 py-2 border-b-2 border-transparent hover:bg-gray-50 transition";
-      });
-      renderTransactions();
-    }
 
   function renderTransactions() {
   const container = document.getElementById('listContainer');
@@ -1158,6 +1138,108 @@ window.changePage = function(page) {
   renderTransactions();
 }
 // ------------------------------------
+
+// --- FUNGSI FORMAT & TEKS TANGGAL ---
+function formatDateText(dateString) {
+  if (!dateString) return "";
+  const parts = dateString.split('-'); // asusmi format YYYY-MM-DD
+  if (parts.length !== 3) return dateString;
+  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+  const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+  // Menampilkan format: 01 Jan 24
+  return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear().toString().slice(2)}`;
+}
+
+window.updateDateRangeText = function() {
+  const start = document.getElementById('f-date-start').value;
+  const end = document.getElementById('f-date-end').value;
+  const textEl = document.getElementById('date-range-text');
+  if (!textEl) return;
+  
+  if (start && end) {
+    if (start === end) {
+       textEl.innerText = formatDateText(start);
+    } else {
+       textEl.innerText = `${formatDateText(start)} - ${formatDateText(end)}`;
+    }
+  } else {
+    textEl.innerText = "Semua Waktu";
+  }
+};
+
+// --- FUNGSI MODAL PILIH TANGGAL ---
+window.openDateModal = function() {
+  const modal = document.getElementById('general-modal');
+  const content = document.getElementById('modalContent');
+  
+  const currentStart = document.getElementById('f-date-start').value;
+  const currentEnd = document.getElementById('f-date-end').value;
+
+  content.innerHTML = `
+    <div class="flex flex-col h-full max-h-[80vh]">
+      <div class="flex justify-between items-center pb-4 border-b border-slate-100 mb-4 shrink-0">
+        <h3 class="text-base font-black text-slate-800 flex items-center gap-2">
+          <div class="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+            <i data-lucide="calendar-range" class="w-4 h-4"></i>
+          </div>
+          Pilih Rentang Tanggal
+        </h3>
+        <button onclick="closeModal()" class="w-8 h-8 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-700 active:scale-95 transition-all">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      
+      <div class="space-y-4 flex-1">
+        <div>
+          <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Tanggal Mulai</label>
+          <!-- Tambahkan onchange di sini -->
+          <input type="date" id="modal-date-start" value="${currentStart}" onchange="checkModalDateChange('start')" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Tanggal Akhir</label>
+          <!-- Tambahkan onchange di sini -->
+          <input type="date" id="modal-date-end" value="${currentEnd}" onchange="checkModalDateChange('end')" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer">
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 flex gap-3 mt-6 shrink-0 bg-white">
+          <button onclick="closeModal()" class="flex-1 py-3.5 bg-white border-2 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 font-bold rounded-xl text-xs active:scale-95 transition-all">
+              Batal
+          </button>
+          <button onclick="applyDateModal()" class="flex-[2] py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 text-xs active:scale-95 transition-all flex items-center justify-center gap-2">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i> Terapkan
+          </button>
+      </div>
+    </div>
+  `;
+  
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.applyDateModal = function() {
+  const mStart = document.getElementById('modal-date-start').value;
+  const mEnd = document.getElementById('modal-date-end').value;
+  
+  if(!mStart || !mEnd) {
+     alert('Harap lengkapi tanggal mulai dan akhir!');
+     return;
+  }
+
+  // Set nilai ke input tersembunyi
+  document.getElementById('f-date-start').value = mStart;
+  document.getElementById('f-date-end').value = mEnd;
+  
+  // Validasi: Jika Tanggal awal lebih besar dari tanggal akhir
+  if (mStart > mEnd) {
+     document.getElementById('f-date-end').value = mStart;
+  }
+  
+  closeModal();
+  updateDateRangeText(); // Update teks tampilan
+  setFilter('custom');   // Refresh data
+};
     
   async function setFilter(f) {
     currentPage = 1;
@@ -1221,6 +1303,10 @@ window.changePage = function(page) {
     document.getElementById('f-date-end').value = '';
   }
 
+  if(typeof updateDateRangeText === 'function') {
+      updateDateRangeText();
+  }
+
   // 4. Logika Tarik Data (TAMBAHKAN 'custom' ke dalam pengkondisian ini)
   if ((f === 'month' || f === 'all' || f === 'revisi' || f === 'custom') && !isFullDataLoaded) {
     await fetchFullTransactions();
@@ -1269,42 +1355,7 @@ async function fetchFullTransactions() {
     showLoading(false);
   }
 }
-
-async function checkManualDateChange(source) {
-  const startInput = document.getElementById('f-date-start');
-  const endInput = document.getElementById('f-date-end');
-  
-  const startVal = startInput.value;
-  const endVal = endInput.value;
-
-  // Logika Penyesuaian Otomatis Tanggal
-  if (startVal && endVal) {
-    if (startVal > endVal) {
-      if (source === 'start') {
-        // Jika mengubah tanggal AWAL menjadi lebih besar dari tanggal akhir
-        endInput.value = startVal;
-      } else if (source === 'end') {
-        // Jika mengubah tanggal AKHIR menjadi lebih kecil dari tanggal awal
-        startInput.value = endVal;
-      }
-    }
-  }
-
-  // Langsung perintahkan sistem untuk berpindah ke status 'custom'
-  await setFilter('custom');
-}
     
-    function setView(v) {
-      currentPage = 1;
-      currentView = v;
-      ['v-cash', 'v-bank', 'v-all'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.className = 'flex-1 py-3 font-semibold text-gray-500 transition border-b-2 border-transparent';
-      });
-      const activeId = v === 'Cash' ? 'v-cash' : (v === 'Rekening' ? 'v-bank' : 'v-all');
-      document.getElementById(activeId).className = 'flex-1 py-3 font-semibold border-b-2 border-blue-600 text-blue-600 transition';
-      renderTransactions();
-    }
 
 function setLoading(buttonElement, isLoading) {
     if (isLoading) {
@@ -1612,16 +1663,6 @@ function updateStateAndRenderUI(action, trxId, payload) {
     }
 }
 
-
-    // Halaman placeholder untuk contoh integrasi
-    function renderPenjualanPage() {
-      document.getElementById('menu-container').innerHTML = `
-        <div class="bg-white p-6 rounded-3xl border shadow-sm">
-          <h2 class="text-xl font-bold mb-4">Penjualan Baru</h2>
-          <p class="text-sm text-gray-500">Gunakan menu navigasi di bawah untuk berpindah halaman.</p>
-        </div>
-      `;
-    }
     
    async function fetchMasterStock() {
   try {
@@ -3277,25 +3318,7 @@ function generateNotaHTML(t) {
     </div>`;
 }
     
-function printNota(id) {
-  const t = currentTransactions.find(item => item.id === id);
-  if (!t) return;
-
-  const printArea = document.getElementById('printArea');
-  
-  // Set konten nota
-  printArea.innerHTML = generateNotaHTML(t);
-  
-  // Pastikan elemen terlihat di DOM sebelum perintah print
-  printArea.classList.remove('hidden');
-
-  setTimeout(() => {
-    window.print();
-    // Setelah print selesai (atau dibatalkan), sembunyikan kembali
-    printArea.classList.add('hidden');
-  }, 300);
-}
-    
+   
     window.onload = () => {
       refreshData();
       fetchMasterStock();
