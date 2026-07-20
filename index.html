@@ -72,25 +72,27 @@
   -moz-appearance: textfield;
 }
 
-   /* Menghilangkan ikon kalender, tombol clear, dan ruang kosongnya secara total */
-    /* Menghilangkan ikon kalender dan tombol clear secara total */
-    input[type="date"]::-webkit-clear-button,
-    input[type="date"]::-webkit-inner-spin-button,
-    input[type="date"]::-webkit-calendar-picker-indicator {
+  /* Menghilangkan tombol clear */
+    input[type="date"]::-webkit-clear-button {
         display: none !important;
-        -webkit-appearance: none !important;
-        margin: 0 !important;
-    }
-
-    /* Memaksa teks tanggal rata tengah tanpa merusak struktur aslinya */
-    input[type="date"]::-webkit-datetime-edit {
-        padding: 0 !important;
-        margin: 0 !important;
-        text-align: center !important;
     }
     
-    input[type="date"]::-webkit-datetime-edit-fields-wrapper {
-        padding: 0 !important;
+    /* Mengubah ikon kalender jadi transparan dan menutupi area agar tetap bisa diklik */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    /* Memastikan teks tanggal mengambil seluruh sisa ruang dan rata tengah */
+    input[type="date"]::-webkit-datetime-edit {
+        text-align: center;
+        padding: 0;
+        width: 100%;
     }
     
     #loading-overlay {
@@ -639,10 +641,10 @@ function initRiwayatStructure() {
   
   <div class="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-600">
 <input type="date" id="f-date-start" onchange="checkManualDateChange('start')" 
-    class="bg-transparent outline-none border-none w-[105px] cursor-pointer appearance-none text-center px-0">
+    class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center px-0 relative">
 <span class="text-slate-300 font-sans">—</span>
 <input type="date" id="f-date-end" onchange="checkManualDateChange('end')" 
-    class="bg-transparent outline-none border-none w-[105px] cursor-pointer appearance-none text-center px-0">
+    class="bg-transparent outline-none border-none w-[125px] cursor-pointer appearance-none text-center px-0 relative">
     </div>
 
   <!-- Tombol Maju 1 Bulan -->
