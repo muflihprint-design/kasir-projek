@@ -1142,12 +1142,13 @@ window.changePage = function(page) {
 // --- FUNGSI FORMAT & TEKS TANGGAL ---
 function formatDateText(dateString) {
   if (!dateString) return "";
-  const parts = dateString.split('-'); // asusmi format YYYY-MM-DD
+  const parts = dateString.split('-'); 
   if (parts.length !== 3) return dateString;
   const d = new Date(parts[0], parts[1] - 1, parts[2]);
   const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
-  // Menampilkan format: 01 Jan 24
-  return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear().toString().slice(2)}`;
+  
+  // Menggunakan getFullYear() secara langsung tanpa dipotong (slice)
+  return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 window.updateDateRangeText = function() {
