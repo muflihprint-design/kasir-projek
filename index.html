@@ -1113,7 +1113,7 @@ window.changePage = function(page) {
   const monthStr = String(month + 1).padStart(2, '0');
   const todayStr = `${year}-${monthStr}-${date}`;
 
- // 1. Update UI Tombol
+// 1. Update UI Tombol
   ['today', 'month', 'all', 'revisi'].forEach(type => {
     const el = document.getElementById('f-' + type);
     if (el) {
@@ -1125,13 +1125,13 @@ window.changePage = function(page) {
       if (type === 'revisi') {
         el.className = isActive ? 
           `${baseLayout} bg-orange-500 text-white shadow-sm` : 
-          // Ubah menjadi bg-transparent agar menyatu dengan background container
-          `${baseLayout} bg-transparent text-orange-600 hover:bg-orange-100`; 
+          // Hapus hover:bg-orange-100 agar benar-benar bersih di HP
+          `${baseLayout} bg-transparent text-orange-600`; 
       } else {
         el.className = isActive ? 
           `${baseLayout} bg-blue-600 text-white shadow-sm` : 
-          // Ubah bg-gray-100 menjadi bg-transparent
-          `${baseLayout} bg-transparent hover:bg-slate-200/50 text-slate-500`;
+          // Hapus hover:bg-slate-200/50 agar tidak ada sisa bayangan abu-abu
+          `${baseLayout} bg-transparent text-slate-500`;
       }
     }
   });
