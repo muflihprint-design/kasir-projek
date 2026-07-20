@@ -1113,26 +1113,25 @@ window.changePage = function(page) {
   const monthStr = String(month + 1).padStart(2, '0');
   const todayStr = `${year}-${monthStr}-${date}`;
 
-  // 1. Update UI Tombol
-  // Tambahkan 'revisi' ke list
-  // 1. Update UI Tombol
+ // 1. Update UI Tombol
   ['today', 'month', 'all', 'revisi'].forEach(type => {
     const el = document.getElementById('f-' + type);
     if (el) {
       const isActive = (f === type);
       
       // Simpan class tata letak dasar agar tidak tertimpa
-      // Di dalam fungsi setFilter(f) pada bagian // 1. Update UI Tombol
-const baseLayout = 'relative flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5';
+      const baseLayout = 'relative flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5';
 
       if (type === 'revisi') {
         el.className = isActive ? 
-          `${baseLayout} bg-orange-500 text-white` : 
-          `${baseLayout} bg-orange-100 text-orange-600 hover:bg-orange-200 border border-orange-200`;
+          `${baseLayout} bg-orange-500 text-white shadow-sm` : 
+          // Ubah menjadi bg-transparent agar menyatu dengan background container
+          `${baseLayout} bg-transparent text-orange-600 hover:bg-orange-100`; 
       } else {
         el.className = isActive ? 
           `${baseLayout} bg-blue-600 text-white shadow-sm` : 
-          `${baseLayout} bg-gray-100 hover:bg-gray-200 text-slate-600`;
+          // Ubah bg-gray-100 menjadi bg-transparent
+          `${baseLayout} bg-transparent hover:bg-slate-200/50 text-slate-500`;
       }
     }
   });
