@@ -327,13 +327,17 @@ display: block !important;
   <script>
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxFLyXdFP66zi_AlX1ncJ45dt1UnobmYhq2G7dPNdWA6VvIWAmcbEYqlgJLRNgg_MQzig/exec";
 
-    let allTransactions = [];
-    let isDataLoaded = false;
-    let isFullDataLoaded = false;
-    let currentFilter = 'today';
-    let currentView = 'Semua';
-    let currentCategory = 'SEMUA';
-    let productMaster = [];
+   let allTransactions = [];
+   let currentFetchId = 0;
+// --- VARIABEL STATUS PEMUATAN BARU ---
+let isTodayDataLoaded = false;
+let isMonthDataLoaded = false;
+let isFullDataLoaded = false;
+
+let currentFilter = 'today';
+let currentView = 'Semua';
+let currentCategory = 'SEMUA';
+let productMaster = [];
 let currentShop = {
   nama: localStorage.getItem('shopName') || '',
   alamat: localStorage.getItem('shopAddress') || ''
@@ -458,6 +462,12 @@ async function refreshData() {
 
     // Matikan loading animasi
     showBalanceLoading(false);
+
+    if (data.version) {
+      window.currentBackendVersion = data.version;
+      const versionEl = document.getElementById('app-version-display');
+      if (versionEl) versionEl.innerText = data.version;
+    }
 
     // Ambil elemen berdasarkan ID yang baru dibuat di atas
     const elKasirTotal = document.getElementById('saldo-kasir-total');
@@ -700,7 +710,7 @@ function initRiwayatStructure() {
   `;
   lucide.createIcons();
   setFilter('today');
-  fetchTransactions();
+ 
 }
  
 // Variabel sementara agar filter tidak langsung berubah sebelum tombol "Terapkan" ditekan
@@ -876,35 +886,50 @@ window.resetTempFilters = function() {
     selectTempView('Semua');
 }
 
-
-
-async function fetchTransactions() {
-  if (isDataLoaded && allTransactions.length > 0) {
-    renderTransactions();
-    return;
-  }
-
+async function fetchTransactions(filterType = 'today') {
+  // Buat ID unik untuk setiap panggilan fetch
+  const fetchId = ++currentFetchId;
+  
   showLoading(true);
   try {
-    const res = await fetch(`${WEB_APP_URL}?action=getTransactions&_=${Date.now()}`);
+    const res = await fetch(`${WEB_APP_URL}?action=getTransactions&filter=${filterType}&_=${Date.now()}`);
     const newData = await res.json();
     
-    // Simpan semua data yang didapat ke memori
-    allTransactions = newData;
-    isDataLoaded = true;
-    isFullDataLoaded = true; // <--- TAMBAHKAN BARIS INI DI SINI
+    // CEGAH RACE CONDITION: 
+    // Jika ID fetch saat ini berbeda dengan ID fetch global (artinya ada request baru yang ditumpuk), hentikan proses ini.
+    if (fetchId !== currentFetchId) return;
     
-     renderTransactions();
+    // Timpa allTransactions
+    allTransactions = newData;
+    
+    // Update status pemuatan berdasarkan tipe data yang ditarik
+    if (filterType === 'today') isTodayDataLoaded = true;
+    if (filterType === 'month') {
+       isTodayDataLoaded = true;
+       isMonthDataLoaded = true;
+    }
+    if (filterType === 'all') {
+       isTodayDataLoaded = true;
+       isMonthDataLoaded = true;
+       isFullDataLoaded = true;
+    }
+    
+    renderTransactions();
     
   } catch (e) {
+    // Abaikan error jika ini adalah request yang sudah usang
+    if (fetchId !== currentFetchId) return;
+
     console.error("Error Detail:", e);
     document.getElementById('listContainer').innerHTML = 
       `<div class="p-8 text-center text-red-500 font-bold">Gagal sinkron data. Pastikan internet stabil.</div>`;
   } finally {
-    showLoading(false);
+    // Hanya matikan loading jika ini adalah request yang paling terakhir dieksekusi
+    if (fetchId === currentFetchId) {
+      showLoading(false);
+    }
   }
 }
-
 
   function renderTransactions() {
   const container = document.getElementById('listContainer');
@@ -1306,18 +1331,16 @@ window.applyDateModal = function() {
   setFilter('custom');   // Refresh data
 };
     
-  async function setFilter(f) {
-    currentPage = 1;
+async function setFilter(f) {
+  currentPage = 1;
   currentFilter = f;
   const now = new Date();
   const year = now.getFullYear();
-  const month = now.getMonth();
-  const date = String(now.getDate()).padStart(2, '0');
-  const monthStr = String(month + 1).padStart(2, '0');
-  const todayStr = `${year}-${monthStr}-${date}`;
+  const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+  const dateStr = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${monthStr}-${dateStr}`;
 
-// 1. Update UI Tombol
- // 1. Update UI Tombol Standar (Tidak ada perubahan, gunakan kode terakhir dari Anda)
+  // 1. Update UI Tombol
   ['today', 'month', 'all', 'revisi'].forEach(type => {
     const el = document.getElementById('f-' + type);
     if (el) {
@@ -1325,29 +1348,23 @@ window.applyDateModal = function() {
       const baseLayout = 'relative flex-1 md:flex-none px-3 py-1.5 text-[10px] font-bold rounded-full transition-all duration-200 flex items-center justify-center gap-1.5';
 
       if (type === 'revisi') {
-        el.className = isActive ? 
-          `${baseLayout} bg-orange-500 text-white shadow-sm` : 
-          `${baseLayout} bg-transparent text-orange-600`; 
+        el.className = isActive ? `${baseLayout} bg-orange-500 text-white shadow-sm` : `${baseLayout} bg-transparent text-orange-600`; 
       } else {
-        el.className = isActive ? 
-          `${baseLayout} bg-blue-600 text-white shadow-sm` : 
-          `${baseLayout} bg-transparent text-slate-500`;
+        el.className = isActive ? `${baseLayout} bg-blue-600 text-white shadow-sm` : `${baseLayout} bg-transparent text-slate-500`;
       }
     }
   });
 
-  // [BARU] 2. Update UI Filter Tanggal Manual
+  // 2. Update UI Filter Tanggal Manual
   const dateContainer = document.getElementById('date-filter-container');
   const dateIcon = document.getElementById('date-filter-icon');
   
   if (dateContainer && dateIcon) {
     if (f === 'custom') {
-      // Tampilan saat filter tanggal AKTIF (Background biru tipis, border biru)
       dateContainer.className = "flex items-center gap-2 bg-blue-50 border border-blue-400 rounded-xl px-3 py-2 transition-all justify-center w-full md:w-auto shadow-sm";
       dateIcon.classList.remove('text-slate-400');
       dateIcon.classList.add('text-blue-600');
     } else {
-      // Tampilan saat filter tanggal TIDAK AKTIF (Kembali normal)
       dateContainer.className = "flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 transition-all justify-center w-full md:w-auto";
       dateIcon.classList.remove('text-blue-600');
       dateIcon.classList.add('text-slate-400');
@@ -1356,7 +1373,7 @@ window.applyDateModal = function() {
 
   showFilterToast(f);
   
-  // 3. Logika Pengisian Input Tanggal (Tetap seperti sebelumnya)
+  // 3. Logika Pengisian Input Tanggal (Sembunyi)
   if (f === 'today') {
     document.getElementById('f-date-start').value = todayStr;
     document.getElementById('f-date-end').value = todayStr;
@@ -1372,11 +1389,42 @@ window.applyDateModal = function() {
       updateDateRangeText();
   }
 
-  // 4. Logika Tarik Data (TAMBAHKAN 'custom' ke dalam pengkondisian ini)
-  if ((f === 'month' || f === 'all' || f === 'revisi' || f === 'custom') && !isFullDataLoaded) {
-    await fetchFullTransactions();
-  } else {
-    renderTransactions();
+  // 4. LOGIKA TARIK DATA PINTAR (SMART FETCH)
+  if (f === 'today') {
+      if (!isTodayDataLoaded) await fetchTransactions('today');
+      else renderTransactions();
+  } 
+  else if (f === 'month') {
+      if (!isMonthDataLoaded) await fetchTransactions('month');
+      else renderTransactions();
+  } 
+  else if (f === 'all') {
+      if (!isFullDataLoaded) await fetchTransactions('all');
+      else renderTransactions();
+  } 
+  else if (f === 'revisi') {
+      // TIDAK PERLU FETCH! Data revisi sudah diinjeksi dari backend saat fetch apapun
+      renderTransactions();
+  } 
+  else if (f === 'custom') {
+      const ds = document.getElementById('f-date-start').value;
+      const de = document.getElementById('f-date-end').value;
+      const currentMonthPrefix = `${year}-${monthStr}`;
+
+      // Cek apakah user memilih rentang tanggal yang melewati bulan ini
+      let isOutsideMonth = false;
+      if (ds && !ds.startsWith(currentMonthPrefix)) isOutsideMonth = true;
+      if (de && !de.startsWith(currentMonthPrefix)) isOutsideMonth = true;
+
+      // Tarik full data HANYA jika rentang tanggal menyentuh bulan lalu/berikutnya
+      if (isOutsideMonth) {
+          if (!isFullDataLoaded) await fetchTransactions('all');
+          else renderTransactions();
+      } else {
+          // Jika masih di dalam bulan yang sama, cukup pastikan data bulan ini sudah ditarik
+          if (!isMonthDataLoaded) await fetchTransactions('month');
+          else renderTransactions();
+      }
   }
 }
 
@@ -1401,26 +1449,7 @@ function updateRevisiBadge() {
     badge.classList.remove('animate-pulse');
   }
 }
-
-async function fetchFullTransactions() {
-  showLoading(true);
-  try {
-    // Panggil tanpa parameter range=today untuk mengambil semua data
-    const res = await fetch(`${WEB_APP_URL}?action=getTransactions&_=${Date.now()}`);
-    const data = await res.json();
-    
-    allTransactions = data; // Ganti cache dengan data lengkap
-    isFullDataLoaded = true; // Tandai bahwa data sudah lengkap
-    isDataLoaded = true;
-    
-    renderTransactions();
-  } catch (e) {
-    alert("Gagal menarik data riwayat lengkap");
-  } finally {
-    showLoading(false);
-  }
-}
-    
+  
 
 function setLoading(buttonElement, isLoading) {
     if (isLoading) {
@@ -2005,6 +2034,9 @@ else if (tab === 'pembelian') {
   lucide.createIcons();
 }
   else if (tab === 'lainnya') {
+    // Ambil versi dari memori, jika belum ada tampilkan "Memuat..."
+    const versionText = window.currentBackendVersion ? window.currentBackendVersion : "Memuat...";
+
     menuContainer.innerHTML = `
       <div class="space-y-6 page-transition">
         <h2 class="text-lg font-bold flex items-center gap-2 text-slate-700">
@@ -2012,6 +2044,7 @@ else if (tab === 'pembelian') {
         </h2>
         
         <div class="grid grid-cols-4 gap-2">
+          <!-- ... 4 Tombol menu Utang/Piutang Anda tetap sama ... -->
           <button onclick="showMenuAction('UTANG', this)" class="action-btn flex flex-col items-center p-3 bg-amber-50 border border-amber-100 rounded-2xl active:scale-95 transition-all gap-1">
             <div class="icon-box p-2 bg-amber-100 rounded-xl text-amber-600 transition-transform"><i data-lucide="book-open" class="w-4 h-4"></i></div>
             <span class="text-[9px] font-black text-amber-800 uppercase tracking-tighter text-center">Utang</span>
@@ -2035,13 +2068,22 @@ else if (tab === 'pembelian') {
         <div id="action-form-container" class="mt-4 hidden p-5 bg-slate-50 rounded-2xl border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-300"></div>
 
         <div class="pt-4 border-t border-slate-100">
-           <button onclick="location.reload()" class="w-full p-4 bg-slate-100 text-slate-600 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+           <button onclick="location.reload()" class="w-full p-4 bg-slate-100 text-slate-600 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.98] transition-all mb-3">
              <i data-lucide="refresh-cw" class="w-4 h-4"></i> Muat Ulang Aplikasi
            </button>
+           
+           <!-- KOTAK INFO VERSI BACKEND -->
+           <div class="text-center flex justify-center items-center gap-1.5 opacity-60">
+              <i data-lucide="server" class="w-3 h-3 text-slate-400"></i>
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Backend Version: <span id="app-version-display" class="font-mono text-slate-600">${versionText}</span>
+              </span>
+           </div>
+           
         </div>
       </div>
     `;
- }
+  }
 }
     if (window.lucide) lucide.createIcons();
 }
@@ -2345,8 +2387,9 @@ window.selectProduct = selectProduct;
       }
 
       // Reset flag agar fetch selanjutnya mengambil data terbaru
-      isDataLoaded = false;
-      isFullDataLoaded = false;
+      isTodayDataLoaded = false;
+isMonthDataLoaded = false;
+isFullDataLoaded = false;
 
       // Berikan feedback instan tanpa menunggu 1.2 detik penuh
       showLoading(false);
@@ -3062,7 +3105,8 @@ async function saveTransfer() {
       method: "POST", 
       body: JSON.stringify(payload) 
     });
- isDataLoaded = false;
+ isTodayDataLoaded = false;
+isMonthDataLoaded = false;
 isFullDataLoaded = false;
     // Memberikan jeda agar sinkronisasi di Google Sheet selesai
     setTimeout(() => {
@@ -3180,7 +3224,8 @@ async function executeCancel(id) {
       mode: "no-cors", 
       body: JSON.stringify(payload) 
     });
- isDataLoaded = false;
+ isTodayDataLoaded = false;
+isMonthDataLoaded = false;
 isFullDataLoaded = false;
     // Sesuai Ledger Anda: Pesanan dibatalkan ditandai "CANCEL ORDER" agar tidak pengaruhi saldo
     setTimeout(() => {
