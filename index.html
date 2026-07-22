@@ -738,17 +738,17 @@ window.openAdvancedFilter = function() {
                 <div class="flex items-center justify-between mb-3">
                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipe Transaksi</p>
                 </div>
-                <div class="grid grid-cols-3 gap-2.5">
-                    ${['SEMUA', 'MASUK', 'KELUAR'].map(cat => `
-                        <button onclick="selectTempCategory('${cat}')" id="btn-temp-cat-${cat}" 
-                          class="temp-cat-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 
-                          ${tempCategory === cat 
-                            ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]' 
-                            : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}">
-                            ${cat}
-                        </button>
-                    `).join('')}
-                </div>
+              <div class="grid grid-cols-3 gap-2.5">
+    ${['SEMUA', 'MASUK', 'KELUAR', 'PENJUALAN', 'BLANGKO', 'UNDANGAN', 'LAIN-LAIN', 'OPERASIONAL', 'STOK', 'ALAT'].map(cat => `
+        <button onclick="selectTempCategory('${cat}')" id="btn-temp-cat-${cat.replace(/\s+/g, '-')}" 
+          class="temp-cat-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[9px] font-bold border-2 transition-all duration-200 
+          ${tempCategory === cat 
+            ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]' 
+            : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}">
+            ${cat}
+        </button>
+    `).join('')}
+</div>
             </div>
 
             <!-- Filter Metode Pembayaran -->
@@ -851,16 +851,23 @@ window.selectTempCategory = function(cat) {
     document.querySelectorAll('.temp-cat-btn').forEach(btn => {
         btn.className = 'temp-cat-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50';
     });
-    document.getElementById(`btn-temp-cat-${cat}`).className = 'temp-cat-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]';
+    
+    // Gunakan fungsi replace agar ID tombol dengan spasi (seperti LAIN-LAIN jika menggunakan spasi) tidak error
+    const formattedId = cat.replace(/\s+/g, '-');
+    document.getElementById(`btn-temp-cat-${formattedId}`).className = 'temp-cat-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]';
 }
 
+// Interaksi saat opsi Metode diklik di dalam modal
 // Interaksi saat opsi Metode diklik di dalam modal
 window.selectTempView = function(v) {
     tempView = v;
     document.querySelectorAll('.temp-view-btn').forEach(btn => {
         btn.className = 'temp-view-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50';
     });
-    document.getElementById(`btn-temp-view-${v}`).className = 'temp-view-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]';
+    
+    // Perbaikan: Tambahkan replace() agar spasi diubah menjadi strip
+    const formattedId = v.replace(/\s+/g, '-');
+    document.getElementById(`btn-temp-view-${formattedId}`).className = 'temp-view-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 bg-blue-50 border-blue-500 text-blue-700 shadow-[0_2px_10px_-3px_rgba(37,99,235,0.2)]';
 }
 
 // Fungsi tombol Reset
@@ -919,7 +926,46 @@ async function fetchTransactions() {
     }
 
     if (currentView !== 'Semua' && t.metode !== currentView) return false;
-    if (currentCategory !== 'SEMUA' && t.tipe !== currentCategory) return false;
+    // LOGIKA FILTER TIPE TRANSAKSI (BARU)
+      if (currentCategory !== 'SEMUA') {
+        const catUpper = currentCategory.toUpperCase();
+        const tKatUpper = (t.kat || "").toUpperCase();
+        const tTipe = t.tipe || "";
+        
+        if (catUpper === 'MASUK' || catUpper === 'KELUAR') {
+            if (tTipe !== catUpper) return false;
+        } else if (catUpper === 'PENJUALAN' || catUpper === 'OPERASIONAL') {
+            if (tKatUpper !== catUpper) return false;
+        } else if (catUpper === 'STOK' || catUpper === 'ALAT') {
+            if (tKatUpper !== 'PEMBELIAN') return false; // Stok dan Alat dialihkan ke data Pembelian
+        } else if (catUpper === 'BLANGKO' || catUpper === 'UNDANGAN' || catUpper === 'LAIN-LAIN') {
+            if (tKatUpper !== 'PENJUALAN') return false;
+            
+            let jenisOrderan = "LAIN-LAIN"; 
+            const ketString = (t.ket || "");
+            const splitKet = ketString.split('-');
+            
+            // Mengecek data setelah tanda strip '-'
+            if (splitKet.length > 1) {
+                const teksSetelahStrip = splitKet.slice(1).join('-'); 
+                if (/UNDANGAN/i.test(teksSetelahStrip)) {
+                    jenisOrderan = "UNDANGAN";
+                } else if (/BLANGKO/i.test(teksSetelahStrip)) {
+                    jenisOrderan = "BLANGKO";
+                }
+            } else {
+                // Fallback jika tidak terdapat strip sama sekali pada keterangan
+                if (/UNDANGAN/i.test(ketString)) {
+                    jenisOrderan = "UNDANGAN";
+                } else if (/BLANGKO/i.test(ketString)) {
+                    jenisOrderan = "BLANGKO";
+                }
+            }
+            
+            // Gugurkan jika jenis orderan yang didapat tidak sama dengan kategori filter yang sedang aktif
+            if (jenisOrderan !== catUpper) return false;
+        }
+      }
     
     const tDate = t.waktu.split(' ')[0];
     if (ds && tDate < ds) return false;
