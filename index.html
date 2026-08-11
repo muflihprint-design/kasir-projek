@@ -301,13 +301,16 @@ display: block !important;
     <div id="balance-container">
        </div>
 
-    <button onclick="resetShop()" class="group flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 hover:bg-red-50 border border-slate-100 rounded-xl transition-all duration-300">
-      <div class="text-right hidden xs:block">
-        <p class="text-[7px] font-bold text-slate-400 uppercase leading-none">Identitas</p> 
-        <p class="text-[9px] font-black text-slate-600 group-hover:text-red-600 transition-colors mt-0.5">GANTI TOKO</p> 
+    <!-- Tombol Identitas (Hanya Icon di HP, Text + Icon di Desktop) -->
+    <button onclick="resetShop()" title="Ganti Akun / Toko" class="group flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 hover:bg-red-50 border border-slate-100 rounded-xl transition-all duration-300">
+      <!-- Teks disembunyikan di HP (hidden), muncul di layar yang lebih besar (sm:block) -->
+      <div class="text-right hidden sm:block">
+        <p class="text-[7px] font-bold text-slate-400 uppercase leading-none">Masuk Sebagai</p> 
+        <p id="identity-name" class="text-[9px] font-black text-slate-600 group-hover:text-red-600 transition-colors mt-0.5">Memuat...</p> 
       </div>
-      <div class="w-7 h-7 flex items-center justify-center bg-white rounded-lg shadow-sm group-active:scale-90 transition-all border border-slate-100">
-        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-400 group-hover:text-red-500 group-hover:rotate-180 transition-transform duration-500"></i>
+      <!-- Wadah Ikon Dinamis -->
+      <div id="identity-icon-wrapper" class="w-7 h-7 flex items-center justify-center bg-white rounded-lg shadow-sm group-active:scale-90 transition-all border border-slate-100">
+        <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400 group-hover:text-red-500 transition-transform"></i>
       </div>
     </button>
   </div>
@@ -365,6 +368,41 @@ let currentShop = {
 let currentPage = 1;
 let itemsPerPage = 20; // Angka 20 atau string 'all'
 
+
+// --- FUNGSI UPDATE UI IDENTITAS ---
+function updateIdentityUI() {
+  const nameEl = document.getElementById('identity-name');
+  const iconWrapper = document.getElementById('identity-icon-wrapper');
+  
+  // Ambil nama dari variabel global atau localStorage
+  const shopName = currentShop.nama || localStorage.getItem('shopName') || 'PILIH TOKO';
+
+  if (!nameEl || !iconWrapper) return;
+
+  nameEl.innerText = shopName;
+
+  // Setelan dasar animasi dan interaksi hover
+  const baseClasses = "w-7 h-7 flex items-center justify-center rounded-lg shadow-sm group-active:scale-90 transition-all border group-hover:bg-red-100 group-hover:border-red-200 group-hover:text-red-600 ";
+
+  if (shopName === 'MUFLIH PRINT') {
+    iconWrapper.className = baseClasses + "bg-orange-100 border-orange-200 text-orange-600";
+    iconWrapper.innerHTML = '<span class="text-xs font-black">M</span>';
+  } else if (shopName === 'VI PRINTING') {
+    iconWrapper.className = baseClasses + "bg-purple-100 border-purple-200 text-purple-600";
+    iconWrapper.innerHTML = '<span class="text-xs font-black">V</span>';
+  } else if (shopName === 'ADMINISTRATOR') {
+    iconWrapper.className = baseClasses + "bg-slate-800 border-slate-700 text-white group-hover:text-red-600";
+    iconWrapper.innerHTML = '<i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>';
+  } else {
+    iconWrapper.className = baseClasses + "bg-white border-slate-100 text-slate-400";
+    iconWrapper.innerHTML = '<i data-lucide="user" class="w-3.5 h-3.5"></i>';
+  }
+
+  // Refresh ikon lucide jika yang dirender adalah ikon <i data-lucide="...">
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}    
+ 
+
 // Fungsi saat toko dipilih
 function selectShop(nama, alamat) {
   currentShop.nama = nama.toUpperCase();
@@ -379,6 +417,8 @@ function selectShop(nama, alamat) {
   
   // Jalankan inisialisasi aplikasi (misal tab jual)
   if (typeof changeTab === "function") changeTab('penjualan');
+
+  updateIdentityUI();
 }
 
 // TAMBAHAN: Logika Autentikasi Admin
@@ -398,10 +438,14 @@ window.addEventListener('DOMContentLoaded', () => {
   } else {
     document.getElementById('shop-selector').style.display = 'flex';
   }
+
+  updateIdentityUI();
+
   if (window.lucide) lucide.createIcons();
 });
     // Inisialisasi
-   
+
+  
 
 function handleModalScroll() {
   const content = document.getElementById('modalContent');
