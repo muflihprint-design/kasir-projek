@@ -227,6 +227,18 @@ display: block !important;
           <p class="text-xs text-slate-400">Jl. Rappokalling Raya, Makassar</p>
         </div>
       </button>
+
+      <!-- TAMBAHAN: Tombol Administrator -->
+      <button onclick="loginAdmin()" 
+              class="w-full p-5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-3xl flex items-center gap-4 transition-all group active:scale-95 mt-2">
+        <div class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center font-bold text-white text-xl">
+          <i data-lucide="lock" class="w-6 h-6 text-slate-400 group-hover:text-white transition"></i>
+        </div>
+        <div class="text-left">
+          <p class="font-bold text-white group-hover:text-blue-400 transition">Administrator</p>
+          <p class="text-xs text-slate-400">Akses Penuh (Gaji & Laporan)</p>
+        </div>
+      </button>
     </div>
   </div>
 </div>
@@ -360,6 +372,16 @@ function selectShop(nama, alamat) {
   
   // Jalankan inisialisasi aplikasi (misal tab jual)
   if (typeof changeTab === "function") changeTab('penjualan');
+}
+
+// TAMBAHAN: Logika Autentikasi Admin
+function loginAdmin() {
+  const pass = prompt("Masukkan Password Administrator:");
+  if (pass === "muflih123456") {
+    selectShop('ADMINISTRATOR', 'Akses Penuh Semua Data');
+  } else if (pass !== null && pass.trim() !== "") {
+    alert("Akses Ditolak! Password salah.");
+  }
 }
 
 // Cek saat halaman dimuat
@@ -945,12 +967,26 @@ async function fetchTransactions(filterType = 'today') {
 
   // 1. Lakukan Filtering seperti biasa
   const filtered = allTransactions.filter(t => {
+  // --- TAMBAHAN BARU: LOGIKA FILTER GAJI ---
+    // Jika yang login BUKAN Administrator, sembunyikan transaksi yang memiliki unsur kata "gaji"
+    if (currentShop.nama !== 'ADMINISTRATOR') {
+      const teksKeterangan = (t.ket || "").toLowerCase();
+      const teksKategori = (t.kat || "").toLowerCase();
+      
+      // Deteksi kata "gaji" pada kolom keterangan maupun kategori
+      if (teksKeterangan.includes("gaji") || teksKategori.includes("gaji")) {
+        return false; // Lewati/jangan tampilkan transaksi ini
+      }
+    }
+    // -----------------------------------------
+
     if (currentFilter === 'revisi') {
       const isNeedRevisi = t.revisi && t.revisi.trim() !== "" && (!t.ketSelesai || t.ketSelesai.trim() === "");
       if (!isNeedRevisi) return false;
     }
 
     if (currentView !== 'Semua' && t.metode !== currentView) return false;
+    
     // LOGIKA FILTER TIPE TRANSAKSI (BARU)
       if (currentCategory !== 'SEMUA') {
         const catUpper = currentCategory.toUpperCase();
