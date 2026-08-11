@@ -2504,6 +2504,11 @@ isFullDataLoaded = false;
 }
 
 function savePenjualan() {
+    // Cegah eksekusi jika login sebagai Administrator
+  if (currentShop.nama === 'ADMINISTRATOR') {
+    return alert("Aksi Ditolak: Administrator hanya memiliki akses untuk melihat riwayat dan memantau laporan. Silakan ganti identitas (login) ke toko Muflih Print atau Vi Printing untuk melakukan transaksi.");
+  }
+  
   const items = collectItems();
   if(items.length === 0) return alert("Pilih barang terlebih dahulu!");
   
