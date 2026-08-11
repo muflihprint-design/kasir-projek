@@ -236,7 +236,7 @@ display: block !important;
         </div>
         <div class="text-left">
           <p class="font-bold text-white group-hover:text-blue-400 transition">Administrator</p>
-          <p class="text-xs text-slate-400">Akses Penuh (Gaji & Laporan)</p>
+          <p class="text-xs text-slate-400">Akses Penuh</p>
         </div>
       </button>
     </div>
@@ -986,7 +986,7 @@ async function fetchTransactions(filterType = 'today') {
     }
 
     if (currentView !== 'Semua' && t.metode !== currentView) return false;
-    
+
     // LOGIKA FILTER TIPE TRANSAKSI (BARU)
       if (currentCategory !== 'SEMUA') {
         const catUpper = currentCategory.toUpperCase();
