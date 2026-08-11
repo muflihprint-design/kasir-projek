@@ -242,6 +242,13 @@ display: block !important;
     </div>
   </div>
 </div>
+
+<script>
+    // Mengecek memori secara instan sebelum UI selesai dirender
+    if (localStorage.getItem('shopName')) {
+      document.getElementById('shop-selector').style.display = 'none';
+    }
+  </script>
   
 <div id="printArea" class="hidden"></div>
   <div id="loading-overlay">
