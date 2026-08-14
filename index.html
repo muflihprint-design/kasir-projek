@@ -2745,7 +2745,6 @@ async function fetchUtangList() {
     const rawData = await res.json();
     const data = rawData.filter(u => (parseFloat(u.Sisa_Utang) || 0) > 0);
     
-    // Simpan ke memori global agar bisa diakses oleh Modal Pelunasan Multi
     window.activeUtangData = data; 
     
     if (data.length === 0) {
@@ -2766,8 +2765,10 @@ async function fetchUtangList() {
           </button>
         </div>
         <div class="grid gap-2 page-transition">
-          ${data.map(u => `
-            <div onclick="bayarUtang('${u.ID_Pembelian}', ${u.Sisa_Utang}, '${u.Supplier}')" 
+          ${data.map(u => {
+            const tgl = u.waktu || u.Waktu || u.tanggal || u.Tanggal || '';
+            return `
+            <div onclick="bayarUtang('${u.ID_Pembelian}', ${u.Sisa_Utang}, '${u.Supplier}', '${tgl}')" 
                  class="group p-4 bg-white border border-slate-200 rounded-2xl flex justify-between items-center active:scale-[0.97] transition-all hover:border-red-300 hover:shadow-md cursor-pointer">
               <div class="flex-1 pr-4">
                 <p class="font-bold text-slate-800 text-sm group-hover:text-red-600 transition-colors">${u.Supplier}</p>
@@ -2780,7 +2781,7 @@ async function fetchUtangList() {
                 </p>
               </div>
             </div>
-          `).join('')}
+          `}).join('')}
         </div>`;
     }
     lucide.createIcons();
@@ -2789,13 +2790,19 @@ async function fetchUtangList() {
   }
 }
 
-
-async function bayarUtang(idUtang, sisaLama, namaSupplier) {
+async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = '') {
   const modal = document.getElementById('general-modal');
   const content = document.getElementById('modalContent');
   
   if (modal) modal.classList.remove('hidden'); 
   
+  if (!tanggalTransaksi) {
+    const trx = (typeof allTransactions !== 'undefined' ? allTransactions : []).find(t => t.id === idUtang);
+    tanggalTransaksi = (trx && trx.waktu) ? trx.waktu.split(' ')[0] : '-';
+  } else {
+    tanggalTransaksi = tanggalTransaksi.split(' ')[0];
+  }
+
   content.innerHTML = `
     <div class="flex flex-col items-center py-10">
       <div class="w-10 h-10 border-4 border-slate-100 border-t-red-600 rounded-full animate-spin"></div>
@@ -2838,8 +2845,17 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier) {
         <div class="bg-slate-900 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
           <div class="absolute top-0 right-0 p-2 opacity-10"><i data-lucide="wallet" class="w-12 h-12"></i></div>
           <div class="relative z-10">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${namaSupplier}</p>
-            <p class="text-[9px] font-mono text-slate-500 mb-2">${idUtang}</p>
+            <div class="flex justify-between items-start">
+              <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${namaSupplier}</p>
+                <p class="text-[9px] font-mono text-slate-500 mb-2">${idUtang}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-[9px] font-bold text-slate-400 flex items-center justify-end gap-1 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
+                  <i data-lucide="calendar" class="w-3 h-3"></i> ${tanggalTransaksi !== '-' ? tanggalTransaksi : 'N/A'}
+                </p>
+              </div>
+            </div>
             <div class="flex justify-between items-end border-t border-slate-800 pt-3 mt-1">
               <span class="text-xs text-slate-400">Total Tagihan:</span>
               <span class="text-xl font-black text-red-400">${formatRupiah(sisaLama)}</span>
@@ -2886,13 +2902,8 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier) {
   }
 }
 
-
-
-    
-    // --- LOGIKA PIUTANG ---
 async function fetchPiutangList() {
   const container = document.getElementById('action-form-container');
-  // Loading state yang lebih modern
   container.innerHTML = `
     <div class="p-8 text-center">
       <div class="w-8 h-8 border-4 border-slate-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-3"></div>
@@ -2922,8 +2933,10 @@ async function fetchPiutangList() {
           <span class="text-[9px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-bold">Aktif</span>
         </div>
         <div class="grid gap-2 page-transition">
-          ${activePiutang.map(p => `
-            <div onclick="bayarPiutang('${p.id}', ${p.sisa}, '${p.nama}')" 
+          ${activePiutang.map(p => {
+            const tgl = p.waktu || p.Waktu || p.tanggal || p.Tanggal || '';
+            return `
+            <div onclick="bayarPiutang('${p.id}', ${p.sisa}, '${p.nama}', '${tgl}')" 
                  class="group p-4 bg-white border border-slate-200 rounded-2xl flex justify-between items-center active:scale-[0.97] transition-all hover:border-purple-300 hover:shadow-md cursor-pointer">
               <div class="flex-1 pr-4">
                 <p class="font-bold text-slate-800 text-sm group-hover:text-purple-600 transition-colors">${p.nama || 'Tanpa Nama'}</p>
@@ -2936,7 +2949,7 @@ async function fetchPiutangList() {
                 </p>
               </div>
             </div>
-          `).join('')}
+          `}).join('')}
         </div>`;
     }
   } catch (err) {
@@ -2948,11 +2961,17 @@ async function fetchPiutangList() {
   lucide.createIcons();
 }
 
-    // --- LOGIKA PIUTANG (DENGAN RINCIAN BARANG) ---
-async function bayarPiutang(id, sisa, nama) {
+async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
   openModal();
   const content = document.getElementById('modalContent');
   
+  if (!tanggalTransaksi) {
+    const trx = (typeof allTransactions !== 'undefined' ? allTransactions : []).find(t => t.id === id);
+    tanggalTransaksi = (trx && trx.waktu) ? trx.waktu.split(' ')[0] : '-';
+  } else {
+    tanggalTransaksi = tanggalTransaksi.split(' ')[0];
+  }
+
   content.innerHTML = `
     <div class="flex flex-col items-center py-10">
       <div class="w-10 h-10 border-4 border-slate-100 border-t-purple-600 rounded-full animate-spin"></div>
@@ -2996,8 +3015,17 @@ async function bayarPiutang(id, sisa, nama) {
         <div class="bg-slate-900 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
           <div class="absolute top-0 right-0 p-2 opacity-10"><i data-lucide="user" class="w-12 h-12"></i></div>
           <div class="relative z-10">
-            <p id="pi_nama_display" class="text-[10px] font-bold text-purple-300 uppercase tracking-widest">${nama || 'Pelanggan Umum'}</p>
-            <p class="text-[9px] font-mono text-slate-500 mb-2">${id}</p>
+            <div class="flex justify-between items-start">
+              <div>
+                <p id="pi_nama_display" class="text-[10px] font-bold text-purple-300 uppercase tracking-widest">${nama || 'Pelanggan Umum'}</p>
+                <p class="text-[9px] font-mono text-slate-500 mb-2">${id}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-[9px] font-bold text-purple-300 flex items-center justify-end gap-1 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
+                  <i data-lucide="calendar" class="w-3 h-3"></i> ${tanggalTransaksi !== '-' ? tanggalTransaksi : 'N/A'}
+                </p>
+              </div>
+            </div>
             <div class="flex justify-between items-end border-t border-slate-800 pt-3 mt-1">
               <span class="text-xs text-slate-400">Sisa Piutang:</span>
               <span class="text-xl font-black text-purple-400">${formatRupiah(sisa)}</span>
@@ -3055,7 +3083,7 @@ async function bayarPiutang(id, sisa, nama) {
     content.innerHTML = `<div class="p-10 text-center text-red-500 font-bold">Gagal memuat detail: ${e.message}</div>`;
   }
 }
-
+    
 function toggleShopeeInput() {
   // Mencari nilai dari radio button yang dipilih
   const selectedRadio = document.querySelector('input[name="pi-method"]:checked');
