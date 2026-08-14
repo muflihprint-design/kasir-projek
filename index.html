@@ -2757,13 +2757,28 @@ async function fetchUtangList() {
           <p class="text-[11px] text-emerald-600/70 font-medium">Semua kewajiban utang telah diselesaikan.</p>
         </div>`;
     } else {
+      // 1. Menghitung Total Keseluruhan Utang Aktif
+      const totalUtang = data.reduce((sum, u) => sum + (parseFloat(u.Sisa_Utang) || 0), 0);
+      
       container.innerHTML = `
+        <!-- KARTU RINGKASAN TOTAL UTANG -->
+        <div class="bg-red-50 border border-red-100 p-4 rounded-2xl mb-4 flex justify-between items-center shadow-sm">
+            <div>
+                <p class="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">Total Utang Aktif</p>
+                <p class="text-xs font-bold text-red-600 flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5"></i> ${data.length} Supplier</p>
+            </div>
+            <div class="text-right">
+                <p class="text-lg font-black text-red-600 tracking-tight">${formatRupiah(totalUtang)}</p>
+            </div>
+        </div>
+
         <div class="flex justify-between items-center mb-3 px-1">
-          <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Utang Supplier (${data.length})</h3>
+          <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daftar Tagihan</h3>
           <button onclick="showMultiUtangModal()" class="text-[10px] bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full font-bold hover:bg-blue-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95">
             <i data-lucide="check-square" class="w-3 h-3"></i> Bayar Sekaligus
           </button>
         </div>
+        
         <div class="grid gap-2 page-transition">
           ${data.map(u => {
             const tgl = u.waktu || u.Waktu || u.tanggal || u.Tanggal || '';
@@ -2904,6 +2919,7 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
 
 async function fetchPiutangList() {
   const container = document.getElementById('action-form-container');
+  // Loading state yang lebih modern
   container.innerHTML = `
     <div class="p-8 text-center">
       <div class="w-8 h-8 border-4 border-slate-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-3"></div>
@@ -2927,11 +2943,26 @@ async function fetchPiutangList() {
           <p class="text-[11px] text-emerald-600/70 font-medium">Tidak ada piutang aktif saat ini.</p>
         </div>`;
     } else {
+      // 1. Menghitung Total Keseluruhan Piutang Aktif
+      const totalPiutang = activePiutang.reduce((sum, p) => sum + (parseFloat(p.sisa) || 0), 0);
+      
       container.innerHTML = `
+        <!-- KARTU RINGKASAN TOTAL PIUTANG -->
+        <div class="bg-purple-50 border border-purple-100 p-4 rounded-2xl mb-4 flex justify-between items-center shadow-sm">
+            <div>
+                <p class="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-1">Total Piutang Aktif</p>
+                <p class="text-xs font-bold text-purple-600 flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5"></i> ${activePiutang.length} Pelanggan</p>
+            </div>
+            <div class="text-right">
+                <p class="text-lg font-black text-purple-600 tracking-tight">${formatRupiah(totalPiutang)}</p>
+            </div>
+        </div>
+
         <div class="flex justify-between items-center mb-3 px-1">
-          <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Piutang Pelanggan (${activePiutang.length})</h3>
+          <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daftar Tagihan</h3>
           <span class="text-[9px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-bold">Aktif</span>
         </div>
+        
         <div class="grid gap-2 page-transition">
           ${activePiutang.map(p => {
             const tgl = p.waktu || p.Waktu || p.tanggal || p.Tanggal || '';
