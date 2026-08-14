@@ -2811,11 +2811,25 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
   
   if (modal) modal.classList.remove('hidden'); 
   
+  // 1. Ambil data tanggal mentah
+  let tglRaw = '';
   if (!tanggalTransaksi) {
     const trx = (typeof allTransactions !== 'undefined' ? allTransactions : []).find(t => t.id === idUtang);
-    tanggalTransaksi = (trx && trx.waktu) ? trx.waktu.split(' ')[0] : '-';
+    tglRaw = (trx && trx.waktu) ? trx.waktu : '-';
   } else {
-    tanggalTransaksi = tanggalTransaksi.split(' ')[0];
+    tglRaw = tanggalTransaksi;
+  }
+
+  // 2. Ubah format menjadi DD-MM-YYYY
+  let tglFormatted = 'N/A';
+  if (tglRaw && tglRaw !== '-') {
+    const datePart = tglRaw.split(' ')[0]; // Ambil YYYY-MM-DD
+    const parts = datePart.split('-');
+    if (parts.length === 3) {
+      tglFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`; // Susun balik
+    } else {
+      tglFormatted = datePart;
+    }
   }
 
   content.innerHTML = `
@@ -2867,7 +2881,7 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
               </div>
               <div class="text-right">
                 <p class="text-[9px] font-bold text-slate-400 flex items-center justify-end gap-1 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
-                  <i data-lucide="calendar" class="w-3 h-3"></i> ${tanggalTransaksi !== '-' ? tanggalTransaksi : 'N/A'}
+                  <i data-lucide="calendar" class="w-3 h-3"></i> ${tglFormatted}
                 </p>
               </div>
             </div>
@@ -2996,11 +3010,25 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
   openModal();
   const content = document.getElementById('modalContent');
   
+  // 1. Ambil data tanggal mentah
+  let tglRaw = '';
   if (!tanggalTransaksi) {
     const trx = (typeof allTransactions !== 'undefined' ? allTransactions : []).find(t => t.id === id);
-    tanggalTransaksi = (trx && trx.waktu) ? trx.waktu.split(' ')[0] : '-';
+    tglRaw = (trx && trx.waktu) ? trx.waktu : '-';
   } else {
-    tanggalTransaksi = tanggalTransaksi.split(' ')[0];
+    tglRaw = tanggalTransaksi;
+  }
+
+  // 2. Ubah format menjadi DD-MM-YYYY
+  let tglFormatted = 'N/A';
+  if (tglRaw && tglRaw !== '-') {
+    const datePart = tglRaw.split(' ')[0]; // Ambil YYYY-MM-DD
+    const parts = datePart.split('-');
+    if (parts.length === 3) {
+      tglFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`; // Susun balik
+    } else {
+      tglFormatted = datePart;
+    }
   }
 
   content.innerHTML = `
@@ -3053,7 +3081,7 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
               </div>
               <div class="text-right">
                 <p class="text-[9px] font-bold text-purple-300 flex items-center justify-end gap-1 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
-                  <i data-lucide="calendar" class="w-3 h-3"></i> ${tanggalTransaksi !== '-' ? tanggalTransaksi : 'N/A'}
+                  <i data-lucide="calendar" class="w-3 h-3"></i> ${tglFormatted}
                 </p>
               </div>
             </div>
@@ -3114,7 +3142,7 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
     content.innerHTML = `<div class="p-10 text-center text-red-500 font-bold">Gagal memuat detail: ${e.message}</div>`;
   }
 }
-    
+   
 function toggleShopeeInput() {
   // Mencari nilai dari radio button yang dipilih
   const selectedRadio = document.querySelector('input[name="pi-method"]:checked');
