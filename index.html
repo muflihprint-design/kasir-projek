@@ -1781,8 +1781,9 @@ window.handleRevisiAction = async function(type, trxId, oldNote = '', event) {
         action = 'updateRevisi';
         payload = { catatanRevisi: note.trim() };
     } else if (type === 'selesai') {
-        action = 'selesaiRevisi';
-        payload = { keteranganSelesai: 'Selesai' };
+        // Ubah aksi menjadi updateRevisi dan kirim teks kosong untuk menghapusnya
+        action = 'updateRevisi';
+        payload = { catatanRevisi: '' };
     }
 
     // 2. KUNCI SEMUA TOMBOL MODAL
