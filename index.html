@@ -26,10 +26,10 @@
 
 /* Pastikan container saldo memiliki tinggi minimum yang konsisten */
 #balance-container {
-  height: 40px; /* Atur tinggi yang pas dengan elemen saldo Anda */
+  min-height: 40px; /* Mengizinkan wadah membesar jika konten lebih dari 40px */
   display: flex;
-  align-items: center; /* Menjaga konten tetap di tengah secara vertikal */
-  overflow: hidden;
+  align-items: center; 
+  /* Hapus baris overflow: hidden; */
 }
 
 /* Opsional: Memastikan skeleton tidak lebih tinggi dari teks asli */
@@ -298,7 +298,7 @@ display: block !important;
   
 <header class="bg-white border-b sticky top-0 z-50 p-3 shadow-sm">
   <div class="mx-auto flex justify-between items-center">
-    <div id="balance-container">
+    <div id="balance-container" class="flex-1 mr-3">
        </div>
 
     <!-- Tombol Identitas (Hanya Icon di HP, Text + Icon di Desktop) -->
@@ -368,6 +368,14 @@ let currentShop = {
 let currentPage = 1;
 let itemsPerPage = 20; // Angka 20 atau string 'all'
 
+// Fungsi pintar untuk mendeteksi Kasir Toko mana yang sedang mencatat
+function getActualCashMethod(selectedMethod) {
+  if (selectedMethod === "Cash") {
+    if (currentShop.nama === "VI PRINTING") return "Cash Vi Printing";
+    return "Cash Muflih Print"; // Default untuk Muflih Print dan Admin
+  }
+  return selectedMethod; // Biarkan Rekening / Kas Bendahara
+}
 
 // --- FUNGSI UPDATE UI IDENTITAS ---
 function updateIdentityUI() {
@@ -472,68 +480,44 @@ function showBalanceLoading(isLoading) {
 
   if (isLoading) {
     container.innerHTML = `
-      <div class="animate-pulse flex items-center gap-3 w-full">
-        <div class="flex flex-col gap-1.5 flex-1 pr-2">
-          <div class="h-2.5 bg-slate-200 rounded w-24"></div>
-          <div class="flex gap-2">
-            <div class="h-2 bg-slate-200 rounded w-12"></div>
-            <div class="h-2 bg-slate-200 rounded w-12"></div>
-          </div>
-        </div>
-        <div class="w-[1px] bg-slate-200 self-stretch my-1"></div>
-        <div class="flex flex-col gap-1.5 flex-1 pl-1">
-          <div class="h-2.5 bg-slate-200 rounded w-20"></div>
-          <div class="h-3 bg-slate-200 rounded w-16"></div>
-        </div>
+      <div class="animate-pulse w-full flex flex-col gap-1.5">
+        <div class="h-2.5 bg-slate-200 rounded w-1/2"></div>
+        <div class="h-4 bg-slate-200 rounded w-full"></div>
       </div>
     `;
   } else {
     container.innerHTML = `
-      <div class="flex items-stretch gap-2 sm:gap-4 w-full">
+      <div class="flex flex-col w-full justify-center mt-1">
+        <!-- Baris Atas: Ringkasan Global -->
+        <div class="flex justify-between items-center mb-1 px-1 gap-2">
+          <span class="text-[9px] uppercase font-bold text-slate-400">Total Kasir: <span id="saldo-kasir-total" class="text-slate-800 text-[10px]">Rp 0</span></span>
+          
+          <!-- Pemisah Baru -->
+          <span class="text-slate-300 text-[10px]">|</span>
+          
+          <span class="text-[9px] uppercase font-bold text-slate-400">Bendahara: <span id="saldo-bendahara" class="text-orange-600 text-[10px]">Rp 0</span></span>
+        </div>
         
-        <!-- SISI KIRI: Saldo Kasir (Cash + Rekening) -->
-        <div class="flex flex-col justify-center pr-2">
-          <div class="flex items-center gap-1.5 mb-1">
-            <span class="text-[9px] uppercase font-bold text-slate-400 tracking-tight">Saldo Kasir:</span>
-            <span id="saldo-kasir-total" class="text-[11px] font-black text-slate-800 leading-none">Rp 0</span>
-          </div>
-          <div class="flex items-center gap-2.5">
-            <!-- Rincian Cash -->
-            <div class="flex items-center gap-1">
-              <span class="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-100">C</span>
-              <span id="saldo-cash" class="text-[9px] font-bold text-slate-600 leading-none">Rp 0</span>
-            </div>
-            <!-- Rincian Rekening -->
-            <div class="flex items-center gap-1">
-              <span class="text-[8px] font-black text-blue-600 bg-blue-50 px-1 rounded border border-blue-100">R</span>
-              <span id="saldo-rekening" class="text-[9px] font-bold text-slate-600 leading-none">Rp 0</span>
-            </div>
+        <!-- Baris Bawah: Rincian 3 Dompet Kasir Aktif -->
+        <div class="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg border border-slate-100 shadow-inner">
+          <div class="flex items-center gap-3 w-full justify-between px-1">
+             <span class="text-[9px] font-bold text-slate-600 flex gap-1"><span class="text-orange-500 font-black">M:</span> <span id="saldo-cash-muflih">0</span></span>
+             <span class="text-slate-300">|</span>
+             <span class="text-[9px] font-bold text-slate-600 flex gap-1"><span class="text-purple-500 font-black">V:</span> <span id="saldo-cash-vi">0</span></span>
+             <span class="text-slate-300">|</span>
+             <span class="text-[9px] font-bold text-slate-600 flex gap-1"><span class="text-blue-500 font-black">R:</span> <span id="saldo-rekening">0</span></span>
           </div>
         </div>
-
-        <!-- GARIS PEMISAH TENGAH -->
-        <div class="w-[1px] bg-slate-200 self-stretch my-1"></div>
-
-        <!-- SISI KANAN: Saldo Bendahara -->
-        <div class="flex flex-col justify-center pl-1 sm:pl-2">
-          <span class="text-[9px] uppercase font-bold text-slate-400 tracking-tight mb-1">Saldo Bendahara</span>
-          <span id="saldo-bendahara" class="text-[11px] font-black text-orange-600 leading-none">Rp 0</span>
-        </div>
-
       </div>
     `;
-    if (window.lucide) lucide.createIcons();
   }
 }
 
 async function refreshData() {
   showBalanceLoading(true);
-  
   try {
     const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
     const data = await res.json();
-
-    // Matikan loading animasi
     showBalanceLoading(false);
 
     if (data.version) {
@@ -542,25 +526,18 @@ async function refreshData() {
       if (versionEl) versionEl.innerText = data.version;
     }
 
-    // Ambil elemen berdasarkan ID yang baru dibuat di atas
-    const elKasirTotal = document.getElementById('saldo-kasir-total');
-    const elCash = document.getElementById('saldo-cash');
-    const elRekening = document.getElementById('saldo-rekening');
-    const elBendahara = document.getElementById('saldo-bendahara');
+    const muflihVal = Number(data.cashMuflih) || 0;
+    const viVal = Number(data.cashVi) || 0;
+    const bankVal = Number(data.bank) || 0;
+    const bndhraVal = Number(data.bendahara) || 0;
+    const kasirTotal = muflihVal + viVal + bankVal;
 
-    // Pastikan valuenya berbentuk angka
-    const cashValue = Number(data.cash) || 0;
-    const bankValue = Number(data.bank) || 0;
-    const bendaharaValue = Number(data.bendahara) || 0;
-    
-    // Hitung total saldo kasir (Cash + Rekening)
-    const kasirTotal = cashValue + bankValue;
-
-    // Suntikkan nominal ke masing-masing elemen HTML
-    if (elKasirTotal) elKasirTotal.innerText = formatRupiah(kasirTotal);
-    if (elCash) elCash.innerText = formatRupiah(cashValue);
-    if (elRekening) elRekening.innerText = formatRupiah(bankValue);
-    if (elBendahara) elBendahara.innerText = formatRupiah(bendaharaValue);
+    document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
+    document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
+    // Kita hapus tulisan "Rp" agar muat di layar HP, misal: "M: 1.500.000"
+    document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
+    document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
+    document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
 
   } catch (e) {
     console.error("Gagal refresh data:", e);
@@ -1036,7 +1013,14 @@ async function fetchTransactions(filterType = 'today') {
       if (!isNeedRevisi) return false;
     }
 
-    if (currentView !== 'Semua' && t.metode !== currentView) return false;
+   if (currentView !== 'Semua') {
+      if (currentView === 'Cash') {
+         // Jika filter Cash dipilih, tampilkan Cash Muflih maupun Cash Vi (atau Cash lama)
+         if (!t.metode.includes('Cash')) return false;
+      } else {
+         if (t.metode !== currentView) return false;
+      }
+    }
 
     // LOGIKA FILTER TIPE TRANSAKSI (BARU)
       if (currentCategory !== 'SEMUA') {
@@ -2575,7 +2559,7 @@ function savePenjualan() {
     items: items,
     diskon: unmask(document.getElementById('p_disc').value),
     dp: unmask(document.getElementById('p_dp').value),
-    metode: selectedRadio.value 
+    metode: getActualCashMethod(selectedRadio.value) 
   };
   
   payload.total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
@@ -2606,7 +2590,7 @@ function savePenjualan() {
     total: total,
     dp: unmask(document.getElementById('b_dp').value),
     // Mengambil nilai dari radio button yang dipilih
-    metode: selectedRadioBeli.value
+    metode: getActualCashMethod(selectedRadioBeli.value)
   };
   
   runScript('processTransaction', payload, 'pembelian');
@@ -2638,7 +2622,7 @@ function savePenjualan() {
     nominal: nominal,
     ket: isRefund ? "[REFUND] " + keterangan.toUpperCase() : keterangan.toUpperCase(),
     // Mengambil nilai dari radio card yang terpilih
-    metode: selectedRadioOp.value
+    metode: getActualCashMethod(selectedRadioOp.value)
   };
 
   runScript('saveOperasional', payload, 'operasional');
@@ -2712,7 +2696,7 @@ async function eksekusiPelunasanUtang(id, nominal) {
     type: 'BAYAR_UTANG',
     idUtang: id,
     nominal: nominal,
-    metode: metode,
+    metode: getActualCashMethod(metode),
     ket: `Pelunasan Utang: ${namaSupplier}` 
   };
   
@@ -3183,7 +3167,7 @@ function toggleShopeeInput() {
     type: 'BAYAR_PIUTANG', 
     idPiutang: id, 
     nominal: sisa, 
-    metode: metodePilihan,
+    metode: getActualCashMethod(metodePilihan),
     pelanggan: namaPelanggan // Kirim nama yang sudah dimodifikasi
   };
   
@@ -3191,10 +3175,49 @@ function toggleShopeeInput() {
   await runScript('processTransaction', payload, 'riwayat');
 }
 
-// --- LOGIKA TRANSFER KAS ---
+// Fungsi baru untuk memvalidasi sumber dan tujuan transfer
+window.validateTransfer = function() {
+  const dari = document.getElementById('t_dari').value;
+  const ke = document.getElementById('t_ke').value;
+  const btn = document.getElementById('btn_proses_transfer');
+  
+  if (!btn) return;
+
+  if (dari === ke) {
+    // Jika SAMA: Matikan tombol dan ubah warnanya jadi abu-abu
+    btn.disabled = true;
+    btn.classList.replace('bg-blue-600', 'bg-slate-400');
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    btn.classList.remove('active:scale-95', 'shadow-lg');
+    btn.innerHTML = `<i data-lucide="ban" class="w-4 h-4"></i> SUMBER & TUJUAN SAMA`;
+  } else {
+    // Jika BEDA: Nyalakan kembali tombol
+    btn.disabled = false;
+    btn.classList.replace('bg-slate-400', 'bg-blue-600');
+    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    btn.classList.add('active:scale-95', 'shadow-lg');
+    btn.innerHTML = `<i data-lucide="send" class="w-4 h-4"></i> PROSES TRANSFER`;
+  }
+  
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
 function showTransferForm() {
   const container = document.getElementById('action-form-container');
   container.classList.remove('hidden');
+
+  // Deteksi kasir dinamis
+  const myCash = currentShop.nama === 'VI PRINTING' ? 'Cash Vi Printing' : 'Cash Muflih Print';
+  const otherCash = currentShop.nama === 'VI PRINTING' ? 'Cash Muflih Print' : 'Cash Vi Printing';
+
+  // Teks "Toko Ini" dan "Toko Sebelah" Dihilangkan
+  const optionsHTML = `
+    <option value="${myCash}">Kas ${myCash.replace('Cash ', '')}</option>
+    <option value="${otherCash}">Kas ${otherCash.replace('Cash ', '')}</option>
+    <option value="Rekening">Rekening Bank</option>
+    <option value="Kas Bendahara">Kas Bendahara</option>
+  `;
+
   container.innerHTML = `
     <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-4 page-transition">
       <div class="flex items-center gap-2 mb-2">
@@ -3204,24 +3227,30 @@ function showTransferForm() {
         <h3 class="text-sm font-black text-blue-800 uppercase tracking-tight">Form Transfer Kas</h3>
       </div>
       
-      <div class="relative flex items-center gap-3">
-        <div class="flex-1 bg-white p-3 rounded-xl border-2 border-white shadow-sm flex flex-col items-center">
-          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">ASAL</label>
-          <span id="label_t_dari" class="font-black text-slate-700 uppercase">Cash</span>
-          <input type="hidden" id="t_dari" value="Cash">
+      <div class="flex flex-col gap-3">
+        <!-- Sumber -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative">
+          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">DARI (SUMBER DANA)</label>
+          <select id="t_dari" onchange="validateTransfer()" class="w-full font-bold text-slate-700 bg-transparent outline-none cursor-pointer appearance-none">
+            ${optionsHTML}
+          </select>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2"></i>
         </div>
 
-        <div class="flex flex-col items-center">
-          <button onclick="swapTransferAccounts()" class="bg-blue-600 p-3 rounded-full text-white shadow-lg active:scale-90 transition-all duration-300 hover:rotate-180">
-            <i data-lucide="repeat" class="w-4 h-4"></i>
+        <!-- Tombol Tukar -->
+        <div class="flex justify-center -my-5 relative z-10">
+          <button onclick="swapTransferAccounts()" class="bg-blue-600 p-2.5 rounded-full text-white shadow-md hover:scale-110 active:scale-95 transition-all outline-none border-4 border-blue-50">
+            <i data-lucide="arrow-up-down" class="w-4 h-4"></i>
           </button>
-          <span class="text-[8px] font-bold text-blue-400 uppercase mt-1">Tukar</span>
         </div>
 
-        <div class="flex-1 bg-white p-3 rounded-xl border-2 border-white shadow-sm flex flex-col items-center">
-          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">TUJUAN</label>
-          <span id="label_t_ke" class="font-black text-slate-700 uppercase">Rekening</span>
-          <input type="hidden" id="t_ke" value="Rekening">
+        <!-- Tujuan -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative mt-1">
+          <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">KE (TUJUAN DANA)</label>
+          <select id="t_ke" onchange="validateTransfer()" class="w-full font-bold text-slate-700 bg-transparent outline-none cursor-pointer appearance-none">
+            ${optionsHTML}
+          </select>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2"></i>
         </div>
       </div>
 
@@ -3230,33 +3259,35 @@ function showTransferForm() {
         <div class="relative mt-1">
           <span class="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">Rp</span>
           <input type="text" id="t_nom" placeholder="0" 
-            oninput="maskNominal(this)"
-            inputmode="numeric"
-            class="w-full p-4 pl-10 border-2 border-white rounded-xl bg-white font-black text-lg outline-none focus:border-blue-300 shadow-sm transition-all">
+            oninput="maskNominal(this)" inputmode="numeric"
+            class="w-full p-4 pl-10 border border-slate-200 rounded-xl bg-white font-black text-lg outline-none focus:border-blue-400 shadow-sm transition-all">
         </div>
       </div>
 
-      <button onclick="saveTransfer()" class="w-full py-4 bg-blue-600 text-white font-black rounded-xl shadow-lg shadow-blue-100 active:scale-95 transition-transform flex items-center justify-center gap-2">
-        <i data-lucide="send" class="w-4 h-4"></i>
-        PROSES TRANSFER
+      <!-- Menambahkan ID btn_proses_transfer -->
+      <button id="btn_proses_transfer" onclick="saveTransfer()" class="w-full py-4 bg-blue-600 text-white font-black rounded-xl shadow-lg shadow-blue-100 active:scale-95 transition-transform flex items-center justify-center gap-2">
+        <i data-lucide="send" class="w-4 h-4"></i> PROSES TRANSFER
       </button>
     </div>
   `;
-  lucide.createIcons();
+  
+  // Set default (Kasir Ini -> Rekening)
+  document.getElementById('t_dari').selectedIndex = 0; 
+  document.getElementById('t_ke').selectedIndex = 2; 
+  
+  // Panggil validasi awal saat form dibuka
+  validateTransfer();
 }
 
 function swapTransferAccounts() {
-  const dariInput = document.getElementById('t_dari');
-  const keInput = document.getElementById('t_ke');
-  const dariLabel = document.getElementById('label_t_dari');
-  const keLabel = document.getElementById('label_t_ke');
+  const dari = document.getElementById('t_dari');
+  const ke = document.getElementById('t_ke');
+  const temp = dari.value;
+  dari.value = ke.value;
+  ke.value = temp;
   
-  const tempVal = dariInput.value;
-  dariInput.value = keInput.value;
-  keInput.value = tempVal;
-  
-  dariLabel.innerText = dariInput.value;
-  keLabel.innerText = keInput.value;
+  // Panggil validasi setelah posisi ditukar
+  validateTransfer();
 }
 
 async function saveTransfer() {
@@ -4059,7 +4090,7 @@ window.eksekusiMultiUtang = async function() {
     const payload = {
         action: 'processTransaction',
         type: 'BAYAR_UTANG_MULTI',
-        metode: selectedRadio.value,
+        metode: getActualCashMethod(selectedRadio.value),
         items: items
     };
 
