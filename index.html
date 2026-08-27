@@ -4153,9 +4153,14 @@ function formatRupiahExcel(worksheet, cols, dataStartRow = 1) {
             `).join('')}
         </div>
 
-        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex justify-between items-center">
-            <span class="text-xs font-bold text-blue-800 uppercase tracking-widest">Total Bayar:</span>
-            <span id="multi-utang-total" class="text-xl font-black text-blue-700">Rp 0</span>
+        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex justify-between items-center relative overflow-hidden">
+            <div>
+                <span class="text-xs font-bold text-blue-800 uppercase tracking-widest block mb-1">Total Bayar:</span>
+                <span id="multi-utang-total" class="text-xl font-black text-blue-700">Rp 0</span>
+            </div>
+            <button onclick="copyMultiUtangRincian()" class="flex items-center gap-1.5 px-3 py-2 bg-blue-200/50 hover:bg-blue-200 text-blue-700 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all">
+                <i data-lucide="copy" class="w-4 h-4"></i> Salin
+            </button>
         </div>
 
         <div>
@@ -4187,6 +4192,46 @@ function formatRupiahExcel(worksheet, cols, dataStartRow = 1) {
     </div>
     `;
     lucide.createIcons();
+}
+
+// Fungsi baru untuk menyalin rincian pelunasan ke Clipboard
+window.copyMultiUtangRincian = function() {
+    const checks = document.querySelectorAll('.multi-utang-chk');
+    const data = window.activeUtangData; // Mengambil data utang yang sedang aktif
+    
+    let invoiceList = [];
+    let totalNominal = 0;
+
+    // Looping semua checkbox untuk mencari yang dicentang
+    checks.forEach(chk => {
+        if (chk.checked) {
+            const idx = chk.value;
+            // Gunakan fungsi unmask bawaan untuk mengubah string format rupiah ke angka murni
+            const nominal = unmask(document.getElementById(`nom-utang-${idx}`).value);
+            
+            if (nominal > 0) {
+                // Ekstrak nama supplier yang juga berfungsi sebagai nomor faktur
+                invoiceList.push(data[idx].Supplier); 
+                totalNominal += nominal;
+            }
+        }
+    });
+
+    // Validasi jika belum ada faktur yang dicentang
+    if (invoiceList.length === 0) {
+        return alert("Silakan centang minimal satu nota/faktur terlebih dahulu!");
+    }
+
+    // Susun format teks yang rapi
+    const textToCopy = `Pelunasan Faktur: ${invoiceList.join(', ')}\nTotal Nominal: ${formatRupiah(totalNominal)}`;
+
+    // Eksekusi API penyalinan teks
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        alert("Faktur berhasil disalin!\n\n" + textToCopy + "\n\nSilakan paste di WhatsApp.");
+    }).catch(err => {
+        console.error('Gagal menyalin teks: ', err);
+        alert("Penyalinan otomatis ditolak oleh browser. Silakan salin manual.");
+    });
 }
 
 // Fungsi menghitung total saat user mencentang/mengubah nominal
