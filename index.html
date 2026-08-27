@@ -2237,21 +2237,10 @@ else if (tab === 'pembelian') {
           </div>
         </div>
 
-        <div class="flex flex-col gap-2 p-4 bg-orange-50 border border-orange-200 rounded-2xl">
-    <div class="flex items-center gap-3">
-        <input type="checkbox" id="is_talangan_beli" class="w-6 h-6 accent-orange-600 cursor-pointer" onchange="toggleTalangan('beli')">
-        <label for="is_talangan_beli" class="text-[11px] font-bold text-orange-800 cursor-pointer uppercase tracking-widest">Ditalangi Karyawan (Uang Pribadi)</label>
-    </div>
-    <div id="talangan_input_beli" class="hidden mt-2">
-        <input type="text" id="nama_talangan_beli" placeholder="Nama karyawan yang menalangi..." class="w-full p-3 border border-orange-200 rounded-xl outline-none focus:border-orange-400 font-medium text-sm">
-    </div>
-</div>
-
-<!-- Bungkus input DP dengan ID agar bisa disembunyikan saat mode Talangan -->
-<div id="dp_container_beli">
-    <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Bayar Sekarang (DP)</label>
-    <input id="b_dp" type="text" inputmode="numeric" oninput="maskNominal(this); calcTotal()" placeholder="0" class="w-full p-4 bg-red-50 border-2 border-red-100 rounded-2xl text-xl font-extrabold text-red-600 focus:ring-4 focus:ring-red-100 outline-none accounting">
-</div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Bayar Sekarang (DP)</label>
+          <input id="b_dp" type="text" inputmode="numeric" oninput="maskNominal(this); calcTotal()" placeholder="0" class="w-full p-4 bg-red-50 border-2 border-red-100 rounded-2xl text-xl font-extrabold text-red-600 focus:ring-4 focus:ring-red-100 outline-none accounting">
+        </div>
 
         <div class="bg-red-50 p-4 rounded-2xl border border-red-100 flex justify-between items-center">
           <span class="font-bold text-red-800">Total Belanja:</span>
@@ -2301,16 +2290,6 @@ else if (tab === 'pembelian') {
           <input type="checkbox" id="is_refund" class="w-6 h-6 accent-red-600 cursor-pointer">
           <label for="is_refund" class="text-xs font-bold text-red-700 cursor-pointer">Ini adalah Dana Refund (Pengembalian)</label>
         </div>
-
-        <div class="flex flex-col gap-2 p-4 bg-orange-50 border border-orange-200 rounded-2xl mb-4">
-    <div class="flex items-center gap-3">
-        <input type="checkbox" id="is_talangan_op" class="w-6 h-6 accent-orange-600 cursor-pointer" onchange="toggleTalangan('op')">
-        <label for="is_talangan_op" class="text-[11px] font-bold text-orange-800 cursor-pointer uppercase tracking-widest">Ditalangi Karyawan (Uang Pribadi)</label>
-    </div>
-    <div id="talangan_input_op" class="hidden mt-2">
-        <input type="text" id="nama_talangan_op" placeholder="Nama karyawan yang menalangi..." class="w-full p-3 border border-orange-200 rounded-xl outline-none focus:border-orange-400 font-medium text-sm">
-    </div>
-</div>
 
         <div>
           <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Nominal Pengeluaran</label>
@@ -2448,32 +2427,6 @@ function addItem(autoOpen = true) {
         document.getElementById('product-modal').style.display = 'none';
       }
     }
-
-window.toggleTalangan = function(type) {
-    const isChecked = document.getElementById(`is_talangan_${type}`).checked;
-    const inputDiv = document.getElementById(`talangan_input_${type}`);
-    const dpContainer = document.getElementById(`dp_container_${type}`);
-    
-    if (isChecked) {
-        inputDiv.classList.remove('hidden');
-        
-        // Uncheck radio button otomatis berdasarkan tipe
-        let radioName = "";
-        if (type === 'beli') radioName = 'payment-method-beli';
-        else if (type === 'op') radioName = 'payment-method-op';
-        else if (type === 'utang') radioName = 'pay-utang-method';
-        else if (type === 'multi_utang') radioName = 'pay-multi-method';
-        
-        if (radioName) {
-            document.querySelectorAll(`input[name="${radioName}"]`).forEach(r => r.checked = false);
-        }
-        
-        if (dpContainer) dpContainer.classList.add('hidden');
-    } else {
-        inputDiv.classList.add('hidden');
-        if (dpContainer) dpContainer.classList.remove('hidden');
-    }
-}
 
  function filterProducts() {
   const searchInput = document.getElementById('modal-search');
@@ -2825,33 +2778,27 @@ function savePenjualan() {
   const items = collectItems();
   if(items.length === 0) return alert("Daftar belanja kosong!");
   
- const isTalangan = document.getElementById('is_talangan_beli')?.checked;
-  const namaTalangan = document.getElementById('nama_talangan_beli')?.value.trim();
-  
-  let metodePilihan = "";
-  let dpVal = unmask(document.getElementById('b_dp').value);
-
-  if (isTalangan) {
-      if (!namaTalangan) return alert("Masukkan nama karyawan yang menalangi uang!");
-      metodePilihan = "Talangan Karyawan";
-      // Manipulasi DP menjadi sama dengan Total agar sistem tidak membuat utang ke Supplier asli
-      dpVal = total; 
-  } else {
-      const selectedRadioBeli = document.querySelector('input[name="payment-method-beli"]:checked');
-      if (!selectedRadioBeli) return alert("Silahkan pilih Metode Pembayaran!");
-      metodePilihan = getActualCashMethod(selectedRadioBeli.value);
+  // --- VALIDASI METODE PEMBAYARAN (Wajib Pilih) ---
+  const selectedRadioBeli = document.querySelector('input[name="payment-method-beli"]:checked');
+  if (!selectedRadioBeli) {
+    return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
   }
-
+  // ------------------------------------------------
+  
+  const supplier = (document.getElementById('b_supp').value || '-').toUpperCase();
+  const total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
+  
   const payload = {
     action: 'processTransaction',
     type: 'PEMBELIAN',
     supplier: supplier,
-    ket: isTalangan ? `PEMBELIAN DARI ${supplier} [DITALANGI]` : `PEMBELIAN DARI ${supplier}`, 
+    // Keterangan otomatis untuk riwayat
+    ket: `PEMBELIAN DARI ${supplier}`, 
     items: items,
     total: total,
-    dp: dpVal,
-    metode: metodePilihan,
-    talanganBy: isTalangan ? namaTalangan.toUpperCase() : "" // Penanda khusus untuk backend
+    dp: unmask(document.getElementById('b_dp').value),
+    // Mengambil nilai dari radio button yang dipilih
+    metode: getActualCashMethod(selectedRadioBeli.value)
   };
   
   runScript('processTransaction', payload, 'pembelian');
@@ -2864,27 +2811,26 @@ function savePenjualan() {
   const keterangan = elKet?.value.trim();
   const isRefund = document.getElementById('is_refund')?.checked;
 
- const isTalangan = document.getElementById('is_talangan_op')?.checked;
-  const namaTalangan = document.getElementById('nama_talangan_op')?.value.trim();
+  // --- VALIDASI METODE PEMBAYARAN (Update Baru) ---
+  // Mencari radio button yang dipilih dalam grup 'payment-method-op'
+  const selectedRadioOp = document.querySelector('input[name="payment-method-op"]:checked');
   
-  let metodePilihan = "";
-
-  if (isTalangan) {
-      if (!namaTalangan) return alert("Masukkan nama karyawan yang menalangi uang!");
-      metodePilihan = "Talangan Karyawan";
-  } else {
-      const selectedRadioOp = document.querySelector('input[name="payment-method-op"]:checked');
-      if (!selectedRadioOp) return alert("Silahkan pilih Metode Pembayaran!");
-      metodePilihan = getActualCashMethod(selectedRadioOp.value);
+  if (nominal <= 0 || !keterangan) {
+    return alert("Nominal dan keterangan wajib diisi.");
   }
+
+  if (!selectedRadioOp) {
+    return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
+  }
+  // ------------------------------------------------
 
   const payload = {
     action: "saveOperasional", 
     type: isRefund ? "PENGEMBALIAN_DANA" : "OPERASIONAL",
     nominal: nominal,
-    ket: isTalangan ? `[TALANGAN: ${namaTalangan.toUpperCase()}] ` + keterangan.toUpperCase() : (isRefund ? "[REFUND] " + keterangan.toUpperCase() : keterangan.toUpperCase()),
-    metode: metodePilihan,
-    talanganBy: isTalangan ? namaTalangan.toUpperCase() : "" // Penanda khusus untuk backend
+    ket: isRefund ? "[REFUND] " + keterangan.toUpperCase() : keterangan.toUpperCase(),
+    // Mengambil nilai dari radio card yang terpilih
+    metode: getActualCashMethod(selectedRadioOp.value)
   };
 
   runScript('saveOperasional', payload, 'operasional');
@@ -2934,39 +2880,45 @@ function openModal() {
   modal.classList.remove('hidden');
 }
 
+
 async function eksekusiPelunasanUtang(id, nominal) {
-  const isTalangan = document.getElementById('is_talangan_utang')?.checked;
-  const namaTalangan = document.getElementById('nama_talangan_utang')?.value.trim();
-  let metodePilihan = "";
-
-  if (isTalangan) {
-      if (!namaTalangan) return alert("Masukkan nama karyawan yang menalangi uang!");
-      metodePilihan = "Talangan Karyawan";
-  } else {
-      const selectedRadio = document.querySelector('input[name="pay-utang-method"]:checked');
-      if (!selectedRadio) return alert("Silahkan pilih Metode Pembayaran terlebih dahulu!");
-      metodePilihan = getActualCashMethod(selectedRadio.value);
+  // --- VALIDASI & PENGAMBILAN METODE (Update Baru) ---
+  // Mencari radio button yang dipilih dalam grup 'pay-utang-method'
+  const selectedRadio = document.querySelector('input[name="pay-utang-method"]:checked');
+  
+  if (!selectedRadio) {
+    return alert("Silahkan pilih Metode Pembayaran terlebih dahulu!");
   }
+  
+  const metode = selectedRadio.value;
+  // --------------------------------------------------
 
-  // Mengambil nama supplier (tetap menggunakan logika lama Anda)
+  // Mengambil nama supplier dari elemen display di modal
+  // Pastikan di HTML bayarUtang, elemen nama supplier memiliki class ini atau sesuaikan selector-nya
   const elSupplier = document.querySelector('.modal-supplier-name') || { innerText: 'Supplier' };
   const namaSupplier = elSupplier.innerText;
 
+  // DEFINISIKAN payload
   const payload = {
     action: 'processTransaction',
     type: 'BAYAR_UTANG',
     idUtang: id,
     nominal: nominal,
-    metode: metodePilihan,
-    ket: isTalangan ? `Pelunasan Utang: ${namaSupplier} [DITALANGI]` : `Pelunasan Utang: ${namaSupplier}`, 
-    talanganBy: isTalangan ? namaTalangan.toUpperCase() : "" 
+    metode: getActualCashMethod(metode),
+    ket: `Pelunasan Utang: ${namaSupplier}` 
   };
   
+  // Sembunyikan modal
   closeModal(); 
   
   try {
+    // Jalankan runScript menggunakan payload yang sudah didefinisikan
     await runScript('processTransaction', payload, 'riwayat');
-    if (typeof fetchUtangList === 'function') fetchUtangList();
+    
+    // Refresh list utang jika fungsi tersedia agar sisa utang langsung terupdate di layar
+    if (typeof fetchUtangList === 'function') {
+      fetchUtangList();
+    }
   } catch (error) {
     console.error("Gagal eksekusi utang:", error);
     alert("Terjadi kesalahan saat memproses pelunasan.");
@@ -3158,16 +3110,6 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
                   <span class="text-sm font-bold text-slate-600 peer-checked:text-red-700">Rekening</span>
                 </div>
               </label>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-2 p-3 bg-orange-50 border border-orange-200 rounded-xl mt-2">
-            <div class="flex items-center gap-3">
-              <input type="checkbox" id="is_talangan_utang" class="w-5 h-5 accent-orange-600 cursor-pointer" onchange="toggleTalangan('utang')">
-              <label for="is_talangan_utang" class="text-[10px] font-bold text-orange-800 cursor-pointer uppercase tracking-widest">Ditalangi Karyawan</label>
-            </div>
-            <div id="talangan_input_utang" class="hidden mt-2">
-              <input type="text" id="nama_talangan_utang" placeholder="Nama karyawan..." class="w-full p-2.5 border border-orange-200 rounded-lg outline-none focus:border-orange-400 font-medium text-xs">
             </div>
           </div>
           
@@ -4364,16 +4306,6 @@ function formatRupiahExcel(worksheet, cols, dataStartRow = 1) {
             </div>
         </div>
 
-        <div class="flex flex-col gap-2 p-3 bg-orange-50 border border-orange-200 rounded-xl mt-2">
-            <div class="flex items-center gap-3">
-                <input type="checkbox" id="is_talangan_multi_utang" class="w-5 h-5 accent-orange-600 cursor-pointer" onchange="toggleTalangan('multi_utang')">
-                <label for="is_talangan_multi_utang" class="text-[10px] font-bold text-orange-800 cursor-pointer uppercase tracking-widest">Ditalangi Karyawan</label>
-            </div>
-            <div id="talangan_input_multi_utang" class="hidden mt-2">
-                <input type="text" id="nama_talangan_multi_utang" placeholder="Nama karyawan..." class="w-full p-2.5 border border-orange-200 rounded-lg outline-none focus:border-orange-400 font-medium text-xs">
-            </div>
-        </div>
-
         <div class="flex gap-2 pt-2">
             <button onclick="closeModal()" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl active:scale-95 transition-transform">Batal</button>
             <button onclick="eksekusiMultiUtang()" class="flex-[2] py-4 bg-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 active:scale-95 transition-all">
@@ -4443,33 +4375,20 @@ window.calcMultiUtangTotal = function() {
 
 // Fungsi memproses transaksi multi ke backend
 window.eksekusiMultiUtang = async function() {
-    // 1. TANGKAP LOGIKA TALANGAN
-    const isTalangan = document.getElementById('is_talangan_multi_utang')?.checked;
-    const namaTalangan = document.getElementById('nama_talangan_multi_utang')?.value.trim();
-    let metodePilihan = "";
-
-    if (isTalangan) {
-        if (!namaTalangan) return alert("Masukkan nama karyawan yang menalangi uang!");
-        metodePilihan = "Talangan Karyawan";
-    } else {
-        const selectedRadio = document.querySelector('input[name="pay-multi-method"]:checked');
-        if (!selectedRadio) {
-            return alert("Silahkan pilih Metode Pembayaran (Cash/Rekening) terlebih dahulu!");
-        }
-        metodePilihan = getActualCashMethod(selectedRadio.value);
+    const selectedRadio = document.querySelector('input[name="pay-multi-method"]:checked');
+    if (!selectedRadio) {
+        return alert("Silahkan pilih Metode Pembayaran (Cash/Rekening) terlebih dahulu!");
     }
     
     const checks = document.querySelectorAll('.multi-utang-chk');
     const items = [];
     const data = window.activeUtangData;
-    let totalNominalMulti = 0; // Variabel untuk menjumlahkan total talangan
 
     checks.forEach(chk => {
         if (chk.checked) {
             const idx = chk.value;
             const nominal = unmask(document.getElementById(`nom-utang-${idx}`).value);
             if (nominal > 0) {
-                totalNominalMulti += nominal; // Akumulasi nominal
                 items.push({
                     idUtang: data[idx].ID_Pembelian,
                     nominal: nominal,
@@ -4486,10 +4405,8 @@ window.eksekusiMultiUtang = async function() {
     const payload = {
         action: 'processTransaction',
         type: 'BAYAR_UTANG_MULTI',
-        metode: metodePilihan,
-        items: items,
-        nominal: totalNominalMulti, // WAJIB dikirim agar Blok 8 Backend bisa membaca totalnya
-        talanganBy: isTalangan ? namaTalangan.toUpperCase() : "" // Kirim penanda talangan
+        metode: getActualCashMethod(selectedRadio.value),
+        items: items
     };
 
     closeModal();
@@ -4502,8 +4419,8 @@ window.eksekusiMultiUtang = async function() {
         console.error("Gagal eksekusi multi utang:", error);
         alert("Terjadi kesalahan saat memproses pelunasan.");
     }
-}
-   
+}   
+    
   </script>
   
 </body>
