@@ -3062,9 +3062,14 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
                 </p>
               </div>
             </div>
-            <div class="flex justify-between items-end border-t border-slate-800 pt-3 mt-1">
-              <span class="text-xs text-slate-400">Total Tagihan:</span>
-              <span class="text-xl font-black text-red-400">${formatRupiah(sisaLama)}</span>
+           <div class="flex justify-between items-center border-t border-slate-800 pt-3 mt-1">
+              <div>
+                <span class="text-xs text-slate-400 block mb-1">Total Tagihan:</span>
+                <span class="text-xl font-black text-red-400">${formatRupiah(sisaLama)}</span>
+              </div>
+              <button onclick="copyForWhatsApp('${idUtang}', '${namaSupplier}', '${formatRupiah(sisaLama)}', 'Supplier')" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all border border-slate-700">
+                <i data-lucide="copy" class="w-4 h-4"></i> Salin
+              </button>
             </div>
           </div>
         </div>
@@ -3262,9 +3267,14 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
                 </p>
               </div>
             </div>
-            <div class="flex justify-between items-end border-t border-slate-800 pt-3 mt-1">
-              <span class="text-xs text-slate-400">Sisa Piutang:</span>
-              <span class="text-xl font-black text-purple-400">${formatRupiah(sisa)}</span>
+            <div class="flex justify-between items-center border-t border-slate-800 pt-3 mt-1">
+              <div>
+                <span class="text-xs text-slate-400 block mb-1">Sisa Piutang:</span>
+                <span class="text-xl font-black text-purple-400">${formatRupiah(sisa)}</span>
+              </div>
+              <button onclick="copyForWhatsApp('${id}', '${nama || 'Pelanggan Umum'}', '${formatRupiah(sisa)}', 'Pelanggan')" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all border border-slate-700">
+                <i data-lucide="copy" class="w-4 h-4"></i> Salin
+              </button>
             </div>
           </div>
         </div>
