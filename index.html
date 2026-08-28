@@ -2257,7 +2257,7 @@ else if (tab === 'pembelian') {
   lucide.createIcons(); // Penting: Agar ikon muncul
   addItem(false);
 }
- else if (tab === 'operasional') {
+else if (tab === 'operasional') {
   menuContainer.innerHTML = `
     <div class="space-y-4 page-transition">
       <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
@@ -2265,20 +2265,26 @@ else if (tab === 'pembelian') {
       </h2>
       
       <div class="space-y-4">
-        <!-- Update: Metode Pembayaran Card Style -->
+        
+        <!-- CHECKBOX BAYAR NANTI -->
+        <div class="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-2xl">
+          <input type="checkbox" id="op_bayar_nanti" class="w-6 h-6 accent-orange-600 cursor-pointer" onchange="toggleOpPaymentMethod()">
+          <label for="op_bayar_nanti" class="text-xs font-bold text-orange-700 cursor-pointer">Bayar Nanti (Catat sebagai Utang)</label>
+        </div>
+
         <div>
           <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 tracking-widest">Metode Pembayaran</label>
-          <div class="grid grid-cols-2 gap-3">
-            <label class="cursor-pointer group">
-              <input type="radio" name="payment-method-op" value="Cash" class="hidden peer">
-              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-orange-500 peer-checked:bg-orange-50 group-active:scale-95">
+          <div class="grid grid-cols-2 gap-3" id="op_payment_container">
+            <label class="cursor-pointer group op-radio-label">
+              <input type="radio" name="payment-method-op" value="Cash" class="hidden peer op-radio-input">
+              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-orange-500 peer-checked:bg-orange-50 group-active:scale-95 peer-disabled:opacity-50 peer-disabled:bg-slate-50">
                 <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-orange-600"></i>
                 <span class="text-sm font-bold text-slate-600 peer-checked:text-orange-700">Cash</span>
               </div>
             </label>
-            <label class="cursor-pointer group">
-              <input type="radio" name="payment-method-op" value="Rekening" class="hidden peer">
-              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-orange-500 peer-checked:bg-orange-50 group-active:scale-95">
+            <label class="cursor-pointer group op-radio-label">
+              <input type="radio" name="payment-method-op" value="Rekening" class="hidden peer op-radio-input">
+              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-orange-500 peer-checked:bg-orange-50 group-active:scale-95 peer-disabled:opacity-50 peer-disabled:bg-slate-50">
                 <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-orange-600"></i>
                 <span class="text-sm font-bold text-slate-600 peer-checked:text-orange-700">Rekening</span>
               </div>
@@ -2366,6 +2372,15 @@ else if (tab === 'pembelian') {
   }
 }
     if (window.lucide) lucide.createIcons();
+}
+
+window.toggleOpPaymentMethod = function() {
+  const isChecked = document.getElementById('op_bayar_nanti').checked;
+  const radios = document.querySelectorAll('.op-radio-input');
+  radios.forEach(radio => {
+    radio.disabled = isChecked;
+    if (isChecked) radio.checked = false; // Kosongkan pilihan jika bayar nanti
+  });
 }
 
 function addItem(autoOpen = true) {
@@ -2697,7 +2712,6 @@ isFullDataLoaded = false;
 }
 
 function savePenjualan() {
-    // Cegah eksekusi jika login sebagai Administrator
   if (currentShop.nama === 'ADMINISTRATOR') {
     return alert("Aksi Ditolak: Administrator hanya memiliki akses untuk melihat riwayat dan memantau laporan. Silakan ganti identitas (login) ke toko Muflih Print atau Vi Printing untuk melakukan transaksi.");
   }
@@ -2705,85 +2719,78 @@ function savePenjualan() {
   const items = collectItems();
   if(items.length === 0) return alert("Pilih barang terlebih dahulu!");
   
-  // --- ATURAN KHUSUS: TARIK DANA SHOPEE ---
-  const shopeeItems = items.filter(item => 
-    item.nama.toLowerCase().includes("tarik dana shopee")
-  );
-
+  const shopeeItems = items.filter(item => item.nama.toLowerCase().includes("tarik dana shopee"));
   if (shopeeItems.length > 0) {
-    if (items.length > 1) {
-      return alert("Transaksi 'Tarik Dana Shopee' tidak boleh digabung dengan barang lain!");
-    }
-    
-    if (shopeeItems[0].qty > 1) {
-      return alert("Jumlah (Qty) untuk 'Tarik Dana Shopee' maksimal hanya 1!");
-    }
+    if (items.length > 1) return alert("Transaksi 'Tarik Dana Shopee' tidak boleh digabung dengan barang lain!");
+    if (shopeeItems[0].qty > 1) return alert("Jumlah (Qty) untuk 'Tarik Dana Shopee' maksimal hanya 1!");
   }
-  // ----------------------------------------
 
-  // --- VALIDASI METODE PEMBAYARAN ---
+  const dpVal = unmask(document.getElementById('p_dp').value); // Cek nominal bayar
   const selectedRadio = document.querySelector('input[name="payment-method"]:checked');
-  if (!selectedRadio) {
-    return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
+
+  // --- LOGIKA METODE PEMBAYARAN PENJUALAN ---
+  let metodePembayaran = "";
+  if (dpVal === 0) {
+    metodePembayaran = ""; // Biarkan kosong di database
+  } else {
+    if (!selectedRadio) {
+      return alert("Karena nominal DP/Bayar tidak 0, Anda wajib memilih Metode Pembayaran (Cash/Rekening)!");
+    }
+    metodePembayaran = getActualCashMethod(selectedRadio.value);
   }
 
-  // --- VALIDASI & AMBIL OPSI KETERANGAN CEPAT (Wajib Pilih) ---
   const selectedKetOpt = document.querySelector('input[name="p_ket_opt"]:checked');
-  
-  // Menghilangkan fallback "Penjualan Ke" dan mewajibkan pilihan
   if (!selectedKetOpt) {
     return alert("Silahkan pilih Keterangan (Blangko, Cetak Undangan, atau Lain-lain) terlebih dahulu!");
   }
   
   const ketPilihan = selectedKetOpt.value; 
-  // ------------------------------------------------------------
-
   const shopInitial = currentShop.nama ? currentShop.nama.charAt(0).toUpperCase() : '?';
   const inputPelanggan = (document.getElementById('p_cust').value || 'UMUM').toUpperCase();
   
-  // UBAH DARI 'const' MENJADI 'let' agar bisa ditimpa untuk logika Shopee
   let pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
-  
-  // Kirim nilai pilihan ke payload agar diproses server menjadi "Pelanggan - Keterangan"
   let keteranganOtomatis = ketPilihan;
 
-  // OVERRIDE UNTUK SHOPEE: Menyesuaikan aturan pelunasan piutang Shopee
   const shopee1 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee1");
   const shopee2 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee2");
 
-  if (shopee1) {
-    keteranganOtomatis = "Tarik Dana Shopee1"; // Keterangan diisi nama barang saja
-    pelangganFormatted = "-"; // Subjek diisi "-"
-  } else if (shopee2) {
-    keteranganOtomatis = "Tarik Dana Shopee2"; // Keterangan diisi nama barang saja
-    pelangganFormatted = "-"; // Subjek diisi "-"
+  if (shopee1 || shopee2) {
+    keteranganOtomatis = shopee1 ? "Tarik Dana Shopee1" : "Tarik Dana Shopee2"; 
+    pelangganFormatted = "-"; 
   }
 
   const payload = {
     action: 'processTransaction',
     type: 'PENJUALAN',
-    pelanggan: pelangganFormatted, // Nilai ini akan masuk sebagai subjek/sub
-    ket: keteranganOtomatis,       // Nilai ini akan masuk sebagai keterangan/ket
+    pelanggan: pelangganFormatted, 
+    ket: keteranganOtomatis,       
     items: items,
     diskon: unmask(document.getElementById('p_disc').value),
-    dp: unmask(document.getElementById('p_dp').value),
-    metode: getActualCashMethod(selectedRadio.value) 
+    dp: dpVal,
+    metode: metodePembayaran // Mengirim value yang sudah divalidasi
   };
   
   payload.total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
   runScript('processTransaction', payload, 'penjualan');
 }
 
- function savePembelian() {
+function savePembelian() {
   const items = collectItems();
   if(items.length === 0) return alert("Daftar belanja kosong!");
   
-  // --- VALIDASI METODE PEMBAYARAN (Wajib Pilih) ---
+  const dpVal = unmask(document.getElementById('b_dp').value); // Cek nominal bayar
   const selectedRadioBeli = document.querySelector('input[name="payment-method-beli"]:checked');
-  if (!selectedRadioBeli) {
-    return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
+  
+  // --- LOGIKA METODE PEMBAYARAN PEMBELIAN ---
+  let metodePembayaran = "";
+  if (dpVal === 0) {
+    metodePembayaran = ""; // Biarkan kosong di database karena murni Utang
+  } else {
+    if (!selectedRadioBeli) {
+      return alert("Karena Anda membayar (DP tidak 0), wajib memilih Metode Pembayaran (Cash/Rekening)!");
+    }
+    metodePembayaran = getActualCashMethod(selectedRadioBeli.value);
   }
-  // ------------------------------------------------
   
   const supplier = (document.getElementById('b_supp').value || '-').toUpperCase();
   const total = items.reduce((a, b) => a + (b.qty * b.harga), 0);
@@ -2792,45 +2799,48 @@ function savePenjualan() {
     action: 'processTransaction',
     type: 'PEMBELIAN',
     supplier: supplier,
-    // Keterangan otomatis untuk riwayat
     ket: `PEMBELIAN DARI ${supplier}`, 
     items: items,
     total: total,
-    dp: unmask(document.getElementById('b_dp').value),
-    // Mengambil nilai dari radio button yang dipilih
-    metode: getActualCashMethod(selectedRadioBeli.value)
+    dp: dpVal,
+    metode: metodePembayaran // Mengirim value yang sudah divalidasi
   };
   
   runScript('processTransaction', payload, 'pembelian');
 }
 
-   async function saveOperasional() {
+async function saveOperasional() {
   const elNom = document.getElementById('op_nom');
   const elKet = document.getElementById('op_ket');
   const nominal = unmask(elNom?.value);
   const keterangan = elKet?.value.trim();
   const isRefund = document.getElementById('is_refund')?.checked;
+  const isBayarNanti = document.getElementById('op_bayar_nanti')?.checked; // Deteksi Utang
 
-  // --- VALIDASI METODE PEMBAYARAN (Update Baru) ---
-  // Mencari radio button yang dipilih dalam grup 'payment-method-op'
   const selectedRadioOp = document.querySelector('input[name="payment-method-op"]:checked');
   
   if (nominal <= 0 || !keterangan) {
     return alert("Nominal dan keterangan wajib diisi.");
   }
 
-  if (!selectedRadioOp) {
-    return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
+  // --- LOGIKA METODE PEMBAYARAN OPERASIONAL ---
+  let metodePembayaran = "";
+  if (isBayarNanti) {
+    metodePembayaran = ""; // Kosongkan database
+  } else {
+    if (!selectedRadioOp) {
+      return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
+    }
+    metodePembayaran = getActualCashMethod(selectedRadioOp.value);
   }
-  // ------------------------------------------------
 
   const payload = {
     action: "saveOperasional", 
     type: isRefund ? "PENGEMBALIAN_DANA" : "OPERASIONAL",
     nominal: nominal,
-    ket: isRefund ? "[REFUND] " + keterangan.toUpperCase() : keterangan.toUpperCase(),
-    // Mengambil nilai dari radio card yang terpilih
-    metode: getActualCashMethod(selectedRadioOp.value)
+    // Tambahkan tag [UTANG] agar jelas di riwayat
+    ket: isRefund ? "[REFUND] " + keterangan.toUpperCase() : (isBayarNanti ? "[UTANG] " + keterangan.toUpperCase() : keterangan.toUpperCase()),
+    metode: metodePembayaran 
   };
 
   runScript('saveOperasional', payload, 'operasional');
