@@ -347,7 +347,7 @@ display: block !important;
   </nav>
 
   <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxFLyXdFP66zi_AlX1ncJ45dt1UnobmYhq2G7dPNdWA6VvIWAmcbEYqlgJLRNgg_MQzig/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyi9IexCxr3IWzOTjltEuO1BQrchlgD-2qXaAKqn4560vAIPbMwAlW3d55boMCyHTFqdg/exec";
 
    let allTransactions = [];
    let currentFetchId = 0;
@@ -368,6 +368,16 @@ let currentShop = {
 let currentPage = 1;
 let itemsPerPage = 20; // Angka 20 atau string 'all'
 
+function refreshIcons(containerId) {
+  if (typeof lucide !== 'undefined') {
+    const container = document.getElementById(containerId);
+    if (container) {
+      lucide.createIcons({ root: container });
+    } else {
+      lucide.createIcons(); // Fallback jika container tidak ditentukan
+    }
+  }
+}
 // Fungsi pintar untuk mendeteksi Kasir Toko mana yang sedang mencatat
 function getActualCashMethod(selectedMethod) {
   if (selectedMethod === "Cash") {
@@ -438,22 +448,6 @@ function loginAdmin() {
     alert("Akses Ditolak! Password salah.");
   }
 }
-
-// Cek saat halaman dimuat
-window.addEventListener('DOMContentLoaded', () => {
-  if (currentShop.nama) {
-    document.getElementById('shop-selector').style.display = 'none';
-  } else {
-    document.getElementById('shop-selector').style.display = 'flex';
-  }
-
-  updateIdentityUI();
-
-  if (window.lucide) lucide.createIcons();
-});
-    // Inisialisasi
-
-  
 
 function handleModalScroll() {
   const content = document.getElementById('modalContent');
@@ -545,15 +539,51 @@ async function refreshData() {
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  lucide.createIcons();
-refreshData();
-   changeTab('penjualan');
-  fetchMasterStock();
-  setTimeout(() => {
-    window.scrollTo(0, 0);
-  }, 100);
-});
+async function fetchInitialData() {
+  showBalanceLoading(true);
+  try {
+    // Memanggil 1 endpoint tunggal untuk mendapatkan data Saldo dan Stok secara bersamaan
+    const res = await fetch(`${WEB_APP_URL}?action=getInitialData&_=${Date.now()}`);
+    const data = await res.json();
+    
+    // 1. EKSEKUSI DATA SALDO
+    const bal = data.balances;
+    if (bal && bal.version) {
+      window.currentBackendVersion = bal.version;
+      const versionEl = document.getElementById('app-version-display');
+      if (versionEl) versionEl.innerText = bal.version;
+    }
+
+    const muflihVal = Number(bal.cashMuflih) || 0;
+    const viVal = Number(bal.cashVi) || 0;
+    const bankVal = Number(bal.bank) || 0;
+    const bndhraVal = Number(bal.bendahara) || 0;
+    const kasirTotal = muflihVal + viVal + bankVal;
+
+    showBalanceLoading(false);
+
+    document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
+    document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
+    document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
+    document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
+    document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
+
+    // 2. EKSEKUSI DATA STOK
+    if (data.stocks && Array.isArray(data.stocks)) {
+      productMaster = data.stocks.map(item => ({
+        nama: String(item.nama || '').toUpperCase(),
+        kategori: String(item.kategori || 'UMUM').toUpperCase(),
+        harga_umum: parseFloat(item.hargaUmum) || 0,
+        harga_reseller: parseFloat(item.hargaReseller) || 0
+      }));
+    }
+
+  } catch (e) {
+    console.error("Gagal load data awal:", e);
+    showBalanceLoading(false);
+  }
+}
+
    function showLoading(show) {
       document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
     }
@@ -669,12 +699,36 @@ window.toggleSummaryView = function() {
             btn.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
             btn.innerHTML = '<i data-lucide="pie-chart" class="w-4 h-4"></i>';
         }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+       refreshIcons('btn-toggle-summary');
     }
     
     // Render ulang tampilan
     renderTransactions();
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+  // 1. Cek Identitas Toko
+  if (currentShop.nama) {
+    document.getElementById('shop-selector').style.display = 'none';
+  } else {
+    document.getElementById('shop-selector').style.display = 'flex';
+  }
+  updateIdentityUI();
+
+  // 2. Tampilkan Ikon Bawaan
+  if (window.lucide) lucide.createIcons();
+
+  // 3. Tarik Data Sekaligus (Saldo & Stok Master) dalam 1 tarikan
+  fetchInitialData(); 
+
+  // 4. Buka Tab Penjualan secara otomatis
+  changeTab('penjualan');
+  
+  // 5. Pastikan layar scroll ke paling atas
+  setTimeout(() => {
+    window.scrollTo(0, 0);
+  }, 100);
+});
 
     /** HALAMAN RIWAYAT **/
 function initRiwayatStructure() {
@@ -796,9 +850,8 @@ function initRiwayatStructure() {
       <div id="paginationContainer" class="bg-white border-t border-slate-100 p-3"></div>
     </div>
   `;
-  lucide.createIcons();
+  refreshIcons('riwayat-container');
   setFilter('today');
- 
 }
  
 // Variabel sementara agar filter tidak langsung berubah sebelum tombol "Terapkan" ditekan
@@ -890,7 +943,7 @@ window.openAdvancedFilter = function() {
     
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    refreshIcons('modalContent');
 }
 
 window.applyAdvancedFilters = function() {
@@ -1144,7 +1197,7 @@ async function fetchTransactions(filterType = 'today') {
           <p class="text-slate-500 font-medium">Tidak ada data untuk diringkas</p>
         </div>`;
       document.getElementById('paginationContainer').innerHTML = ''; 
-      lucide.createIcons();
+      refreshIcons('listContainer');
       return;
     }
 
@@ -1235,7 +1288,7 @@ async function fetchTransactions(filterType = 'today') {
     // Replace kontainer utama dengan HTML Summary dan hilangkan pagination
     container.innerHTML = summaryHtml;
     document.getElementById('paginationContainer').innerHTML = ''; 
-    lucide.createIcons();
+    refreshIcons('listContainer');
     updateRevisiBadge();
     return; // Cegah list default ter-render
   }
@@ -1251,7 +1304,7 @@ async function fetchTransactions(filterType = 'today') {
         <p class="text-slate-400 text-xs mt-1">Coba sesuaikan filter atau kata kunci pencarian Anda</p>
       </div>`;
     document.getElementById('paginationContainer').innerHTML = ''; // Kosongkan pagination
-    lucide.createIcons();
+    refreshIcons('modalContent');
     return;
   }
 
@@ -1333,7 +1386,7 @@ async function fetchTransactions(filterType = 'today') {
   
   // 4. Panggil render Pagination UI di bawah
   renderPagination(totalItems, totalPages);
-  lucide.createIcons();
+  refreshIcons('listContainer');
   updateRevisiBadge();
 }
 
@@ -1531,7 +1584,7 @@ window.openDateModal = function() {
   
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+ refreshIcons('modalContent');
 };
 
 window.applyDateModal = function() {
@@ -1955,7 +2008,7 @@ if (t.revisi && t.revisi.trim() !== '') {
   setTimeout(() => {
     handleModalScroll(content);
   }, 100);
-  if (window.lucide) lucide.createIcons();
+  refreshIcons('modalContent');
 }
 
 // --- HTTP Request Logic (Mutasi Revisi) ---
@@ -2190,9 +2243,7 @@ function updateStateAndRenderUI(action, trxId, payload) {
         </button>
       </div>
     `;
-    
-    lucide.createIcons();
-    addItem(false);
+  addItem(false);
 }
 else if (tab === 'pembelian') {
   menuContainer.innerHTML = `
@@ -2253,8 +2304,6 @@ else if (tab === 'pembelian') {
       </div>
     </div>
   `;
-  
-  lucide.createIcons(); // Penting: Agar ikon muncul
   addItem(false);
 }
 else if (tab === 'operasional') {
@@ -2297,18 +2346,20 @@ else if (tab === 'operasional') {
           <label for="is_refund" class="text-xs font-bold text-red-700 cursor-pointer">Ini adalah Dana Refund (Pengembalian)</label>
         </div>
 
-        <div>
-          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Nominal Pengeluaran</label>
-          <input id="op_nom" type="text" inputmode="numeric" oninput="maskNominal(this)" placeholder="0" 
-                 class="w-full p-4 bg-slate-50 border-none rounded-2xl text-xl font-extrabold text-slate-800 focus:ring-4 focus:ring-slate-100 outline-none accounting">
+        <!-- FITUR BARU: MULTIPLE INPUT BIAYA -->
+        <div class="py-2">
+          <div class="border-t border-b border-slate-200 py-3">
+            <p class="text-[10px] font-bold mb-3 text-slate-400 uppercase tracking-widest text-center">Rincian Biaya</p>
+            <div id="opItemContainer" class="space-y-2"></div>
+            <button onclick="addOpItem()" class="w-full mt-3 p-3 bg-orange-50 text-orange-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-transform">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i> TAMBAH BIAYA LAIN
+            </button>
+          </div>
         </div>
 
-        <div>
-          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Keterangan</label>
-          <textarea id="op_ket" 
-          placeholder="Tulis rincian pengeluaran..." 
-          onkeypress="return event.charCode != 44"
-          class="w-full p-4 bg-slate-50 border-none rounded-2xl h-32 focus:ring-4 focus:ring-slate-100 outline-none font-medium"></textarea>
+        <div class="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex justify-between items-center">
+          <span class="font-bold text-orange-800">Total Pengeluaran:</span>
+          <span id="op_final" class="text-xl font-black text-orange-700 tracking-tight">Rp 0</span>
         </div>
 
         <button onclick="saveOperasional()" class="w-full bg-slate-800 text-white p-4 rounded-2xl font-extrabold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
@@ -2317,8 +2368,9 @@ else if (tab === 'operasional') {
       </div>
     </div>
   `;
-  lucide.createIcons();
+   addOpItem(); // Menambahkan 1 form input secara otomatis saat tab dibuka
 }
+
   else if (tab === 'lainnya') {
     // Ambil versi dari memori, jika belum ada tampilkan "Memuat..."
     const versionText = window.currentBackendVersion ? window.currentBackendVersion : "Memuat...";
@@ -2370,8 +2422,8 @@ else if (tab === 'operasional') {
       </div>
     `;
   }
+   refreshIcons('menu-container');
 }
-    if (window.lucide) lucide.createIcons();
 }
 
 window.toggleOpPaymentMethod = function() {
@@ -2381,6 +2433,90 @@ window.toggleOpPaymentMethod = function() {
     radio.disabled = isChecked;
     if (isChecked) radio.checked = false; // Kosongkan pilihan jika bayar nanti
   });
+}
+
+window.addOpItem = function() {
+  const id = Date.now();
+  const div = document.createElement('div');
+  div.id = `op-item-${id}`;
+  div.className = "flex gap-2 items-start bg-white p-3 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-left duration-300";
+  div.innerHTML = `
+    <div class="flex-1 space-y-2">
+      <input type="text" placeholder="Keterangan (mis: Beli Galon)" 
+             onkeypress="return event.charCode != 44"
+             class="op-ket w-full p-2.5 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:ring-2 focus:ring-orange-200 bg-slate-50">
+      <div class="relative">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">Rp</span>
+        <input type="text" inputmode="numeric" placeholder="Nominal" 
+               oninput="maskNominal(this); calcOpTotal()" 
+               class="op-nom w-full p-2.5 pl-8 border border-slate-200 rounded-lg text-sm font-bold accounting outline-none focus:ring-2 focus:ring-orange-200">
+      </div>
+    </div>
+    <button onclick="removeOpItem('op-item-${id}')" class="w-10 h-10 shrink-0 bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 rounded-lg flex items-center justify-center transition-colors self-center">
+      <i data-lucide="trash-2" class="w-4 h-4"></i>
+    </button>
+  `;
+  document.getElementById('opItemContainer').appendChild(div);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+};
+
+window.removeOpItem = function(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.remove();
+    calcOpTotal();
+  }
+};
+
+window.calcOpTotal = function() {
+  const items = document.querySelectorAll('#opItemContainer > div');
+  let total = 0;
+  items.forEach(item => {
+    const price = unmask(item.querySelector('.op-nom').value);
+    total += price;
+  });
+  const elFinal = document.getElementById('op_final');
+  if (elFinal) elFinal.innerText = formatRupiah(total);
+};
+
+window.saveOperasional = async function() {
+  const isRefund = document.getElementById('is_refund')?.checked;
+  const isBayarNanti = document.getElementById('op_bayar_nanti')?.checked; 
+  const selectedRadioOp = document.querySelector('input[name="payment-method-op"]:checked');
+  
+  const itemEls = document.querySelectorAll('#opItemContainer > div');
+  const items = [];
+  
+  itemEls.forEach(el => {
+    const ket = el.querySelector('.op-ket').value.trim();
+    const nom = unmask(el.querySelector('.op-nom').value);
+    if (ket && nom > 0) {
+      items.push({ keterangan: ket, nominal: nom });
+    }
+  });
+
+  if (items.length === 0) {
+    return alert("Gagal. Minimal satu biaya dengan keterangan dan nominal harus diisi.");
+  }
+
+  let metodePembayaran = "";
+  if (!isBayarNanti) {
+    if (!selectedRadioOp) {
+      return alert("Silahkan pilih Metode Pembayaran (Cash atau Rekening) terlebih dahulu!");
+    }
+    metodePembayaran = getActualCashMethod(selectedRadioOp.value);
+  }
+
+  const payload = {
+    action: "processTransaction", 
+    type: "OPERASIONAL_MULTI",
+    isRefund: isRefund,
+    isBayarNanti: isBayarNanti,
+    items: items,
+    metode: metodePembayaran 
+  };
+
+  runScript('processTransaction', payload, 'operasional');
 }
 
 function addItem(autoOpen = true) {
@@ -2430,7 +2566,7 @@ function addItem(autoOpen = true) {
     </div>
   `;
   document.getElementById('itemContainer').appendChild(div);
-  lucide.createIcons();
+ refreshIcons('itemContainer');
 
   if (autoOpen) {
     openProductModal(`input-${id}`);
@@ -2459,11 +2595,13 @@ function addItem(autoOpen = true) {
   });
 
   if (filtered.length > 0) {
+    // 1. BUAT WADAH VIRTUAL (DOCUMENT FRAGMENT)
+    const fragment = document.createDocumentFragment();
+
     filtered.forEach(p => {
       const div = document.createElement('div');
       div.className = "p-4 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center active:bg-blue-50 transition-colors cursor-pointer hover:border-blue-200 mb-2";
       
-      // Pastikan data yang dikirim ke selectProduct sudah aman
       const namaSafe = String(p.nama || "").toUpperCase();
       const katSafe = String(p.kategori || "UMUM").toUpperCase();
       const hargaU = parseFloat(p.harga_umum || p.hargaUmum) || 0;
@@ -2488,8 +2626,14 @@ function addItem(autoOpen = true) {
            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300"></i>
         </div>
       `;
-      list.appendChild(div);
+      
+      // 2. MASUKKAN ELEMEN KE WADAH VIRTUAL (TIDAK MEMBEBANI LAYAR)
+      fragment.appendChild(div);
     });
+    
+    // 3. TEMPELKAN WADAH KE DOM SEKALI SAJA SETELAH LOOP SELESAI
+    list.appendChild(fragment);
+
     if (btnManual) btnManual.classList.add('hidden');
   } else {
     const empty = document.createElement('div');
@@ -2510,13 +2654,10 @@ function addItem(autoOpen = true) {
     }
   }
   
-  // Render ulang icon Lucide agar muncul di elemen baru
-  if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
+ if (typeof lucide !== 'undefined') {
+    refreshIcons('product-list');
   }
 }
-
-
 
  function selectProduct(name, category, priceUmum, priceReseller) {
   const rowId = currentTargetInputId.split('-')[1];
@@ -2678,7 +2819,13 @@ window.selectProduct = selectProduct;
     if (result.status === 'success') {
       // Masukkan data baru ke memori agar riwayat langsung terupdate
       if (result.data && typeof allTransactions !== 'undefined') {
-        allTransactions.unshift(result.data);
+        if (Array.isArray(result.data)) {
+          // Jika multiple items (OPERASIONAL_MULTI), unshift semuanya
+          result.data.reverse().forEach(d => allTransactions.unshift(d));
+        } else {
+          // Fallback untuk transaksi normal (Jual/Beli)
+          allTransactions.unshift(result.data);
+        }
       }
 
       // Reset flag agar fetch selanjutnya mengambil data terbaru
@@ -2876,7 +3023,7 @@ async function saveOperasional() {
   else if (type === 'TRANSFER') showTransferForm();
   else if (type === 'CANCEL') fetchCancelList();
 
-  lucide.createIcons();
+  refreshIcons('action-form-container');
 }
     // --- UTILITY FUNCTIONS ---
     function formatRupiah(angka) {
@@ -2890,10 +3037,8 @@ function openModal() {
   modal.classList.remove('hidden');
 }
 
-
 async function eksekusiPelunasanUtang(id, nominal) {
-  // --- VALIDASI & PENGAMBILAN METODE (Update Baru) ---
-  // Mencari radio button yang dipilih dalam grup 'pay-utang-method'
+  // --- VALIDASI & PENGAMBILAN METODE ---
   const selectedRadio = document.querySelector('input[name="pay-utang-method"]:checked');
   
   if (!selectedRadio) {
@@ -2901,10 +3046,6 @@ async function eksekusiPelunasanUtang(id, nominal) {
   }
   
   const metode = selectedRadio.value;
-  // --------------------------------------------------
-
-  // Mengambil nama supplier dari elemen display di modal
-  // Pastikan di HTML bayarUtang, elemen nama supplier memiliki class ini atau sesuaikan selector-nya
   const elSupplier = document.querySelector('.modal-supplier-name') || { innerText: 'Supplier' };
   const namaSupplier = elSupplier.innerText;
 
@@ -2918,17 +3059,23 @@ async function eksekusiPelunasanUtang(id, nominal) {
     ket: `Pelunasan Utang: ${namaSupplier}` 
   };
   
-  // Sembunyikan modal
   closeModal(); 
   
   try {
-    // Jalankan runScript menggunakan payload yang sudah didefinisikan
+    // 1. Jalankan proses transaksi
     await runScript('processTransaction', payload, 'riwayat');
     
-    // Refresh list utang jika fungsi tersedia agar sisa utang langsung terupdate di layar
+    // 2. Refresh menu Utang di background
     if (typeof fetchUtangList === 'function') {
       fetchUtangList();
     }
+
+    // 3. --- FITUR BARU: TARIK ULANG RIWAYAT TRANSAKSI ---
+    // Memaksa sistem mengambil data terbaru dari Google Sheets agar teks [LUNAS] langsung tampil
+    if (typeof fetchTransactions === 'function') {
+      fetchTransactions(currentFilter);
+    }
+
   } catch (error) {
     console.error("Gagal eksekusi utang:", error);
     alert("Terjadi kesalahan saat memproses pelunasan.");
@@ -3002,7 +3149,7 @@ async function fetchUtangList() {
           `}).join('')}
         </div>`;
     }
-    lucide.createIcons();
+    refreshIcons('action-form-container');
   } catch (e) {
     container.innerHTML = `<div class="p-6 text-center text-red-500 font-bold text-xs bg-red-50 rounded-2xl">Gagal memuat data. Periksa koneksi internet.</div>`;
   }
@@ -3133,7 +3280,7 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
         </div>
       </div>
     `;
-    lucide.createIcons();
+    refreshIcons('modalContent');
   } catch (e) {
     content.innerHTML = `<div class="p-10 text-center text-red-500 font-bold">Error: ${e.message}</div>`;
   }
@@ -3205,13 +3352,13 @@ async function fetchPiutangList() {
           `}).join('')}
         </div>`;
     }
+    refreshIcons('action-form-container');
   } catch (err) {
     container.innerHTML = `
       <div class="p-10 text-center bg-red-50 rounded-2xl border border-red-100">
         <p class="text-red-500 font-bold text-xs uppercase tracking-widest">Gagal terhubung ke server.</p>
       </div>`;
   }
-  lucide.createIcons();
 }
 
 async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
@@ -3350,7 +3497,7 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
         </div>
       </div>
     `;
-    lucide.createIcons();
+   refreshIcons('modalContent');
   } catch (e) {
     content.innerHTML = `<div class="p-10 text-center text-red-500 font-bold">Gagal memuat detail: ${e.message}</div>`;
   }
@@ -3645,7 +3792,7 @@ function confirmCancel(id, ket, nom) {
       </div>
     </div>
   `;
-  lucide.createIcons();
+  refreshIcons('modalContent');
 }
 
 async function executeCancel(id) {
@@ -3917,13 +4064,6 @@ function generateNotaHTML(t) {
         </div>
     </div>`;
 }
-    
-   
-    window.onload = () => {
-      refreshData();
-      fetchMasterStock();
-      changeTab('penjualan');
-    };
 
 function downloadExcel() {
     try {
@@ -4324,7 +4464,7 @@ function formatRupiahExcel(worksheet, cols, dataStartRow = 1) {
         </div>
     </div>
     `;
-    lucide.createIcons();
+   refreshIcons('modalContent');
 }
 
 // Fungsi baru untuk menyalin rincian pelunasan ke Clipboard
@@ -4383,7 +4523,6 @@ window.calcMultiUtangTotal = function() {
     document.getElementById('multi-utang-total').innerText = formatRupiah(total);
 }
 
-// Fungsi memproses transaksi multi ke backend
 window.eksekusiMultiUtang = async function() {
     const selectedRadio = document.querySelector('input[name="pay-multi-method"]:checked');
     if (!selectedRadio) {
@@ -4421,16 +4560,25 @@ window.eksekusiMultiUtang = async function() {
 
     closeModal();
     try {
+        // 1. Jalankan proses transaksi
         await runScript('processTransaction', payload, 'riwayat');
+        
+        // 2. Refresh menu Utang
         if (typeof fetchUtangList === 'function') {
             fetchUtangList();
         }
+
+        // 3. --- FITUR BARU: TARIK ULANG RIWAYAT TRANSAKSI ---
+        if (typeof fetchTransactions === 'function') {
+            fetchTransactions(currentFilter);
+        }
+
     } catch (error) {
         console.error("Gagal eksekusi multi utang:", error);
         alert("Terjadi kesalahan saat memproses pelunasan.");
     }
-}   
-    
+}
+
   </script>
   
 </body>
