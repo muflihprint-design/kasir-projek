@@ -2483,6 +2483,10 @@ else if (tab === 'operasional') {
       </h2>
       
       <div class="space-y-4">
+        <!-- TAMBAHAN BARU: INPUT NAMA SUPPLIER -->
+        <input id="op_supplier" type="text" placeholder="NAMA SUPPLIER / PENERIMA (Opsional)" 
+               oninput="this.value = this.value.toUpperCase()"
+               class="w-full p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium">
         
         <!-- CHECKBOX BAYAR NANTI -->
         <div class="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-2xl">
@@ -2491,13 +2495,25 @@ else if (tab === 'operasional') {
         </div>
 
         <div>
-    <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 tracking-widest">Metode Pembayaran</label>
-    ${generatePaymentMethodHTML('payment-method-op', { color: 'orange', isOperasional: true })}
-  </div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 tracking-widest">Metode Pembayaran</label>
+          ${generatePaymentMethodHTML('payment-method-op', { color: 'orange', isOperasional: true })}
+        </div>
         
-        <div class="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl">
-          <input type="checkbox" id="is_refund" class="w-6 h-6 accent-red-600 cursor-pointer">
-          <label for="is_refund" class="text-xs font-bold text-red-700 cursor-pointer">Ini adalah Dana Refund (Pengembalian)</label>
+        <!-- MODIFIKASI: CHECKBOX REFUND + TOMBOL PASTE + DETAIL TRANSAKSI -->
+        <div class="flex flex-col p-4 bg-red-50 border border-red-100 rounded-2xl gap-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <!-- Tambahkan onchange="toggleRefundMode()" di sini -->
+              <input type="checkbox" id="is_refund" class="w-6 h-6 accent-red-600 cursor-pointer" onchange="toggleRefundMode()">
+              <label for="is_refund" class="text-xs font-bold text-red-700 cursor-pointer">Ini adalah Dana Refund</label>
+            </div>
+            <!-- TOMBOL PASTE (Tersembunyi by default) -->
+            <button type="button" id="btn_paste_refund" onclick="handlePasteRefund()" class="hidden items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-red-700 transition-all shadow-sm active:scale-95">
+              <i data-lucide="clipboard-paste" class="w-4 h-4"></i> Paste
+            </button>
+          </div>
+          <!-- KOTAK DETAIL HASIL PASTE (Tersembunyi by default) -->
+          <div id="refund_detail_container" class="hidden p-3 bg-white border border-red-200 rounded-xl shadow-sm"></div>
         </div>
 
         <!-- FITUR BARU: MULTIPLE INPUT BIAYA -->
@@ -2505,7 +2521,8 @@ else if (tab === 'operasional') {
           <div class="border-t border-b border-slate-200 py-3">
             <p class="text-[10px] font-bold mb-3 text-slate-400 uppercase tracking-widest text-center">Rincian Biaya</p>
             <div id="opItemContainer" class="space-y-2"></div>
-            <button onclick="addOpItem()" class="w-full mt-3 p-3 bg-orange-50 text-orange-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-transform">
+            <!-- Tambahkan ID btn_add_op_item agar bisa di-hide saat mode refund -->
+            <button id="btn_add_op_item" onclick="addOpItem()" class="w-full mt-3 p-3 bg-orange-50 text-orange-600 rounded-xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-transform">
               <i data-lucide="plus-circle" class="w-4 h-4"></i> TAMBAH BIAYA LAIN
             </button>
           </div>
@@ -2522,9 +2539,8 @@ else if (tab === 'operasional') {
       </div>
     </div>
   `;
-   addOpItem(); // Menambahkan 1 form input secara otomatis saat tab dibuka
+  addOpItem(); 
 }
-
   else if (tab === 'lainnya') {
     // Ambil versi dari memori, jika belum ada tampilkan "Memuat..."
     const versionText = window.currentBackendVersion ? window.currentBackendVersion : "Memuat...";
@@ -2579,6 +2595,149 @@ else if (tab === 'operasional') {
    refreshIcons('menu-container');
 }
 }
+
+// Fungsi untuk mematikan/menghidupkan Mode Refund
+window.toggleRefundMode = function() {
+  const isChecked = document.getElementById('is_refund').checked;
+  const btnPaste = document.getElementById('btn_paste_refund');
+  const detailContainer = document.getElementById('refund_detail_container');
+  const btnAddOp = document.getElementById('btn_add_op_item');
+
+  // Ambil form input yang pertama (digenerate oleh addOpItem)
+  const firstItem = document.querySelector('#opItemContainer > div');
+  if (!firstItem) return;
+
+  const inputKet = firstItem.querySelector('.op-ket');
+  const inputNom = firstItem.querySelector('.op-nom');
+  
+  // MODIFIKASI: Cari tombol hapus di dalam item tersebut
+  const btnRemove = firstItem.querySelector('button[onclick^="removeOpItem"]');
+
+  if (isChecked) {
+    // TAMPILKAN TOMBOL PASTE & SEMBUNYIKAN TOMBOL TAMBAH
+    btnPaste.classList.remove('hidden');
+    btnPaste.classList.add('flex');
+    if (btnAddOp) btnAddOp.classList.add('hidden');
+    
+    // MODIFIKASI: SEMBUNYIKAN TOMBOL HAPUS
+    if (btnRemove) btnRemove.classList.add('hidden');
+    
+    // UBAH INPUT JADI READ ONLY
+    inputKet.readOnly = true;
+    inputKet.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+    inputKet.placeholder = "Klik tombol paste di atas...";
+    
+    inputNom.readOnly = true;
+    inputNom.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+    inputNom.placeholder = "Otomatis";
+
+    // Hapus baris input tambahan (jika user sebelumnya menekan tambah biaya > 1 kali)
+    const allItems = document.querySelectorAll('#opItemContainer > div');
+    for (let i = 1; i < allItems.length; i++) {
+        allItems[i].remove();
+    }
+    calcOpTotal();
+  } else {
+    // KEMBALIKAN KE MODE NORMAL
+    btnPaste.classList.add('hidden');
+    btnPaste.classList.remove('flex');
+    detailContainer.classList.add('hidden');
+    detailContainer.innerHTML = '';
+    
+    if (btnAddOp) btnAddOp.classList.remove('hidden');
+    
+    // MODIFIKASI: TAMPILKAN KEMBALI TOMBOL HAPUS
+    if (btnRemove) btnRemove.classList.remove('hidden');
+
+    inputKet.readOnly = false;
+    inputKet.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+    inputKet.placeholder = "Keterangan (mis: Beli Galon)";
+    inputKet.value = "";
+    
+    inputNom.readOnly = false;
+    inputNom.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+    inputNom.placeholder = "Nominal";
+    inputNom.value = "";
+    
+    calcOpTotal();
+  }
+};
+
+// Fungsi saat tombol Paste ditekan
+window.handlePasteRefund = async function() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text || text.trim() === '') {
+      return alert("Clipboard kosong! Salin detail transaksi terlebih dahulu dari menu Riwayat.");
+    }
+    
+    // Mengekstrak ID Transaksi (Format TRX-XXXX)
+    const match = text.match(/(TRX-[\w-]+)/i);
+    if (!match) {
+        return alert("ID Transaksi tidak terdeteksi. Pastikan Anda menekan tombol 'Salin Detail' pada transaksi.");
+    }
+    
+    const trxId = match[1];
+    
+    // Mencari data transaksi dari array allTransactions milik Anda
+    const trx = (typeof allTransactions !== 'undefined' ? allTransactions : []).find(t => t.id === trxId);
+    
+    if (!trx) {
+        return alert(`Transaksi ${trxId} tidak ditemukan. Buka tab "Riwayat" lalu tarik "Semua Data" terlebih dahulu agar aplikasi dapat membaca histori.`);
+    }
+    
+    // Validasi: Pastikan Kategorinya hanya "CANCEL ORDER"
+    if ((trx.kat || "").toUpperCase() !== "CANCEL ORDER") {
+        return alert(`Transaksi ${trxId} berkategori ${trx.kat}. Fitur paste ini HANYA untuk transaksi yang sudah dibatalkan (Kategori: CANCEL ORDER).`);
+    }
+    
+    // Mengisi form input secara otomatis
+    const firstItem = document.querySelector('#opItemContainer > div');
+    if (firstItem) {
+        const inputKet = firstItem.querySelector('.op-ket');
+        const inputNom = firstItem.querySelector('.op-nom');
+        
+        // Ambil nama Pelanggan (jika kosong, tulis UMUM)
+        const namaPelanggan = trx.sub && trx.sub !== '-' ? trx.sub : 'UMUM';
+        
+        // MODIFIKASI: Masukkan Nama Pelanggan ke Keterangan
+        inputKet.value = `REFUND ${trx.id} - ${namaPelanggan}`;
+        
+        // Ambil nominal yang masuk/keluar dari database
+        const nominal = trx.masuk > 0 ? trx.masuk : trx.keluar;
+        
+        // Masukkan nominal ke input lalu format
+        inputNom.value = Number(nominal).toLocaleString('id-ID');
+        calcOpTotal();
+        
+        // Menampilkan Info Transaksi di bawah tombol
+        const detailContainer = document.getElementById('refund_detail_container');
+        detailContainer.classList.remove('hidden');
+        detailContainer.innerHTML = `
+            <div class="flex items-center gap-1.5 mb-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+                <p class="font-bold text-emerald-700 text-xs uppercase tracking-wider">Data Tervalidasi</p>
+            </div>
+            <div class="mt-2 text-slate-600 text-[11px] space-y-1.5">
+                <div class="flex justify-between"><span class="font-bold">ID Transaksi:</span> <span class="font-mono text-slate-800">${trx.id}</span></div>
+                
+                <!-- MODIFIKASI: BARIS NAMA PELANGGAN DITAMBAHKAN DI SINI -->
+                <div class="flex justify-between"><span class="font-bold">Pelanggan:</span> <span class="font-bold text-blue-700">${namaPelanggan}</span></div>
+                
+                <div class="flex justify-between"><span class="font-bold">Kategori:</span> <span class="text-rose-600 font-bold bg-rose-50 px-1 rounded">${trx.kat}</span></div>
+                <div class="flex justify-between border-t border-slate-100 pt-1.5 mt-1"><span class="font-bold text-xs uppercase text-slate-400">Total Refund:</span> <span class="font-black text-rose-600 text-sm">${formatRupiah(nominal)}</span></div>
+            </div>
+        `;
+        
+        // Render ikon lucide yang baru ditambahkan
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+    
+  } catch (err) {
+    console.error("Gagal paste: ", err);
+    alert("Gagal melakukan Paste Otomatis. Pastikan browser Anda memiliki izin untuk membaca Clipboard (Papan Klip).");
+  }
+};
 
 window.toggleOpPaymentMethod = function() {
   const isChecked = document.getElementById('op_bayar_nanti').checked;
@@ -2638,6 +2797,9 @@ window.saveOperasional = async function() {
   const isBayarNanti = document.getElementById('op_bayar_nanti')?.checked; 
   const selectedRadioOp = document.querySelector('input[name="payment-method-op"]:checked');
   
+  // 1. Ambil nilai input Nama Supplier
+  const namaSupplier = document.getElementById('op_supplier')?.value.trim().toUpperCase() || "";
+  
   const itemEls = document.querySelectorAll('#opItemContainer > div');
   const items = [];
   
@@ -2645,7 +2807,9 @@ window.saveOperasional = async function() {
     const ket = el.querySelector('.op-ket').value.trim();
     const nom = unmask(el.querySelector('.op-nom').value);
     if (ket && nom > 0) {
-      items.push({ keterangan: ket, nominal: nom });
+      // 2. Gabungkan Nama Supplier dengan Keterangan Biaya (jika ada)
+      const finalKet = namaSupplier ? `${namaSupplier} - ${ket}` : ket;
+      items.push({ keterangan: finalKet, nominal: nom });
     }
   });
 
@@ -2666,6 +2830,7 @@ window.saveOperasional = async function() {
     type: "OPERASIONAL_MULTI",
     isRefund: isRefund,
     isBayarNanti: isBayarNanti,
+    supplier: namaSupplier, // Disisipkan ke parameter utama jika backend mendukung
     items: items,
     metode: metodePembayaran 
   };
@@ -4699,6 +4864,7 @@ window.eksekusiMultiUtang = async function() {
         alert("Terjadi kesalahan saat memproses pelunasan.");
     }
 }
+
 
   </script>
   
