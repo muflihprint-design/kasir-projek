@@ -368,6 +368,182 @@ let currentShop = {
 let currentPage = 1;
 let itemsPerPage = 20; // Angka 20 atau string 'all'
 
+// --- OPTIMASI PENCARIAN ANTI-LAG ---
+let searchTimeout;
+
+window.salinEstimasiWA = function() {
+    // 1. Ambil data barang dari form
+    const items = collectItems();
+    if (items.length === 0) {
+        return alert("Tambahkan minimal 1 barang terlebih dahulu untuk membuat estimasi!");
+    }
+
+    // 2. Susun rincian teks barang dengan deteksi Harga Promo/Normal
+    let subtotal = 0;
+    let detailTeks = items.map(item => {
+        const sub = item.qty * item.harga;
+        subtotal += sub;
+
+        // --- LOGIKA HARGA PROMO & NORMAL ---
+        let labelTambahan = "";
+        
+        // Cari apakah ada barang dengan nama yang sama persis di daftar keranjang
+        const barangSama = items.filter(i => i.nama === item.nama);
+        
+        if (barangSama.length > 1) {
+            // Tentukan harga paling murah dan paling mahal
+            const hargaMin = Math.min(...barangSama.map(i => i.harga));
+            const hargaMax = Math.max(...barangSama.map(i => i.harga));
+
+            if (hargaMin !== hargaMax) {
+                if (item.harga === hargaMin) {
+                    labelTambahan = " *(Harga Promo)*";
+                } else if (item.harga === hargaMax) {
+                    labelTambahan = " *(Harga Normal)*";
+                }
+            }
+        }
+        // -----------------------------------
+
+        // Format: - NAMA BARANG (Harga Promo)
+        //           (2 pcs x Rp 15.000) = Rp 30.000
+        return `- ${item.nama}${labelTambahan}\n  (${item.qty} pcs x ${formatRupiah(item.harga)}) = ${formatRupiah(sub)}`;
+    }).join('\n\n');
+
+    // 3. Hitung diskon, total akhir, dan DP
+    const elDisc = document.getElementById('p_disc');
+    const diskon = elDisc ? unmask(elDisc.value) : 0;
+    const totalAkhir = subtotal - diskon;
+
+    const elDp = document.getElementById('p_dp');
+    const dpVal = elDp ? unmask(elDp.value) : 0;
+
+    // 4. Rangkai teks lengkap untuk WhatsApp
+    let teksWA = `*Rincian Pesanan:*\n${detailTeks}\n\n`;
+    
+    // Logika menampilkan Subtotal & Diskon hanya jika diskon > 0
+    if (diskon > 0) {
+        teksWA += `Subtotal: ${formatRupiah(subtotal)}\n`;
+        teksWA += `Diskon: -${formatRupiah(diskon)}\n`;
+    }
+    
+    teksWA += `*TOTAL ESTIMASI: ${formatRupiah(totalAkhir)}*\n`;
+
+    // Logika menampilkan Minimal DP jika kolom DP diisi (Sisa Tagihan dihilangkan)
+    if (dpVal > 0) {
+        teksWA += `Minimal DP: ${formatRupiah(dpVal)}\n`;
+    }
+
+    teksWA += `\n`; // Enter tambahan sebagai penutup teks
+
+    // 5. Eksekusi Salin ke Clipboard (dengan fallback untuk kompatibilitas HP)
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(teksWA).then(() => {
+            alert("Estimasi berhasil disalin! Silakan buka WA dan 'Tempel/Paste' pesannya.");
+        }).catch(err => copyEstimasiFallback(teksWA));
+    } else {
+        copyEstimasiFallback(teksWA);
+    }
+};
+
+// Logika cadangan jika browser HP tidak mendukung clipboard API modern
+function copyEstimasiFallback(text) {
+    let textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        alert("Estimasi berhasil disalin! Silakan buka WA dan 'Tempel/Paste' pesannya.");
+    } catch (err) {
+        alert("Penyalinan otomatis ditolak oleh browser. Silakan coba lagi.");
+    }
+    textArea.remove();
+}
+
+function formatTransactionDate(tanggalManual, idTransaksi) {
+  let tglRaw = tanggalManual || '';
+  
+  // Jika tidak ada tanggal manual, cari otomatis di data transaksi yang sudah dimuat
+  if (!tglRaw) {
+    const trx = (typeof allTransactions !== 'undefined' ? allTransactions : []).find(t => t.id === idTransaksi);
+    tglRaw = (trx && trx.waktu) ? trx.waktu : '-';
+  }
+
+  if (tglRaw === '-') return 'N/A';
+
+  // Pisahkan jam (jika ada) dan ubah format YYYY-MM-DD menjadi DD-MM-YYYY
+  const datePart = tglRaw.split(' ')[0];
+  const parts = datePart.split('-');
+  
+  return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : (datePart || 'N/A');
+}
+
+window.handleSearch = function() {
+  clearTimeout(searchTimeout); // Hapus antrean sebelumnya
+  searchTimeout = setTimeout(() => {
+    currentPage = 1;
+    renderTransactions();
+  }, 300); // Beri jeda 300ms setelah user berhenti mengetik
+};
+
+// Fungsi Helper untuk mencetak HTML Metode Pembayaran Dinamis
+function generatePaymentMethodHTML(radioName, options = {}) {
+  const color = options.color || 'blue'; // Pilihan: blue, red, orange, purple
+  const incShopee = options.includeShopee || false;
+  const isOp = options.isOperasional || false;
+
+  const onChange = incShopee ? 'onchange="toggleShopeeInput()"' : '';
+  const opClasses = isOp ? 'op-radio-input' : '';
+  const opLabelClasses = isOp ? 'op-radio-label' : '';
+  const opDisabled = isOp ? 'peer-disabled:opacity-50 peer-disabled:bg-slate-50' : '';
+  const containerId = isOp ? 'id="op_payment_container"' : '';
+
+  // Peta warna Tailwind JIT agar tidak terhapus saat proses rendering
+  const theme = {
+    blue: { border: 'peer-checked:border-blue-500', bg: 'peer-checked:bg-blue-50', icon: 'peer-checked:text-blue-600', text: 'peer-checked:text-blue-700' },
+    red: { border: 'peer-checked:border-red-500', bg: 'peer-checked:bg-red-50', icon: 'peer-checked:text-red-600', text: 'peer-checked:text-red-700' },
+    orange: { border: 'peer-checked:border-orange-500', bg: 'peer-checked:bg-orange-50', icon: 'peer-checked:text-orange-600', text: 'peer-checked:text-orange-700' },
+    purple: { border: 'peer-checked:border-purple-500', bg: 'peer-checked:bg-purple-50', icon: 'peer-checked:text-purple-600', text: 'peer-checked:text-purple-700' }
+  }[color];
+
+  // Penyesuaian layout jika ada Shopee (3 kolom melayang vs 2 kolom memanjang)
+  const cols = incShopee ? 'grid-cols-3' : 'grid-cols-2';
+  const gap = incShopee ? 'gap-2' : 'gap-3';
+  const innerLayout = incShopee ? 'flex flex-col items-center justify-center p-2' : 'flex items-center justify-center gap-2 p-3';
+  const textClass = incShopee ? 'text-[10px] mt-1' : 'text-sm';
+
+  return `
+    <div class="grid ${cols} ${gap}" ${containerId}>
+      <label class="cursor-pointer group ${opLabelClasses}">
+        <input type="radio" name="${radioName}" value="Cash" class="hidden peer ${opClasses}" ${onChange}>
+        <div class="${innerLayout} rounded-xl border-2 border-slate-100 transition-all ${theme.border} ${theme.bg} group-active:scale-95 ${opDisabled}">
+          <i data-lucide="banknote" class="w-4 h-4 text-slate-400 ${theme.icon}"></i>
+          <span class="font-bold text-slate-600 ${textClass} ${theme.text}">Cash</span>
+        </div>
+      </label>
+      <label class="cursor-pointer group ${opLabelClasses}">
+        <input type="radio" name="${radioName}" value="Rekening" class="hidden peer ${opClasses}" ${onChange}>
+        <div class="${innerLayout} rounded-xl border-2 border-slate-100 transition-all ${theme.border} ${theme.bg} group-active:scale-95 ${opDisabled}">
+          <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 ${theme.icon}"></i>
+          <span class="font-bold text-slate-600 ${textClass} ${theme.text}">Rekening</span>
+        </div>
+      </label>
+      ${incShopee ? `
+      <label class="cursor-pointer group ${opLabelClasses}">
+        <input type="radio" name="${radioName}" value="Shopee" class="hidden peer ${opClasses}" ${onChange}>
+        <div class="${innerLayout} rounded-xl border-2 border-slate-100 transition-all ${theme.border} ${theme.bg} group-active:scale-95 ${opDisabled}">
+          <i data-lucide="shopping-bag" class="w-4 h-4 text-slate-400 ${theme.icon}"></i>
+          <span class="font-bold text-slate-600 ${textClass} ${theme.text}">Shopee</span>
+        </div>
+      </label>` : ''}
+    </div>
+  `;
+}
+
 function refreshIcons(containerId) {
   if (typeof lucide !== 'undefined') {
     const container = document.getElementById(containerId);
@@ -416,8 +592,7 @@ function updateIdentityUI() {
     iconWrapper.innerHTML = '<i data-lucide="user" class="w-3.5 h-3.5"></i>';
   }
 
-  // Refresh ikon lucide jika yang dirender adalah ikon <i data-lucide="...">
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  refreshIcons('identity-icon-wrapper');
 }    
  
 
@@ -812,7 +987,7 @@ function initRiwayatStructure() {
               <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
                 <i data-lucide="search" class="w-4 h-4"></i>
               </span>
-              <input type="text" id="searchInput" oninput="currentPage=1; renderTransactions()" 
+              <input type="text" id="searchInput" oninput="handleSearch()" 
                 placeholder="Cari ID, Ket, Nama Produk" 
                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200 transition-all">
             </div>
@@ -1325,7 +1500,10 @@ async function fetchTransactions(filterType = 'today') {
     currentPage = 1; // Paksa ke halaman 1 jika menampilkan semua
   }
 
-  // 3. Render Item (Menggunakan data paginatedData, bukan filtered)
+ // 3. Render Item (Menggunakan data paginatedData, bukan filtered)
+  // LANGKAH OPTIMASI 1: Buat wadah virtual
+  const fragment = document.createDocumentFragment();
+
   paginatedData.forEach(t => {
     const isMasuk = t.tipe === 'MASUK';
     const amount = isMasuk ? t.masuk : t.keluar;
@@ -1381,9 +1559,14 @@ async function fetchTransactions(filterType = 'today') {
         </div>
       </div>
     `;
-    container.appendChild(div);
+    
+    // LANGKAH OPTIMASI 2: Masukkan elemen ke wadah virtual, bukan ke layar
+    fragment.appendChild(div);
   });
   
+  // LANGKAH OPTIMASI 3: Tempelkan isi wadah virtual ke layar HANYA SATU KALI
+  container.appendChild(fragment);
+
   // 4. Panggil render Pagination UI di bawah
   renderPagination(totalItems, totalPages);
   refreshIcons('listContainer');
@@ -1743,9 +1926,9 @@ function setLoading(buttonElement, isLoading) {
         buttonElement.classList.remove('opacity-50', 'cursor-not-allowed');
         // Kembalikan teks asli
         buttonElement.innerHTML = buttonElement.dataset.originalText;
-    }
-    // Refresh ikon Lucide
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+   }
+    // Refresh ikon Lucide secara spesifik pada elemen tombol tersebut
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: buttonElement });
 }
 
 function toggleModalButtons(enabled) {
@@ -1934,16 +2117,24 @@ if (t.revisi && t.revisi.trim() !== '') {
 }
   revisiHtml += `</div>`;
 
-  // --- Rendering Utama ---
+ // --- Rendering Utama ---
   content.innerHTML = `
-    <div class="flex items-center gap-3 mb-4">
-        <div class="p-3 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
-          <i data-lucide="${t.tipe === 'MASUK' ? 'trending-up' : 'trending-down'}"></i>
+    <div class="flex justify-between items-start mb-4">
+        <div class="flex items-center gap-3">
+            <div class="p-3 rounded-full ${t.tipe === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
+              <i data-lucide="${t.tipe === 'MASUK' ? 'trending-up' : 'trending-down'}"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-bold">Detail ${t.kat}</h2>
+              <p class="text-xs text-gray-400 font-medium">${t.id}</p>
+            </div>
         </div>
-        <div>
-          <h2 class="text-lg font-bold">Detail ${t.kat}</h2>
-          <p class="text-xs text-gray-400 font-medium">${t.id}</p>
-        </div>
+        
+        <!-- TOMBOL SALIN BARU DI KANAN ATAS -->
+        <button onclick="copyForWhatsApp('${t.id}', '${displayValue}', '${formattedNominal}', '${labelKeterangan}')" 
+                class="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all border border-slate-200 mt-1">
+            <i data-lucide="copy" class="w-4 h-4"></i> Salin Detail
+        </button>
     </div>
     
     <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm bg-slate-50 p-4 rounded-xl border mb-4">
@@ -1974,12 +2165,6 @@ if (t.revisi && t.revisi.trim() !== '') {
     </div>
     
     <div class="mt-6 flex flex-col gap-3">
-        <!-- TOMBOL BARU: SALIN KE WHATSAPP -->
-        <button onclick="copyForWhatsApp('${t.id}', '${displayValue}', '${formattedNominal}', '${labelKeterangan}')" 
-                class="w-full py-3 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition flex items-center justify-center gap-2 text-sm shadow-sm active:scale-95">
-            <i data-lucide="copy" class="w-4 h-4"></i> Salin Teks ke WhatsApp
-        </button>
-
         <div class="grid ${t.kat && t.kat.toUpperCase() === 'PENJUALAN' ? 'grid-cols-2' : 'grid-cols-1'} gap-3">
             <button onclick="closeModal()" class="py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition text-sm active:scale-95">
               Tutup
@@ -2200,24 +2385,9 @@ function updateStateAndRenderUI(action, trxId, payload) {
           </div>
           
           <div>
-            <label class="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-2 block">Metode Pembayaran</label>
-            <div class="grid grid-cols-2 gap-3">
-              <label class="cursor-pointer group">
-                <input type="radio" name="payment-method" value="Cash" class="hidden peer">
-                <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
-                  <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-blue-600"></i>
-                  <span class="text-sm font-bold text-slate-600 peer-checked:text-blue-700">Cash</span>
-                </div>
-              </label>
-              <label class="cursor-pointer group">
-                <input type="radio" name="payment-method" value="Rekening" class="hidden peer">
-                <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
-                  <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-blue-600"></i>
-                  <span class="text-sm font-bold text-slate-600 peer-checked:text-blue-700">Rekening</span>
-                </div>
-              </label>
-            </div>
-          </div>
+    <label class="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-2 block">Metode Pembayaran</label>
+    ${generatePaymentMethodHTML('payment-method', { color: 'blue' })}
+  </div>
         </div>
 
         <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100">
@@ -2238,9 +2408,17 @@ function updateStateAndRenderUI(action, trxId, payload) {
           <p id="p_status_piutang" class="text-[10px] mt-1 text-slate-500 italic px-1"></p>
         </div>
 
-        <button onclick="savePenjualan()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-extrabold shadow-lg shadow-blue-100 active:scale-95 transition-transform flex items-center justify-center gap-2">
-           <i data-lucide="check-circle" class="w-5"></i> PROSES TRANSAKSI
-        </button>
+       <div class="flex flex-col sm:flex-row gap-3 mt-4">
+          <!-- TOMBOL BARU: SALIN ESTIMASI -->
+          <button onclick="salinEstimasiWA()" class="w-full sm:w-1/2 bg-emerald-500 hover:bg-emerald-600 text-white p-4 rounded-2xl font-extrabold shadow-lg shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+             <i data-lucide="message-circle" class="w-5"></i> ESTIMASI KE WA
+          </button>
+          
+          <!-- TOMBOL ASLI: PROSES TRANSAKSI -->
+          <button onclick="savePenjualan()" class="w-full sm:w-1/2 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-extrabold shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+             <i data-lucide="check-circle" class="w-5"></i> PROSES TRANSAKSI
+          </button>
+        </div>
       </div>
     `;
   addItem(false);
@@ -2268,25 +2446,10 @@ else if (tab === 'pembelian') {
         </div>
 
         <!-- Update: Metode Pembayaran Card Style -->
-        <div>
-          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 tracking-widest">Metode Pembayaran</label>
-          <div class="grid grid-cols-2 gap-3">
-            <label class="cursor-pointer group">
-              <input type="radio" name="payment-method-beli" value="Cash" class="hidden peer">
-              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-red-500 peer-checked:bg-red-50 group-active:scale-95">
-                <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-red-600"></i>
-                <span class="text-sm font-bold text-slate-600 peer-checked:text-red-700">Cash</span>
-              </div>
-            </label>
-            <label class="cursor-pointer group">
-              <input type="radio" name="payment-method-beli" value="Rekening" class="hidden peer">
-              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-red-500 peer-checked:bg-red-50 group-active:scale-95">
-                <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-red-600"></i>
-                <span class="text-sm font-bold text-slate-600 peer-checked:text-red-700">Rekening</span>
-              </div>
-            </label>
-          </div>
-        </div>
+       <div>
+    <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 tracking-widest">Metode Pembayaran</label>
+    ${generatePaymentMethodHTML('payment-method-beli', { color: 'red' })}
+  </div>
 
         <div>
           <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 tracking-wider">Bayar Sekarang (DP)</label>
@@ -2322,24 +2485,9 @@ else if (tab === 'operasional') {
         </div>
 
         <div>
-          <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 tracking-widest">Metode Pembayaran</label>
-          <div class="grid grid-cols-2 gap-3" id="op_payment_container">
-            <label class="cursor-pointer group op-radio-label">
-              <input type="radio" name="payment-method-op" value="Cash" class="hidden peer op-radio-input">
-              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-orange-500 peer-checked:bg-orange-50 group-active:scale-95 peer-disabled:opacity-50 peer-disabled:bg-slate-50">
-                <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-orange-600"></i>
-                <span class="text-sm font-bold text-slate-600 peer-checked:text-orange-700">Cash</span>
-              </div>
-            </label>
-            <label class="cursor-pointer group op-radio-label">
-              <input type="radio" name="payment-method-op" value="Rekening" class="hidden peer op-radio-input">
-              <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-orange-500 peer-checked:bg-orange-50 group-active:scale-95 peer-disabled:opacity-50 peer-disabled:bg-slate-50">
-                <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-orange-600"></i>
-                <span class="text-sm font-bold text-slate-600 peer-checked:text-orange-700">Rekening</span>
-              </div>
-            </label>
-          </div>
-        </div>
+    <label class="block text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 tracking-widest">Metode Pembayaran</label>
+    ${generatePaymentMethodHTML('payment-method-op', { color: 'orange', isOperasional: true })}
+  </div>
         
         <div class="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl">
           <input type="checkbox" id="is_refund" class="w-6 h-6 accent-red-600 cursor-pointer">
@@ -2457,7 +2605,7 @@ window.addOpItem = function() {
     </button>
   `;
   document.getElementById('opItemContainer').appendChild(div);
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  refreshIcons('opItemContainer');
 };
 
 window.removeOpItem = function(id) {
@@ -3161,26 +3309,7 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
   
   if (modal) modal.classList.remove('hidden'); 
   
-  // 1. Ambil data tanggal mentah
-  let tglRaw = '';
-  if (!tanggalTransaksi) {
-    const trx = (typeof allTransactions !== 'undefined' ? allTransactions : []).find(t => t.id === idUtang);
-    tglRaw = (trx && trx.waktu) ? trx.waktu : '-';
-  } else {
-    tglRaw = tanggalTransaksi;
-  }
-
-  // 2. Ubah format menjadi DD-MM-YYYY
-  let tglFormatted = 'N/A';
-  if (tglRaw && tglRaw !== '-') {
-    const datePart = tglRaw.split(' ')[0]; // Ambil YYYY-MM-DD
-    const parts = datePart.split('-');
-    if (parts.length === 3) {
-      tglFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`; // Susun balik
-    } else {
-      tglFormatted = datePart;
-    }
-  }
+ const tglFormatted = formatTransactionDate(tanggalTransaksi, idUtang);
 
   content.innerHTML = `
     <div class="flex flex-col items-center py-10">
@@ -3252,22 +3381,8 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
         <div class="space-y-3 pt-2">
           <div>
             <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 block">Metode Pembayaran</label>
-            <div class="grid grid-cols-2 gap-3">
-              <label class="cursor-pointer group">
-                <input type="radio" name="pay-utang-method" value="Cash" class="hidden peer">
-                <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-red-500 peer-checked:bg-red-50 group-active:scale-95">
-                  <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-red-600"></i>
-                  <span class="text-sm font-bold text-slate-600 peer-checked:text-red-700">Cash</span>
-                </div>
-              </label>
-              <label class="cursor-pointer group">
-                <input type="radio" name="pay-utang-method" value="Rekening" class="hidden peer">
-                <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-red-500 peer-checked:bg-red-50 group-active:scale-95">
-                  <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-red-600"></i>
-                  <span class="text-sm font-bold text-slate-600 peer-checked:text-red-700">Rekening</span>
-                </div>
-              </label>
-            </div>
+            <!-- Panggil helper dengan warna merah (tema utang) -->
+            ${generatePaymentMethodHTML('pay-utang-method', { color: 'red' })}
           </div>
           
           <div class="flex gap-2 pt-2">
@@ -3364,27 +3479,7 @@ async function fetchPiutangList() {
 async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
   openModal();
   const content = document.getElementById('modalContent');
-  
-  // 1. Ambil data tanggal mentah
-  let tglRaw = '';
-  if (!tanggalTransaksi) {
-    const trx = (typeof allTransactions !== 'undefined' ? allTransactions : []).find(t => t.id === id);
-    tglRaw = (trx && trx.waktu) ? trx.waktu : '-';
-  } else {
-    tglRaw = tanggalTransaksi;
-  }
-
-  // 2. Ubah format menjadi DD-MM-YYYY
-  let tglFormatted = 'N/A';
-  if (tglRaw && tglRaw !== '-') {
-    const datePart = tglRaw.split(' ')[0]; // Ambil YYYY-MM-DD
-    const parts = datePart.split('-');
-    if (parts.length === 3) {
-      tglFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`; // Susun balik
-    } else {
-      tglFormatted = datePart;
-    }
-  }
+  const tglFormatted = formatTransactionDate(tanggalTransaksi, id);
 
   content.innerHTML = `
     <div class="flex flex-col items-center py-10">
@@ -3456,31 +3551,9 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
 
         <div class="space-y-3 pt-2">
           <div>
-            <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 block">Metode Penerimaan</label>
-            <div class="grid grid-cols-3 gap-2">
-              <label class="cursor-pointer group">
-                <input type="radio" name="pi-method" value="Cash" class="hidden peer" onchange="toggleShopeeInput()">
-                <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-purple-500 peer-checked:bg-purple-50 group-active:scale-95">
-                  <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-purple-600"></i>
-                  <span class="text-[10px] font-bold text-slate-600 peer-checked:text-purple-700 mt-1">Cash</span>
-                </div>
-              </label>
-              <label class="cursor-pointer group">
-                <input type="radio" name="pi-method" value="Rekening" class="hidden peer" onchange="toggleShopeeInput()">
-                <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-purple-500 peer-checked:bg-purple-50 group-active:scale-95">
-                  <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-purple-600"></i>
-                  <span class="text-[10px] font-bold text-slate-600 peer-checked:text-purple-700 mt-1">Transfer</span>
-                </div>
-              </label>
-              <label class="cursor-pointer group">
-                <input type="radio" name="pi-method" value="Shopee" class="hidden peer" onchange="toggleShopeeInput()">
-                <div class="flex flex-col items-center justify-center p-2 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-purple-500 peer-checked:bg-purple-50 group-active:scale-95">
-                  <i data-lucide="shopping-bag" class="w-4 h-4 text-slate-400 peer-checked:text-purple-600"></i>
-                  <span class="text-[10px] font-bold text-slate-600 peer-checked:text-purple-700 mt-1">Shopee</span>
-                </div>
-              </label>
-            </div>
-          </div>
+    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 block">Metode Penerimaan</label>
+    ${generatePaymentMethodHTML('pi-method', { color: 'purple', includeShopee: true })}
+  </div>
 
           <div id="shopee_ref_container" class="hidden animate-in fade-in slide-in-from-top-2">
             <label class="text-[10px] font-bold text-orange-500 uppercase ml-1">No. Transaksi Shopee</label>
@@ -4438,22 +4511,8 @@ function formatRupiahExcel(worksheet, cols, dataStartRow = 1) {
 
         <div>
             <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 mb-2 block">Metode Pembayaran</label>
-            <div class="grid grid-cols-2 gap-3">
-                <label class="cursor-pointer group">
-                    <input type="radio" name="pay-multi-method" value="Cash" class="hidden peer">
-                    <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
-                        <i data-lucide="banknote" class="w-4 h-4 text-slate-400 peer-checked:text-blue-600"></i>
-                        <span class="text-sm font-bold text-slate-600 peer-checked:text-blue-700">Cash</span>
-                    </div>
-                </label>
-                <label class="cursor-pointer group">
-                    <input type="radio" name="pay-multi-method" value="Rekening" class="hidden peer">
-                    <div class="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-slate-100 transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
-                        <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 peer-checked:text-blue-600"></i>
-                        <span class="text-sm font-bold text-slate-600 peer-checked:text-blue-700">Rekening</span>
-                    </div>
-                </label>
-            </div>
+            <!-- Panggil helper dengan warna biru (tema multi-utang) -->
+            ${generatePaymentMethodHTML('pay-multi-method', { color: 'blue' })}
         </div>
 
         <div class="flex gap-2 pt-2">
