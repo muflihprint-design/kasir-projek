@@ -936,6 +936,29 @@ window.addEventListener('DOMContentLoaded', () => {
   }, 100);
 });
 
+// Fungsi untuk memunculkan/menyembunyikan tombol silang
+window.toggleClearButton = function() {
+  const input = document.getElementById('searchInput');
+  const btn = document.getElementById('clearSearchBtn');
+  if (input && btn) {
+    if (input.value.length > 0) {
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  }
+};
+
+// Fungsi untuk menghapus teks dan mereset pencarian
+window.clearSearch = function() {
+  const input = document.getElementById('searchInput');
+  if (input) {
+    input.value = '';        // Kosongkan teks
+    toggleClearButton();     // Sembunyikan ikon silang
+    handleSearch();          // Refresh daftar riwayat
+    input.focus();           // Kembalikan kursor ke kolom pencarian
+  }
+};
     /** HALAMAN RIWAYAT **/
 function initRiwayatStructure() {
   const container = document.getElementById('riwayat-container');
@@ -1015,13 +1038,17 @@ function initRiwayatStructure() {
         <div class="flex flex-col w-full gap-2">
           <div class="flex gap-2 w-full">
             <div class="relative flex-1 group">
-              <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                <i data-lucide="search" class="w-4 h-4"></i>
-              </span>
-              <input type="text" id="searchInput" oninput="handleSearch()" 
-                placeholder="Cari ID, Ket, Nama Produk" 
-                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200 transition-all">
-            </div>
+  <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 group-focus-within:text-blue-500 transition-colors">
+    <i data-lucide="search" class="w-4 h-4"></i>
+  </span>
+  <input type="text" id="searchInput" oninput="handleSearch(); toggleClearButton()" 
+    placeholder="Cari ID, Ket, Nama Produk" 
+    class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-medium outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-200 transition-all">
+  <!-- Tombol Silang Baru -->
+  <button id="clearSearchBtn" onclick="clearSearch()" class="absolute inset-y-0 right-2 flex items-center p-1.5 text-slate-400 hover:text-red-500 hidden transition-colors" title="Hapus Pencarian">
+    <i data-lucide="x" class="w-4 h-4"></i>
+  </button>
+</div>
             
             <div class="flex gap-1.5 shrink-0">
                 <!-- TOMBOL BARU: Toggle Ringkasan -->
