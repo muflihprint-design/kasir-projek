@@ -1,7 +1,8 @@
 {
+  "id": "kasir-app-v1",
   "name": "Kasir & Arus Kas Modern",
   "short_name": "Kasir",
-  "start_url": "./index.html",
+  "start_url": "./index.html?app=kasir",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",
