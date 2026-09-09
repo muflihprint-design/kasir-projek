@@ -424,14 +424,17 @@ function setupSupabaseRealtime() {
         }
 
         // --- 3. EKSEKUSI PEMBARUAN ---
-        // Jika sedang di tab riwayat, langsung refresh
+        // FITUR BARU: Selalu perbarui saldo di header secara realtime apa pun tab yang sedang aktif
+        refreshData(); 
+
+        // Logika pembaruan riwayat berdasarkan tab yang aktif
         if (activeTab === 'riwayat') {
-          console.log('Perubahan Kasir terdeteksi via Supabase. Memuat ulang riwayat...');
+          console.log('Perubahan Kasir terdeteksi via Supabase. Memuat ulang riwayat & saldo...');
           fetchTransactions(currentFilter);
         } else {
-          // Jika sedang di tab lain, tandai bahwa ada pembaruan yang belum dimuat
+          // Jika sedang di tab lain, tandai bahwa ada pembaruan riwayat yang belum dimuat
           pendingRiwayatUpdate = true;
-          console.log('Ada transaksi kasir baru. Menunggu pindah ke tab riwayat...');
+          console.log('Ada transaksi kasir baru. Saldo diperbarui, menunggu pindah ke tab riwayat...');
         }
       }
     )
