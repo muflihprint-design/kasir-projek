@@ -6,6 +6,8 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2563eb">
   <title>Kasir & Arus Kas Modern</title>
+  <!-- Tambahkan di dalam <head> pada index.html -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@2.8.0/dist/dom-to-image-more.min.js"></script>
@@ -372,6 +374,74 @@ let itemsPerPage = 20; // Angka 20 atau string 'all'
 
 // --- OPTIMASI PENCARIAN ANTI-LAG ---
 let searchTimeout;
+
+// Konfigurasi Supabase
+const SUPABASE_URL = "https://zqxeoveanevsvynptckm.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxeGVvdmVhbmV2c3Z5bnB0Y2ttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNzUzODEsImV4cCI6MjA4OTg1MTM4MX0.eeIaytpW1wtWPJc2FbhufkDkhONUt9yypTZU4dTVmsM";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let localUpdatedTransactions = new Set();
+let activeTab = 'penjualan'; 
+let pendingRiwayatUpdate = false; // Tambahkan variabel ini
+
+// Fungsi untuk mengirim log ke Supabase setiap terjadi transaksi
+function logKasirToSupabase(trxId, jobName, msg) {
+  if (!trxId || trxId === "-") return;
+  localUpdatedTransactions.add(trxId);
+  
+  supabaseClient.from('log_notifikasi_telegram').insert([{
+     keterangan_event: "TRANSAKSI KASIR",
+     nomor_pesanan: trxId,
+     nama_pekerjaan: jobName || "-",
+     isi_pesan: msg || "Aktivitas via Aplikasi Kasir"
+  }]).then(() => {
+     console.log("Log transaksi kasir terkirim ke Supabase.");
+  }).catch(err => {
+     console.error("Gagal mengirim log ke Supabase:", err);
+  });
+}
+
+function setupSupabaseRealtime() {
+  supabaseClient
+    .channel('tabel-notifikasi-kasir')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'log_notifikasi_telegram' },
+      (payload) => {
+        // --- 1. FILTER APLIKASI ---
+        // Cek apakah event ini benar-benar dari aplikasi kasir
+        if (payload.new.keterangan_event !== "TRANSAKSI KASIR") {
+          return; // Abaikan dan hentikan proses jika ini dari OrderFlow/Aplikasi lain
+        }
+
+        const trxId = payload.new.nomor_pesanan;
+
+        // --- 2. FILTER PERANGKAT ---
+        // Abaikan pembaruan jika transaksi berasal dari perangkat (browser) kita sendiri
+        if (localUpdatedTransactions.has(trxId)) {
+          localUpdatedTransactions.delete(trxId);
+          return;
+        }
+
+        // --- 3. EKSEKUSI PEMBARUAN ---
+        // Jika sedang di tab riwayat, langsung refresh
+        if (activeTab === 'riwayat') {
+          console.log('Perubahan Kasir terdeteksi via Supabase. Memuat ulang riwayat...');
+          fetchTransactions(currentFilter);
+        } else {
+          // Jika sedang di tab lain, tandai bahwa ada pembaruan yang belum dimuat
+          pendingRiwayatUpdate = true;
+          console.log('Ada transaksi kasir baru. Menunggu pindah ke tab riwayat...');
+        }
+      }
+    )
+    .subscribe();
+}
+
+// Panggil fungsi ini saat halaman selesai dimuat (bisa disisipkan di DOMContentLoaded)
+window.addEventListener('DOMContentLoaded', () => {
+  setupSupabaseRealtime();
+});
 
 window.salinKeClipboard = function(teks) {
   // 1. Fungsi internal untuk memunculkan Toast
@@ -2274,6 +2344,7 @@ window.handleRevisiAction = async function(type, trxId, oldNote = '', event) {
             const result = await response.json();
             if (result.success || result.status === 'success') {
                 updateStateAndRenderUI(action, trxId, payload);
+                logKasirToSupabase(trxId, "Revisi Kasir", "Pembaruan Catatan Revisi");
             } else {
                 alert("Gagal memproses revisi: " + (result.message || "Unknown Error"));
             }
@@ -2348,16 +2419,20 @@ function updateStateAndRenderUI(action, trxId, payload) {
   if (activeBtn) activeBtn.classList.add('nav-active');
 
   if (tab === 'riwayat') {
-    menuContainer.classList.add('hidden'); // Sembunyikan form input
-    riwayatContainer.classList.remove('hidden'); // Tampilkan riwayat
+    menuContainer.classList.add('hidden');
+    riwayatContainer.classList.remove('hidden');
     
-    // Inisialisasi struktur riwayat jika belum ada sama sekali
     if (!riwayatContainer.innerHTML.trim()) {
       initRiwayatStructure();
       fetchTransactions();
     } else {
-      // Jika sudah ada, cukup refresh tampilan dengan data yang ada di memori
-      renderTransactions();
+      // Cek apakah ada notifikasi update dari Supabase sebelumnya
+      if (pendingRiwayatUpdate) {
+        fetchTransactions(currentFilter); // Tarik data baru dari server
+        pendingRiwayatUpdate = false;     // Reset kembali penanda
+      } else {
+        renderTransactions(); // Langsung render dari memori tanpa loading ke server
+      }
     }
   } else {
     // Jika pindah ke tab Jual/Beli/Biaya
@@ -3176,16 +3251,25 @@ window.selectProduct = selectProduct;
     const result = await response.json();
 
     if (result.status === 'success') {
-      // Masukkan data baru ke memori agar riwayat langsung terupdate
+      let newTrxId = "-";
+      let newTrxName = "-";
+
       if (result.data && typeof allTransactions !== 'undefined') {
         if (Array.isArray(result.data)) {
-          // Jika multiple items (OPERASIONAL_MULTI), unshift semuanya
           result.data.reverse().forEach(d => allTransactions.unshift(d));
+          newTrxId = result.data[0].id || "-";
+          newTrxName = "Operasional Multi";
         } else {
-          // Fallback untuk transaksi normal (Jual/Beli)
           allTransactions.unshift(result.data);
+          newTrxId = result.data.id || "-";
+          newTrxName = result.data.ket || "-";
         }
       }
+
+      // MODIFIKASI: Kirim trigger Supabase
+      logKasirToSupabase(newTrxId, newTrxName, "Transaksi / Update Baru");
+      
+      // ... Lanjutan kode runScript bawaan Anda
 
       // Reset flag agar fetch selanjutnya mengambil data terbaru
       isTodayDataLoaded = false;
@@ -4131,6 +4215,8 @@ window.executeCancel = async function(id) {
       isTodayDataLoaded = false;
       isMonthDataLoaded = false;
       isFullDataLoaded = false;
+
+      logKasirToSupabase(id, "Cancel Order", "Transaksi telah dibatalkan");
       
       // 2. Update langsung data di memori lokal agar seketika berubah
       if (typeof allTransactions !== 'undefined') {
@@ -4210,6 +4296,7 @@ window.executeDeleteTransaction = async function(id, alasan) {
       isMonthDataLoaded = false;
       isFullDataLoaded = false;
       
+      logKasirToSupabase(id, "Hapus Transaksi", "Transaksi Dihapus: " + alasan);
       // Beri waktu Sheet untuk sinkronisasi
       setTimeout(() => {
         refreshData();
