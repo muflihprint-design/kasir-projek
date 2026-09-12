@@ -993,7 +993,32 @@ window.toggleSummaryView = function() {
     renderTransactions();
 }
 
+// --- FUNGSI RESET TOOLTIP BERKALA (SETIAP 2 HARI) ---
+function checkAndResetTooltips() {
+  const lastReset = localStorage.getItem('last_tooltip_reset_time');
+  const now = Date.now();
+  const twoDaysInMs = 2 * 24 * 60 * 60 * 1000; // 2 Hari dalam satuan milidetik (48 Jam)
+
+  // Jika belum pernah diatur, atau sudah lewat dari 2 hari
+  if (!lastReset || (now - parseInt(lastReset)) > twoDaysInMs) {
+    // Hapus semua memori tooltip agar muncul kembali
+    localStorage.removeItem('promo_summary_seen');
+    localStorage.removeItem('category_tooltip_seen');
+    localStorage.removeItem('multipay_tooltip_seen');
+    localStorage.removeItem('salin_tooltip_utang_v2');
+    localStorage.removeItem('salin_tooltip_piutang_seen');
+    localStorage.removeItem('salin_tooltip_multi_utang_seen');
+    
+    // Perbarui waktu reset menjadi waktu saat ini
+    localStorage.setItem('last_tooltip_reset_time', now.toString());
+    console.log("Tooltip telah direset untuk 2 hari ke depan.");
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
+  // 0. Jalankan pengecekan reset tooltip otomatis
+  checkAndResetTooltips();
+
   // 1. Cek Identitas Toko
   if (currentShop.nama) {
     document.getElementById('shop-selector').style.display = 'none';
@@ -3765,7 +3790,7 @@ async function fetchUtangList() {
       
       // TOOLTIP BAYAR SEKALIGUS
       const multiPayTooltip = !localStorage.getItem('multipay_tooltip_seen') ? `
-          <div id="multipay-tooltip" class="absolute top-11 right-0 w-48 p-2.5 bg-blue-600 text-white text-[10px] rounded-xl shadow-xl shadow-blue-500/40 z-[50] animate-bounce" style="animation-duration: 2.5s;">
+          <div id="multipay-tooltip" class="absolute top-14 right-0 w-48 p-2.5 bg-blue-600 text-white text-[10px] rounded-xl shadow-xl shadow-blue-500/40 z-[50] animate-bounce" style="animation-duration: 2.5s;">
               <div class="absolute -top-1.5 right-6 w-3 h-3 bg-blue-600 rotate-45 rounded-sm"></div>
               <div class="flex items-start gap-2 relative z-10">
                   <div class="flex-1">
@@ -3888,7 +3913,7 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
             </div>
            <div class="flex justify-between items-center border-t border-slate-800 pt-3 mt-1 relative">
               ${!localStorage.getItem('salin_tooltip_utang_v2') ? `
-              <div id="salin-tooltip-utang" class="absolute -top-12 right-0 w-44 p-2 bg-blue-600 text-white text-[10px] rounded-xl shadow-xl shadow-blue-500/40 z-[50] animate-bounce" style="animation-duration: 2.5s;">
+              <div id="salin-tooltip-utang" class="absolute -top-10 right-0 w-44 p-2 bg-blue-600 text-white text-[10px] rounded-xl shadow-xl shadow-blue-500/40 z-[50] animate-bounce" style="animation-duration: 2.5s;">
                   <div class="absolute -bottom-1.5 right-6 w-3 h-3 bg-blue-600 rotate-45 rounded-sm"></div>
                   <div class="flex items-start gap-2 relative z-10">
                       <div class="flex-1">
@@ -3903,9 +3928,9 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
                 <span class="text-xs text-slate-400 block mb-1">Total Tagihan:</span>
                 <span class="text-xl font-black text-red-400">${formatRupiah(sisaLama)}</span>
               </div>
-              <button onclick="dismissSalinTooltip('utang'); copyForWhatsApp('${idUtang}', '${namaSupplier}', '${formatRupiah(sisaLama)}', 'Supplier')" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all border border-slate-700">
-                <i data-lucide="copy" class="w-4 h-4"></i> Salin
-              </button>
+              <button title="Salin rincian tagihan" onclick="dismissSalinTooltip('utang'); copyForWhatsApp('${idUtang}', '${namaSupplier}', '${formatRupiah(sisaLama)}', 'Supplier')" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all border border-slate-700">
+  <i data-lucide="copy" class="w-4 h-4"></i> Salin
+</button>
             </div>
           </div>
         </div>
@@ -4071,7 +4096,7 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
             </div>
             <div class="flex justify-between items-center border-t border-slate-800 pt-3 mt-1 relative">
               ${!localStorage.getItem('salin_tooltip_seen') ? `
-              <div id="salin-tooltip-piutang" class="absolute -top-12 right-0 w-44 p-2 bg-blue-600 text-white text-[10px] rounded-xl shadow-xl shadow-blue-500/40 z-[50] animate-bounce" style="animation-duration: 2.5s;">
+              <div id="salin-tooltip-piutang" class="absolute -top-10 right-0 w-44 p-2 bg-blue-600 text-white text-[10px] rounded-xl shadow-xl shadow-blue-500/40 z-[50] animate-bounce" style="animation-duration: 2.5s;">
                   <div class="absolute -bottom-1.5 right-6 w-3 h-3 bg-blue-600 rotate-45 rounded-sm"></div>
                   <div class="flex items-start gap-2 relative z-10">
                       <div class="flex-1">
@@ -5110,12 +5135,25 @@ function formatRupiahExcel(worksheet, cols, dataStartRow = 1) {
             `).join('')}
         </div>
 
-        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex justify-between items-center relative overflow-hidden">
+        <!-- Pastikan menggunakan overflow-visible agar tooltip tidak terpotong -->
+        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex justify-between items-center relative overflow-visible mt-2">
+            ${!localStorage.getItem('salin_tooltip_multi_utang_seen') ? `
+            <div id="salin-tooltip-multi-utang" class="absolute -top-10 right-0 w-44 p-2 bg-blue-600 text-white text-[10px] rounded-xl shadow-xl shadow-blue-500/40 z-[50] animate-bounce" style="animation-duration: 2.5s;">
+                <div class="absolute -bottom-1.5 right-6 w-3 h-3 bg-blue-600 rotate-45 rounded-sm"></div>
+                <div class="flex items-start gap-2 relative z-10">
+                    <div class="flex-1">
+                        <span class="font-medium leading-tight">Salin rincian tagihan untuk dikirim ke WA.</span>
+                    </div>
+                    <button onclick="dismissSalinTooltip('multi-utang', event)" class="p-1 bg-blue-700 hover:bg-blue-800 rounded-md transition-colors shrink-0">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            </div>` : ''}
             <div>
                 <span class="text-xs font-bold text-blue-800 uppercase tracking-widest block mb-1">Total Bayar:</span>
                 <span id="multi-utang-total" class="text-xl font-black text-blue-700">Rp 0</span>
             </div>
-            <button onclick="copyMultiUtangRincian()" class="flex items-center gap-1.5 px-3 py-2 bg-blue-200/50 hover:bg-blue-200 text-blue-700 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all">
+            <button title="Salin rincian tagihan" onclick="dismissSalinTooltip('multi-utang'); copyMultiUtangRincian()" class="flex items-center gap-1.5 px-3 py-2 bg-blue-200/50 hover:bg-blue-200 text-blue-700 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all">
                 <i data-lucide="copy" class="w-4 h-4"></i> Salin
             </button>
         </div>
@@ -5613,6 +5651,10 @@ window.dismissSalinTooltip = function(tipe, event) {
         localStorage.setItem('salin_tooltip_piutang_seen', 'true');
         const tooltipP = document.getElementById('salin-tooltip-piutang');
         if (tooltipP) tooltipP.classList.add('hidden');
+    } else if (tipe === 'multi-utang') {
+        localStorage.setItem('salin_tooltip_multi_utang_seen', 'true');
+        const tooltipM = document.getElementById('salin-tooltip-multi-utang');
+        if (tooltipM) tooltipM.classList.add('hidden');
     }
 };
 
