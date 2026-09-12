@@ -3765,7 +3765,7 @@ async function fetchUtangList() {
       
       // TOOLTIP BAYAR SEKALIGUS
       const multiPayTooltip = !localStorage.getItem('multipay_tooltip_seen') ? `
-          <div id="multipay-tooltip" class="absolute top-8 right-0 w-48 p-2.5 bg-blue-600 text-white text-[10px] rounded-xl shadow-xl shadow-blue-500/40 z-[50] animate-bounce" style="animation-duration: 2.5s;">
+          <div id="multipay-tooltip" class="absolute top-11 right-0 w-48 p-2.5 bg-blue-600 text-white text-[10px] rounded-xl shadow-xl shadow-blue-500/40 z-[50] animate-bounce" style="animation-duration: 2.5s;">
               <div class="absolute -top-1.5 right-6 w-3 h-3 bg-blue-600 rotate-45 rounded-sm"></div>
               <div class="flex items-start gap-2 relative z-10">
                   <div class="flex-1">
@@ -3872,7 +3872,7 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
           </div>
         </div>
 
-        <div class="bg-slate-900 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
+        <div class="bg-slate-900 rounded-2xl p-4 text-white shadow-lg relative">
           <div class="absolute top-0 right-0 p-2 opacity-10"><i data-lucide="wallet" class="w-12 h-12"></i></div>
           <div class="relative z-10">
             <div class="flex justify-between items-start">
@@ -3894,7 +3894,7 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
                       <div class="flex-1">
                           <span class="font-medium leading-tight">Salin rincian tagihan untuk dikirim ke WA.</span>
                       </div>
-                      <button onclick="dismissSalinTooltip(event)" class="p-1 bg-blue-700 hover:bg-blue-800 rounded-md transition-colors shrink-0">
+                      <button onclick="dismissSalinTooltip('utang', event)" class="p-1 bg-blue-700 hover:bg-blue-800 rounded-md transition-colors shrink-0">
                           <i data-lucide="x" class="w-3 h-3"></i>
                       </button>
                   </div>
@@ -3903,7 +3903,7 @@ async function bayarUtang(idUtang, sisaLama, namaSupplier, tanggalTransaksi = ''
                 <span class="text-xs text-slate-400 block mb-1">Total Tagihan:</span>
                 <span class="text-xl font-black text-red-400">${formatRupiah(sisaLama)}</span>
               </div>
-              <button onclick="dismissSalinTooltip(); copyForWhatsApp('${idUtang}', '${namaSupplier}', '${formatRupiah(sisaLama)}', 'Supplier')" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all border border-slate-700">
+              <button onclick="dismissSalinTooltip('utang'); copyForWhatsApp('${idUtang}', '${namaSupplier}', '${formatRupiah(sisaLama)}', 'Supplier')" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all border border-slate-700">
                 <i data-lucide="copy" class="w-4 h-4"></i> Salin
               </button>
             </div>
@@ -4055,7 +4055,7 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
           </div>
         </div>
 
-        <div class="bg-slate-900 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
+        <div class="bg-slate-900 rounded-2xl p-4 text-white shadow-lg relative">
           <div class="absolute top-0 right-0 p-2 opacity-10"><i data-lucide="user" class="w-12 h-12"></i></div>
           <div class="relative z-10">
             <div class="flex justify-between items-start">
@@ -4077,7 +4077,7 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
                       <div class="flex-1">
                           <span class="font-medium leading-tight">Salin rincian tagihan untuk dikirim ke WA.</span>
                       </div>
-                      <button onclick="dismissSalinTooltip(event)" class="p-1 bg-blue-700 hover:bg-blue-800 rounded-md transition-colors shrink-0">
+                      <button onclick="dismissSalinTooltip('piutang', event)" class="p-1 bg-blue-700 hover:bg-blue-800 rounded-md transition-colors shrink-0">
                           <i data-lucide="x" class="w-3 h-3"></i>
                       </button>
                   </div>
@@ -4086,7 +4086,7 @@ async function bayarPiutang(id, sisa, nama, tanggalTransaksi = '') {
                 <span class="text-xs text-slate-400 block mb-1">Sisa Piutang:</span>
                 <span class="text-xl font-black text-purple-400">${formatRupiah(sisa)}</span>
               </div>
-              <button onclick="dismissSalinTooltip(); copyForWhatsApp('${id}', '${nama || 'Pelanggan Umum'}', '${formatRupiah(sisa)}', 'Pelanggan')" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all border border-slate-700">
+              <button onclick="dismissSalinTooltip('piutang'); copyForWhatsApp('${id}', '${nama || 'Pelanggan Umum'}', '${formatRupiah(sisa)}', 'Pelanggan')" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg active:scale-95 transition-all border border-slate-700">
                 <i data-lucide="copy" class="w-4 h-4"></i> Salin
               </button>
             </div>
@@ -5602,15 +5602,18 @@ window.dismissMultiPayTooltip = function(event) {
     if (tooltip) tooltip.classList.add('hidden');
 };
 
-// Fungsi untuk menutup tooltip tombol Salin
-window.dismissSalinTooltip = function(event) {
+window.dismissSalinTooltip = function(tipe, event) {
     if (event) event.stopPropagation();
-    // Simpan history agar di modal mana pun (Utang/Piutang) tooltip ini tidak muncul lagi
-    localStorage.setItem('salin_tooltip_seen', 'true');
-    const tooltipU = document.getElementById('salin-tooltip-utang');
-    const tooltipP = document.getElementById('salin-tooltip-piutang');
-    if (tooltipU) tooltipU.classList.add('hidden');
-    if (tooltipP) tooltipP.classList.add('hidden');
+
+    if (tipe === 'utang') {
+        localStorage.setItem('salin_tooltip_utang_seen', 'true');
+        const tooltipU = document.getElementById('salin-tooltip-utang');
+        if (tooltipU) tooltipU.classList.add('hidden');
+    } else if (tipe === 'piutang') {
+        localStorage.setItem('salin_tooltip_piutang_seen', 'true');
+        const tooltipP = document.getElementById('salin-tooltip-piutang');
+        if (tooltipP) tooltipP.classList.add('hidden');
+    }
 };
 
   </script>
