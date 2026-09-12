@@ -1509,18 +1509,34 @@ async function fetchTransactions(filterType = 'today') {
       return;
     }
 
-    let totalMasuk = 0;
+  let totalMasuk = 0;
     let totalKeluar = 0;
+    
+    // Variabel penampung untuk kalkulasi "Real"
+    let tfMasuk = 0;
+    let tfKeluar = 0;
+    let pengembalianDana = 0;
+    
     let rincianKategori = {};
 
     filtered.forEach(t => {
         const isMasuk = t.tipe === 'MASUK';
         const amount = isMasuk ? parseFloat(t.masuk || 0) : parseFloat(t.keluar || 0);
-        
-        if (isMasuk) totalMasuk += amount;
-        else totalKeluar += amount;
-
         const kat = (t.kat || 'LAIN-LAIN').toUpperCase();
+        
+        // Memisahkan kalkulasi berdasarkan kategori spesifik dari Database
+        if (isMasuk) {
+            totalMasuk += amount;
+            if (kat === 'TRANSFER SALDO' || kat === 'TRANSFER') tfMasuk += amount;
+            // Catatan: Uang DP dari CANCEL ORDER sudah otomatis masuk ke dalam totalMasuk.
+        } else {
+            totalKeluar += amount;
+            if (kat === 'TRANSFER SALDO' || kat === 'TRANSFER') tfKeluar += amount;
+            if (kat === 'PENGEMBALIAN DANA' || kat === 'PENGEMBALIAN_DANA' || (t.ket && t.ket.toUpperCase().includes('[REFUND]'))) {
+                pengembalianDana += amount;
+            }
+        }
+
         if(!rincianKategori[kat]) rincianKategori[kat] = { masuk: 0, keluar: 0, count: 0 };
         
         if (isMasuk) rincianKategori[kat].masuk += amount;
@@ -1528,7 +1544,12 @@ async function fetchTransactions(filterType = 'today') {
         rincianKategori[kat].count += 1;
     });
 
-    const saldoNet = totalMasuk - totalKeluar;
+    // Menerapkan rumus Real Pemasukan dan Real Pengeluaran yang akurat
+    const realMasuk = totalMasuk - tfMasuk - pengembalianDana;
+    const realKeluar = totalKeluar - tfKeluar - pengembalianDana;
+    
+    // Saldo bersih dihitung dari kalkulasi Real agar sinkron di tampilan
+    const saldoNet = realMasuk - realKeluar;
     
     let summaryHtml = `
       <div class="p-4 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300 custom-scrollbar pb-6">
@@ -1544,17 +1565,63 @@ async function fetchTransactions(filterType = 'today') {
                ${saldoNet < 0 ? '-' : ''}${formatRupiah(Math.abs(saldoNet))}
              </p>
              
-             <div class="grid grid-cols-2 gap-4 border-t border-slate-700/50 pt-4">
-               <div>
-                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Pemasukan (+)</p>
-                 <p class="text-sm font-bold text-emerald-400">${formatRupiah(totalMasuk)}</p>
+             <div class="flex flex-col gap-3 border-t border-slate-700/50 pt-4 mt-2">
+               
+               <!-- 1. BLOK KALKULASI UANG MASUK -->
+               <div class="bg-slate-800/60 rounded-xl p-3 border border-emerald-500/20 shadow-sm">
+                 <p class="text-[9px] font-bold text-emerald-400 uppercase tracking-widest border-b border-emerald-500/20 pb-1.5 mb-2 flex items-center gap-1.5">
+                   <i data-lucide="arrow-down-left" class="w-3.5 h-3.5"></i> Kalkulasi Pemasukan
+                 </p>
+                 <div class="space-y-1.5 text-[10px]">
+                   <div class="flex justify-between items-center text-slate-300">
+                     <span>Total Uang Masuk (Kotor)</span>
+                     <span class="font-mono">${formatRupiah(totalMasuk)}</span>
+                   </div>
+                   <div class="flex justify-between items-center text-slate-400/80">
+                     <span>Transfer/Mutasi Masuk</span>
+                     <span class="font-mono text-rose-300/80">- ${formatRupiah(tfMasuk)}</span>
+                   </div>
+                   <!-- Baris visual Refund ditambahkan di sini agar hitungan ke bawahnya logis -->
+                   <div class="flex justify-between items-center text-slate-400/80">
+                     <span>Refund / Batal Transaksi</span>
+                     <span class="font-mono text-rose-300/80">- ${formatRupiah(pengembalianDana)}</span>
+                   </div>
+                   <div class="flex justify-between items-center text-emerald-400 font-bold border-t border-slate-700/50 pt-2 mt-1.5">
+                     <span class="uppercase">Real Pemasukan</span>
+                     <span class="font-mono text-[12px]">${formatRupiah(realMasuk)}</span>
+                   </div>
+                 </div>
                </div>
-               <div>
-                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Pengeluaran (-)</p>
-                 <p class="text-sm font-bold text-rose-400">${formatRupiah(totalKeluar)}</p>
+
+               <!-- 2. BLOK KALKULASI UANG KELUAR -->
+               <div class="bg-slate-800/60 rounded-xl p-3 border border-rose-500/20 shadow-sm">
+                 <p class="text-[9px] font-bold text-rose-400 uppercase tracking-widest border-b border-rose-500/20 pb-1.5 mb-2 flex items-center gap-1.5">
+                   <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i> Kalkulasi Pengeluaran
+                 </p>
+                 <div class="space-y-1.5 text-[10px]">
+                   <div class="flex justify-between items-center text-slate-300">
+                     <span>Total Uang Keluar (Kotor)</span>
+                     <span class="font-mono">${formatRupiah(totalKeluar)}</span>
+                   </div>
+                   <div class="flex justify-between items-center text-slate-400/80">
+                     <span>Transfer/Mutasi Keluar</span>
+                     <span class="font-mono text-amber-300/80">- ${formatRupiah(tfKeluar)}</span>
+                   </div>
+                   <!-- Baris visual Refund di Pengeluaran -->
+                   <div class="flex justify-between items-center text-slate-400/80">
+                     <span>Refund / Batal Transaksi</span>
+                     <span class="font-mono text-amber-300/80">- ${formatRupiah(pengembalianDana)}</span>
+                   </div>
+                   <div class="flex justify-between items-center text-rose-400 font-bold border-t border-slate-700/50 pt-2 mt-1.5">
+                     <span class="uppercase">Real Pengeluaran</span>
+                     <span class="font-mono text-[12px]">${formatRupiah(realKeluar)}</span>
+                   </div>
+                 </div>
                </div>
+               
              </div>
-           </div>
+               
+             </div>
         </div>
 
         <!-- Rincian Kategori -->
