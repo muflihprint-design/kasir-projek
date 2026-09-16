@@ -384,21 +384,39 @@ let localUpdatedTransactions = new Set();
 let activeTab = 'penjualan'; 
 let pendingRiwayatUpdate = false; // Tambahkan variabel ini
 
-// Fungsi untuk mengirim log ke Supabase setiap terjadi transaksi
-function logKasirToSupabase(trxId, jobName, msg) {
+async function logKasirToSupabase(trxId, jobName, msg) {
   if (!trxId || trxId === "-") return;
+  
+  // Tandai transaksi ini berasal dari perangkat lokal
   localUpdatedTransactions.add(trxId);
   
-  supabaseClient.from('log_notifikasi_telegram').insert([{
-     keterangan_event: "TRANSAKSI KASIR",
-     nomor_pesanan: trxId,
-     nama_pekerjaan: jobName || "-",
-     isi_pesan: msg || "Aktivitas via Aplikasi Kasir"
-  }]).then(() => {
-     console.log("Log transaksi kasir terkirim ke Supabase.");
-  }).catch(err => {
-     console.error("Gagal mengirim log ke Supabase:", err);
-  });
+  try {
+    // 1. Ambil data saldo terbaru dari Google Apps Script (Backend)
+    const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
+    const data = await res.json();
+
+    // 2. Ekstrak data saldo menjadi angka
+    const muflihVal = Number(data.cashMuflih) || 0;
+    const viVal = Number(data.cashVi) || 0;
+    const bankVal = Number(data.bank) || 0;
+    const bndhraVal = Number(data.bendahara) || 0;
+
+    // 3. Kirim log event beserta kolom saldo ke Supabase
+    await supabaseClient.from('log_notifikasi_telegram').insert([{
+       keterangan_event: "TRANSAKSI KASIR",
+       nomor_pesanan: trxId,
+       nama_pekerjaan: jobName || "-",
+       isi_pesan: msg || "Aktivitas via Aplikasi Kasir",
+       saldo_muflih: muflihVal,
+       saldo_vi: viVal,
+       saldo_bank: bankVal,
+       saldo_bendahara: bndhraVal
+    }]);
+    
+    console.log("Log transaksi & saldo terbaru terkirim ke Supabase.");
+  } catch (err) {
+     console.error("Gagal mengirim log & saldo ke Supabase:", err);
+  }
 }
 
 function setupSupabaseRealtime() {
@@ -409,32 +427,47 @@ function setupSupabaseRealtime() {
       { event: 'INSERT', schema: 'public', table: 'log_notifikasi_telegram' },
       (payload) => {
         // --- 1. FILTER APLIKASI ---
-        // Cek apakah event ini benar-benar dari aplikasi kasir
         if (payload.new.keterangan_event !== "TRANSAKSI KASIR") {
-          return; // Abaikan dan hentikan proses jika ini dari OrderFlow/Aplikasi lain
+          return; 
         }
 
         const trxId = payload.new.nomor_pesanan;
 
         // --- 2. FILTER PERANGKAT ---
-        // Abaikan pembaruan jika transaksi berasal dari perangkat (browser) kita sendiri
         if (localUpdatedTransactions.has(trxId)) {
           localUpdatedTransactions.delete(trxId);
           return;
         }
 
-        // --- 3. EKSEKUSI PEMBARUAN ---
-        // FITUR BARU: Selalu perbarui saldo di header secara realtime apa pun tab yang sedang aktif
-        refreshData(); 
+        // --- 3. EKSEKUSI PEMBARUAN SALDO SECARA INSTAN ---
+        // Deteksi apakah data saldo disisipkan dalam log Telegram
+        if (payload.new.saldo_muflih !== null && payload.new.saldo_muflih !== undefined) {
+            const muflihVal = Number(payload.new.saldo_muflih);
+            const viVal = Number(payload.new.saldo_vi);
+            const bankVal = Number(payload.new.saldo_bank);
+            const bndhraVal = Number(payload.new.saldo_bendahara);
+            const kasirTotal = muflihVal + viVal + bankVal;
 
-        // Logika pembaruan riwayat berdasarkan tab yang aktif
+            // Suntikkan langsung ke UI menggunakan formatRupiah bawaan sistem
+            document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
+            document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
+            document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
+            document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
+            document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
+            
+            console.log('Saldo diperbarui seketika dari payload Supabase.');
+        } else {
+            // Fallback: Jika tidak ada data saldo (kompatibilitas log lawas), tarik dari server
+            refreshData(); 
+        }
+
+        // --- 4. PEMBARUAN TAB RIWAYAT ---
         if (activeTab === 'riwayat') {
-          console.log('Perubahan Kasir terdeteksi via Supabase. Memuat ulang riwayat & saldo...');
+          console.log('Ada transaksi baru. Memuat ulang daftar riwayat...');
           fetchTransactions(currentFilter);
         } else {
-          // Jika sedang di tab lain, tandai bahwa ada pembaruan riwayat yang belum dimuat
           pendingRiwayatUpdate = true;
-          console.log('Ada transaksi kasir baru. Saldo diperbarui, menunggu pindah ke tab riwayat...');
+          console.log('Ada transaksi baru, menunggu user pindah ke tab riwayat...');
         }
       }
     )
