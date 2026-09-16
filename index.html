@@ -384,21 +384,12 @@ let localUpdatedTransactions = new Set();
 let activeTab = 'penjualan'; 
 let pendingRiwayatUpdate = false; // Tambahkan variabel ini
 
-// Fungsi untuk mengirim log ke Supabase setiap terjadi transaksi
 function logKasirToSupabase(trxId, jobName, msg) {
+  // Hanya simpan ID ke memory lokal untuk filter realtime Supabase
   if (!trxId || trxId === "-") return;
   localUpdatedTransactions.add(trxId);
   
-  supabaseClient.from('log_notifikasi_telegram').insert([{
-     keterangan_event: "TRANSAKSI KASIR",
-     nomor_pesanan: trxId,
-     nama_pekerjaan: jobName || "-",
-     isi_pesan: msg || "Aktivitas via Aplikasi Kasir"
-  }]).then(() => {
-     console.log("Log transaksi kasir terkirim ke Supabase.");
-  }).catch(err => {
-     console.error("Gagal mengirim log ke Supabase:", err);
-  });
+  console.log("Log ke Supabase sekarang ditangani oleh Backend Google Apps Script.");
 }
 
 function setupSupabaseRealtime() {
