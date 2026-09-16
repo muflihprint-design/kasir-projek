@@ -419,59 +419,164 @@ async function logKasirToSupabase(trxId, jobName, msg) {
   }
 }
 
+async function broadcastNewTransaction(trxData) {
+  if (!trxData || !trxData.id) return;
+  // Tandai ID ini agar perangkat kita sendiri tidak terkena pantulan data (loop)
+  localUpdatedTransactions.add(trxData.id); 
+  
+  try {
+    // 1. Ambil saldo terbaru
+    const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
+    const bal = await res.json();
+
+    // Pastikan formatnya array (mendukung pembayaran multi utang/piutang sekaligus)
+    const itemsToInsert = Array.isArray(trxData) ? trxData : [trxData];
+    
+    // 2. Tembakkan rincian lengkap ke tabel Supabase baru
+    for (const t of itemsToInsert) {
+       await supabaseClient.from('log_sinkronisasi_kasir').insert([{
+         trx_id: t.id,
+         waktu: t.waktu || '',
+         tipe: t.tipe || '',
+         kat: t.kat || '',
+         sub: t.sub || '',
+         ket: t.ket || '',
+         detail: typeof t.detail === 'string' ? t.detail : JSON.stringify(t.detail || []),
+         masuk: Number(t.masuk) || 0,
+         keluar: Number(t.keluar) || 0,
+         diskon: Number(t.diskon) || 0,
+         metode: t.metode || '',
+         revisi: t.revisi || '',
+         ket_selesai: t.ketSelesai || '',
+         saldo_muflih: Number(bal.cashMuflih) || 0,
+         saldo_vi: Number(bal.cashVi) || 0,
+         saldo_bank: Number(bal.bank) || 0,
+         saldo_bendahara: Number(bal.bendahara) || 0
+       }]);
+    }
+  } catch (err) {
+     console.error("Gagal broadcast sinkronisasi: ", err);
+  }
+}
+
 function setupSupabaseRealtime() {
+  
+  // LISTENER 1: Tangkap Transaksi Baru (Injeksi Tanpa Bebani GAS)
   supabaseClient
-    .channel('tabel-notifikasi-kasir')
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'log_notifikasi_telegram' },
-      (payload) => {
-        // --- 1. FILTER APLIKASI ---
-        if (payload.new.keterangan_event !== "TRANSAKSI KASIR") {
-          return; 
-        }
+    .channel('tabel-sinkronisasi')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_sinkronisasi_kasir' }, (payload) => {
+        const data = payload.new;
+        const trxId = data.trx_id;
 
-        const trxId = payload.new.nomor_pesanan;
-
-        // --- 2. FILTER PERANGKAT ---
+        // Abaikan jika ini dikirim oleh perangkat kita sendiri
         if (localUpdatedTransactions.has(trxId)) {
-          localUpdatedTransactions.delete(trxId);
-          return;
+            localUpdatedTransactions.delete(trxId);
+            return;
         }
 
-        // --- 3. EKSEKUSI PEMBARUAN SALDO SECARA INSTAN ---
-        // Deteksi apakah data saldo disisipkan dalam log Telegram
-        if (payload.new.saldo_muflih !== null && payload.new.saldo_muflih !== undefined) {
-            const muflihVal = Number(payload.new.saldo_muflih);
-            const viVal = Number(payload.new.saldo_vi);
-            const bankVal = Number(payload.new.saldo_bank);
-            const bndhraVal = Number(payload.new.saldo_bendahara);
+        // --- 1. UPDATE SALDO SECARA INSTAN ---
+        const muflihVal = Number(data.saldo_muflih);
+        const viVal = Number(data.saldo_vi);
+        const bankVal = Number(data.saldo_bank);
+        const bndhraVal = Number(data.saldo_bendahara);
+        const kasirTotal = muflihVal + viVal + bankVal;
+
+        document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
+        document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
+        document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
+        document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
+        document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
+
+        // --- 2. LOGIKA FILTER TANGGAL (Permintaan Anda) ---
+        const trxDate = (data.waktu || "").split(' ')[0]; // Ambil YYYY-MM-DD-nya saja
+        let isIncluded = false;
+
+        if (currentFilter === 'today' || currentFilter === 'month' || currentFilter === 'all') {
+            // Karena ini transaksi riil yang baru saja terjadi hari ini, 
+            // maka pasti masuk ke dalam filter "Hari ini", "Bulan Ini", atau "Semua"
+            isIncluded = true;
+        } else if (currentFilter === 'custom') {
+            // Cek apakah tanggal transaksi ini masuk ke dalam rentang filter "Custom"
+            const ds = document.getElementById('f-date-start').value;
+            const de = document.getElementById('f-date-end').value;
+            if (trxDate >= ds && trxDate <= de) {
+                isIncluded = true;
+            }
+        }
+
+        // --- 3. INJEKSI KE MEMORI LOKAL ---
+        if (isIncluded && typeof allTransactions !== 'undefined') {
+            const objToInject = {
+                id: data.trx_id,
+                waktu: data.waktu,
+                tipe: data.tipe,
+                kat: data.kat,
+                sub: data.sub,
+                ket: data.ket,
+                detail: data.detail,
+                masuk: Number(data.masuk),
+                keluar: Number(data.keluar),
+                diskon: Number(data.diskon),
+                metode: data.metode,
+                revisi: data.revisi,
+                ketSelesai: data.ket_selesai
+            };
+
+            // Masukkan data baru ke urutan paling atas tanpa menyentuh Google Apps Script!
+            allTransactions.unshift(objToInject);
+
+            if (activeTab === 'riwayat') {
+                renderTransactions(); // Refresh layar riwayat seketika!
+            } else {
+                // Hapus status pending agar saat ia buka tab riwayat, tidak terjadi loading ke server
+                pendingRiwayatUpdate = false; 
+            }
+            console.log(`Transaksi ${trxId} diinjeksi ke riwayat seketika!`);
+        } else {
+            console.log(`Transaksi ${trxId} disembunyikan karena berada di luar filter tanggal.`);
+        }
+    })
+    .subscribe();
+
+ // LISTENER 2: Menangkap notifikasi Hapus/Cancel/Revisi dari log_notifikasi_telegram
+  supabaseClient
+    .channel('tabel-notifikasi')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_notifikasi_telegram' }, (payload) => {
+        const data = payload.new;
+        const trxId = data.nomor_pesanan;
+
+        // Abaikan jika ini dikirim oleh perangkat kita sendiri
+        if (localUpdatedTransactions.has(trxId)) {
+            localUpdatedTransactions.delete(trxId);
+            return;
+        }
+
+        // --- UPDATE SALDO INSTAN UNTUK AKSI HAPUS/BATAL ---
+        // Kita manfaatkan saldo yang dibawa oleh log_notifikasi_telegram
+        if (data.saldo_muflih !== null && data.saldo_muflih !== undefined) {
+            const muflihVal = Number(data.saldo_muflih);
+            const viVal = Number(data.saldo_vi);
+            const bankVal = Number(data.saldo_bank);
+            const bndhraVal = Number(data.saldo_bendahara);
             const kasirTotal = muflihVal + viVal + bankVal;
 
-            // Suntikkan langsung ke UI menggunakan formatRupiah bawaan sistem
             document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
             document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
             document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
             document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
             document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
             
-            console.log('Saldo diperbarui seketika dari payload Supabase.');
-        } else {
-            // Fallback: Jika tidak ada data saldo (kompatibilitas log lawas), tarik dari server
-            refreshData(); 
+            console.log(`Saldo di-update seketika karena ada aksi Hapus/Batal pada ${trxId}`);
         }
 
-        // --- 4. PEMBARUAN TAB RIWAYAT ---
+        // --- TARIK ULANG RIWAYAT DARI SERVER ---
+        // Karena ini adalah perubahan data lama (hapus/batal), kita tetap harus fetch ke GAS
         if (activeTab === 'riwayat') {
-          console.log('Ada transaksi baru. Memuat ulang daftar riwayat...');
-          fetchTransactions(currentFilter);
+            fetchTransactions(currentFilter);
         } else {
-          pendingRiwayatUpdate = true;
-          console.log('Ada transaksi baru, menunggu user pindah ke tab riwayat...');
+            pendingRiwayatUpdate = true;
         }
-      }
-    )
-    .subscribe();
+    }).subscribe();
 }
 
 // Panggil fungsi ini saat halaman selesai dimuat (bisa disisipkan di DOMContentLoaded)
@@ -3520,7 +3625,7 @@ window.selectProduct = selectProduct;
 
     const result = await response.json();
 
-    if (result.status === 'success') {
+   if (result.status === 'success') {
       let newTrxId = "-";
       let newTrxName = "-";
 
@@ -3536,15 +3641,24 @@ window.selectProduct = selectProduct;
         }
       }
 
-      // MODIFIKASI: Kirim trigger Supabase
+      // ---------------------------------------------------------
+      // KEDUA FUNGSI INI BERJALAN BERSAMAAN SEBAGAI TIM GANDA
+      // ---------------------------------------------------------
+      
+      // 1. TAMBAHAN BARU: Broadcast rincian lengkap ke perangkat lain (Injeksi UI)
+      if (result.data) {
+         broadcastNewTransaction(result.data);
+      }
+
+      // 2. TETAP DIPERTAHANKAN: Kirim log ringkas untuk trigger Bot Telegram & Refresh Saldo
       logKasirToSupabase(newTrxId, newTrxName, "Transaksi / Update Baru");
       
-      // ... Lanjutan kode runScript bawaan Anda
+      // ---------------------------------------------------------
 
       // Reset flag agar fetch selanjutnya mengambil data terbaru
       isTodayDataLoaded = false;
-isMonthDataLoaded = false;
-isFullDataLoaded = false;
+      isMonthDataLoaded = false;
+      isFullDataLoaded = false;
 
       // Berikan feedback instan tanpa menunggu 1.2 detik penuh
       showLoading(false);
@@ -3558,7 +3672,7 @@ isFullDataLoaded = false;
       fetchMasterStock();
     } else {
       throw new Error(result.message || "Gagal menyimpan");
-    }
+    } 
 
   } catch (err) {
     showLoading(false);
