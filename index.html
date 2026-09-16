@@ -384,38 +384,54 @@ let localUpdatedTransactions = new Set();
 let activeTab = 'penjualan'; 
 let pendingRiwayatUpdate = false; // Tambahkan variabel ini
 
-async function logKasirToSupabase(trxId, jobName, msg) {
-  if (!trxId || trxId === "-") return;
-  
-  // Tandai transaksi ini berasal dari perangkat lokal
+async function logKasirToSupabase(trxDataOrId, keteranganEvent, namaPekerjaan, isiPesan) {
+  if (!trxDataOrId || trxDataOrId === "-") return;
+
+  // Tentukan apakah parameter pertama adalah objek (Transaksi Baru) atau string ID (Batal/Hapus)
+  const isObject = typeof trxDataOrId === 'object' && trxDataOrId !== null;
+  const trxId = isObject ? trxDataOrId.id : trxDataOrId;
+
+  // Tandai agar perangkat sendiri tidak memproses ulang data ini
   localUpdatedTransactions.add(trxId);
   
   try {
-    // 1. Ambil data saldo terbaru dari Google Apps Script (Backend)
+    // 1. Ambil saldo terbaru dari Google Apps Script
     const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
-    const data = await res.json();
+    const bal = await res.json();
 
-    // 2. Ekstrak data saldo menjadi angka
-    const muflihVal = Number(data.cashMuflih) || 0;
-    const viVal = Number(data.cashVi) || 0;
-    const bankVal = Number(data.bank) || 0;
-    const bndhraVal = Number(data.bendahara) || 0;
+    // 2. Siapkan data baris yang akan dikirim
+    const rowData = {
+      keterangan_event: keteranganEvent,
+      nomor_pesanan: trxId,
+      nama_pekerjaan: namaPekerjaan || "-",
+      isi_pesan: isiPesan || "Aktivitas via Aplikasi Kasir",
+      
+      // Jika isObject true (Transaksi Baru), masukkan rincian. Jika false, kosongkan.
+      waktu: isObject ? (trxDataOrId.waktu || '') : '',
+      tipe: isObject ? (trxDataOrId.tipe || '') : '',
+      kat: isObject ? (trxDataOrId.kat || '') : '',
+      sub: isObject ? (trxDataOrId.sub || '') : '',
+      detail: isObject ? (typeof trxDataOrId.detail === 'string' ? trxDataOrId.detail : JSON.stringify(trxDataOrId.detail || [])) : '',
+      masuk: isObject ? (Number(trxDataOrId.masuk) || 0) : 0,
+      keluar: isObject ? (Number(trxDataOrId.keluar) || 0) : 0,
+      diskon: isObject ? (Number(trxDataOrId.diskon) || 0) : 0,
+      metode: isObject ? (trxDataOrId.metode || '') : '',
+      revisi: isObject ? (trxDataOrId.revisi || '') : '',
+      ket_selesai: isObject ? (trxDataOrId.ketSelesai || '') : '',
 
-    // 3. Kirim log event beserta kolom saldo ke Supabase
-    await supabaseClient.from('log_notifikasi_telegram').insert([{
-       keterangan_event: "TRANSAKSI KASIR",
-       nomor_pesanan: trxId,
-       nama_pekerjaan: jobName || "-",
-       isi_pesan: msg || "Aktivitas via Aplikasi Kasir",
-       saldo_muflih: muflihVal,
-       saldo_vi: viVal,
-       saldo_bank: bankVal,
-       saldo_bendahara: bndhraVal
-    }]);
-    
-    console.log("Log transaksi & saldo terbaru terkirim ke Supabase.");
+      // Saldo Terkini
+      saldo_muflih: Number(bal.cashMuflih) || 0,
+      saldo_vi: Number(bal.cashVi) || 0,
+      saldo_bank: Number(bal.bank) || 0,
+      saldo_bendahara: Number(bal.bendahara) || 0
+    };
+
+    // 3. Tembakkan ke tabel tunggal Supabase
+    await supabaseClient.from('log_sinkronisasi_kasir').insert([rowData]);
+    console.log(`Log ${keteranganEvent} berhasil dikirim ke Supabase.`);
+
   } catch (err) {
-     console.error("Gagal mengirim log & saldo ke Supabase:", err);
+    console.error("Gagal mengirim log & sinkronisasi: ", err);
   }
 }
 
@@ -460,88 +476,9 @@ async function broadcastNewTransaction(trxData) {
 }
 
 function setupSupabaseRealtime() {
-  
-  // LISTENER 1: Tangkap Transaksi Baru (Injeksi Tanpa Bebani GAS)
   supabaseClient
-    .channel('tabel-sinkronisasi')
+    .channel('tabel-master-sinkronisasi')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_sinkronisasi_kasir' }, (payload) => {
-        const data = payload.new;
-        const trxId = data.trx_id;
-
-        // Abaikan jika ini dikirim oleh perangkat kita sendiri
-        if (localUpdatedTransactions.has(trxId)) {
-            localUpdatedTransactions.delete(trxId);
-            return;
-        }
-
-        // --- 1. UPDATE SALDO SECARA INSTAN ---
-        const muflihVal = Number(data.saldo_muflih);
-        const viVal = Number(data.saldo_vi);
-        const bankVal = Number(data.saldo_bank);
-        const bndhraVal = Number(data.saldo_bendahara);
-        const kasirTotal = muflihVal + viVal + bankVal;
-
-        document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
-        document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
-        document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
-        document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
-        document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
-
-        // --- 2. LOGIKA FILTER TANGGAL (Permintaan Anda) ---
-        const trxDate = (data.waktu || "").split(' ')[0]; // Ambil YYYY-MM-DD-nya saja
-        let isIncluded = false;
-
-        if (currentFilter === 'today' || currentFilter === 'month' || currentFilter === 'all') {
-            // Karena ini transaksi riil yang baru saja terjadi hari ini, 
-            // maka pasti masuk ke dalam filter "Hari ini", "Bulan Ini", atau "Semua"
-            isIncluded = true;
-        } else if (currentFilter === 'custom') {
-            // Cek apakah tanggal transaksi ini masuk ke dalam rentang filter "Custom"
-            const ds = document.getElementById('f-date-start').value;
-            const de = document.getElementById('f-date-end').value;
-            if (trxDate >= ds && trxDate <= de) {
-                isIncluded = true;
-            }
-        }
-
-        // --- 3. INJEKSI KE MEMORI LOKAL ---
-        if (isIncluded && typeof allTransactions !== 'undefined') {
-            const objToInject = {
-                id: data.trx_id,
-                waktu: data.waktu,
-                tipe: data.tipe,
-                kat: data.kat,
-                sub: data.sub,
-                ket: data.ket,
-                detail: data.detail,
-                masuk: Number(data.masuk),
-                keluar: Number(data.keluar),
-                diskon: Number(data.diskon),
-                metode: data.metode,
-                revisi: data.revisi,
-                ketSelesai: data.ket_selesai
-            };
-
-            // Masukkan data baru ke urutan paling atas tanpa menyentuh Google Apps Script!
-            allTransactions.unshift(objToInject);
-
-            if (activeTab === 'riwayat') {
-                renderTransactions(); // Refresh layar riwayat seketika!
-            } else {
-                // Hapus status pending agar saat ia buka tab riwayat, tidak terjadi loading ke server
-                pendingRiwayatUpdate = false; 
-            }
-            console.log(`Transaksi ${trxId} diinjeksi ke riwayat seketika!`);
-        } else {
-            console.log(`Transaksi ${trxId} disembunyikan karena berada di luar filter tanggal.`);
-        }
-    })
-    .subscribe();
-
- // LISTENER 2: Menangkap notifikasi Hapus/Cancel/Revisi dari log_notifikasi_telegram
-  supabaseClient
-    .channel('tabel-notifikasi')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_notifikasi_telegram' }, (payload) => {
         const data = payload.new;
         const trxId = data.nomor_pesanan;
 
@@ -551,8 +488,7 @@ function setupSupabaseRealtime() {
             return;
         }
 
-        // --- UPDATE SALDO INSTAN UNTUK AKSI HAPUS/BATAL ---
-        // Kita manfaatkan saldo yang dibawa oleh log_notifikasi_telegram
+        // --- 1. SELALU UPDATE SALDO INSTAN ---
         if (data.saldo_muflih !== null && data.saldo_muflih !== undefined) {
             const muflihVal = Number(data.saldo_muflih);
             const viVal = Number(data.saldo_vi);
@@ -565,18 +501,53 @@ function setupSupabaseRealtime() {
             document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
             document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
             document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
-            
-            console.log(`Saldo di-update seketika karena ada aksi Hapus/Batal pada ${trxId}`);
         }
 
-        // --- TARIK ULANG RIWAYAT DARI SERVER ---
-        // Karena ini adalah perubahan data lama (hapus/batal), kita tetap harus fetch ke GAS
-        if (activeTab === 'riwayat') {
-            fetchTransactions(currentFilter);
-        } else {
-            pendingRiwayatUpdate = true;
+        // --- 2. ROUTING LOGIKA BERDASARKAN EVENT ---
+        if (data.keterangan_event === "TRANSAKSI BARU") {
+            // FILTER TANGGAL SEBELUM INJEKSI
+            const trxDate = (data.waktu || "").split(' ')[0]; 
+            let isIncluded = false;
+
+            if (currentFilter === 'today' || currentFilter === 'month' || currentFilter === 'all') {
+                isIncluded = true;
+            } else if (currentFilter === 'custom') {
+                const ds = document.getElementById('f-date-start').value;
+                const de = document.getElementById('f-date-end').value;
+                if (trxDate >= ds && trxDate <= de) isIncluded = true;
+            }
+
+            if (isIncluded && typeof allTransactions !== 'undefined') {
+                const objToInject = {
+                    id: data.nomor_pesanan,
+                    waktu: data.waktu,
+                    tipe: data.tipe,
+                    kat: data.kat,
+                    sub: data.sub,
+                    ket: data.nama_pekerjaan, // Mengambil dari nama pekerjaan/ket
+                    detail: data.detail,
+                    masuk: Number(data.masuk),
+                    keluar: Number(data.keluar),
+                    diskon: Number(data.diskon),
+                    metode: data.metode,
+                    revisi: data.revisi,
+                    ketSelesai: data.ket_selesai
+                };
+
+                // Injeksi instan
+                allTransactions.unshift(objToInject);
+                if (activeTab === 'riwayat') renderTransactions(); 
+                else pendingRiwayatUpdate = false; 
+            }
+        } 
+        else {
+            // JIKA EVENT ADALAH HAPUS, BATAL, ATAU REVISI
+            // Karena data berubah, paksa fetch ke server Google Sheets agar aman
+            if (activeTab === 'riwayat') fetchTransactions(currentFilter);
+            else pendingRiwayatUpdate = true;
         }
-    }).subscribe();
+    })
+    .subscribe();
 }
 
 // Panggil fungsi ini saat halaman selesai dimuat (bisa disisipkan di DOMContentLoaded)
@@ -3625,52 +3596,23 @@ window.selectProduct = selectProduct;
 
     const result = await response.json();
 
-   if (result.status === 'success') {
-      let newTrxId = "-";
-      let newTrxName = "-";
-
-      if (result.data && typeof allTransactions !== 'undefined') {
+  if (result.data && typeof allTransactions !== 'undefined') {
         if (Array.isArray(result.data)) {
           result.data.reverse().forEach(d => allTransactions.unshift(d));
           newTrxId = result.data[0].id || "-";
           newTrxName = "Operasional Multi";
+          
+          // Kirim data lengkap (Objek pertama dari array)
+          logKasirToSupabase(result.data[0], "TRANSAKSI BARU", newTrxName, "Transaksi / Update Baru");
         } else {
           allTransactions.unshift(result.data);
           newTrxId = result.data.id || "-";
           newTrxName = result.data.ket || "-";
+          
+          // Kirim data lengkap (Objek tunggal)
+          logKasirToSupabase(result.data, "TRANSAKSI BARU", newTrxName, "Transaksi / Update Baru");
         }
-      }
-
-      // ---------------------------------------------------------
-      // KEDUA FUNGSI INI BERJALAN BERSAMAAN SEBAGAI TIM GANDA
-      // ---------------------------------------------------------
-      
-      // 1. TAMBAHAN BARU: Broadcast rincian lengkap ke perangkat lain (Injeksi UI)
-      if (result.data) {
-         broadcastNewTransaction(result.data);
-      }
-
-      // 2. TETAP DIPERTAHANKAN: Kirim log ringkas untuk trigger Bot Telegram & Refresh Saldo
-      logKasirToSupabase(newTrxId, newTrxName, "Transaksi / Update Baru");
-      
-      // ---------------------------------------------------------
-
-      // Reset flag agar fetch selanjutnya mengambil data terbaru
-      isTodayDataLoaded = false;
-      isMonthDataLoaded = false;
-      isFullDataLoaded = false;
-
-      // Berikan feedback instan tanpa menunggu 1.2 detik penuh
-      showLoading(false);
-      if (btn) btn.disabled = false;
-      
-      // Pindah ke tab riwayat agar user melihat datanya sudah masuk
-      changeTab('riwayat');
-      
-      // Refresh background data
-      refreshData();
-      fetchMasterStock();
-    } else {
+      } else {
       throw new Error(result.message || "Gagal menyimpan");
     } 
 
