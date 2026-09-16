@@ -384,18 +384,25 @@ let localUpdatedTransactions = new Set();
 let activeTab = 'penjualan'; 
 let pendingRiwayatUpdate = false; // Tambahkan variabel ini
 
-// Fungsi untuk mengirim log ke Supabase setiap terjadi transaksi
-function logKasirToSupabase(trxId, jobName, msg) {
+// Tambahkan parameter ke-4: balancesPayload
+function logKasirToSupabase(trxId, jobName, msg, balancesPayload) {
   if (!trxId || trxId === "-") return;
   localUpdatedTransactions.add(trxId);
   
-  supabaseClient.from('log_notifikasi_telegram').insert([{
+  const payloadToSupabase = {
      keterangan_event: "TRANSAKSI KASIR",
      nomor_pesanan: trxId,
      nama_pekerjaan: jobName || "-",
      isi_pesan: msg || "Aktivitas via Aplikasi Kasir"
-  }]).then(() => {
-     console.log("Log transaksi kasir terkirim ke Supabase.");
+  };
+
+  // Jika ada titipan data saldo, masukkan ke kolom baru Supabase
+  if (balancesPayload) {
+     payloadToSupabase.saldo_terkini = balancesPayload; 
+  }
+
+  supabaseClient.from('log_notifikasi_telegram').insert([payloadToSupabase]).then(() => {
+     console.log("Log & Saldo terkirim ke Supabase.");
   }).catch(err => {
      console.error("Gagal mengirim log ke Supabase:", err);
   });
@@ -423,9 +430,11 @@ function setupSupabaseRealtime() {
           return;
         }
 
-        // --- 3. EKSEKUSI PEMBARUAN ---
-        // FITUR BARU: Selalu perbarui saldo di header secara realtime apa pun tab yang sedang aktif
-        refreshData(); 
+        if (payload.new.saldo_terkini) {
+           updateSaldoUI(payload.new.saldo_terkini);
+        } else {
+           refreshData(); 
+        } 
 
         // Logika pembaruan riwayat berdasarkan tab yang aktif
         if (activeTab === 'riwayat') {
@@ -785,38 +794,6 @@ function showBalanceLoading(isLoading) {
         </div>
       </div>
     `;
-  }
-}
-
-async function refreshData() {
-  showBalanceLoading(true);
-  try {
-    const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
-    const data = await res.json();
-    showBalanceLoading(false);
-
-    if (data.version) {
-      window.currentBackendVersion = data.version;
-      const versionEl = document.getElementById('app-version-display');
-      if (versionEl) versionEl.innerText = data.version;
-    }
-
-    const muflihVal = Number(data.cashMuflih) || 0;
-    const viVal = Number(data.cashVi) || 0;
-    const bankVal = Number(data.bank) || 0;
-    const bndhraVal = Number(data.bendahara) || 0;
-    const kasirTotal = muflihVal + viVal + bankVal;
-
-    document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
-    document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
-    // Kita hapus tulisan "Rp" agar muat di layar HP, misal: "M: 1.500.000"
-    document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
-    document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
-    document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
-
-  } catch (e) {
-    console.error("Gagal refresh data:", e);
-    showBalanceLoading(false);
   }
 }
 
@@ -3503,10 +3480,14 @@ window.selectProduct = selectProduct;
         }
       }
 
-      // MODIFIKASI: Kirim trigger Supabase
-      logKasirToSupabase(newTrxId, newTrxName, "Transaksi / Update Baru");
-      
-      // ... Lanjutan kode runScript bawaan Anda
+    // Ambil data saldo yang dikirim dari Backend Google Apps Script
+      const saldoTerbaru = result.balances; 
+
+      // Update layar perangkat ini SECARA INSTAN
+      if (saldoTerbaru) updateSaldoUI(saldoTerbaru);
+
+      // Kirim trigger Supabase BESERTA paket saldonya ke perangkat lain
+      logKasirToSupabase(newTrxId, newTrxName, "Transaksi / Update Baru", saldoTerbaru);
 
       // Reset flag agar fetch selanjutnya mengambil data terbaru
       isTodayDataLoaded = false;
@@ -3519,9 +3500,7 @@ isFullDataLoaded = false;
       
       // Pindah ke tab riwayat agar user melihat datanya sudah masuk
       changeTab('riwayat');
-      
-      // Refresh background data
-      refreshData();
+           
       fetchMasterStock();
     } else {
       throw new Error(result.message || "Gagal menyimpan");
@@ -4558,21 +4537,24 @@ async function saveTransfer() {
 
   showLoading(true);
   try {
-    // Catatan: Google Apps Script seringkali membutuhkan mode 'no-cors' atau 
-    // penanganan respon yang tepat agar alert tidak muncul sebagai 'Unexpected Token'
-    const response = await fetch(WEB_APP_URL, { 
+   const response = await fetch(WEB_APP_URL, { 
       method: "POST", 
       body: JSON.stringify(payload) 
     });
- isTodayDataLoaded = false;
-isMonthDataLoaded = false;
-isFullDataLoaded = false;
-    // Memberikan jeda agar sinkronisasi di Google Sheet selesai
-    setTimeout(() => {
-      refreshData();
-      showTransferForm(); 
-      showLoading(false);
-         }, 1500);
+    const result = await response.json(); // Wajib baca response
+
+    isTodayDataLoaded = false;
+    isMonthDataLoaded = false;
+    isFullDataLoaded = false;
+
+    const saldoTerbaru = result.balances;
+    if (saldoTerbaru) updateSaldoUI(saldoTerbaru);
+
+    // Kasih tahu kasir lain
+    logKasirToSupabase(`TRF-${Date.now()}`, "Transfer Saldo", "Transfer antar Kas", saldoTerbaru);
+
+    showTransferForm(); 
+    showLoading(false);
 
   } catch (e) {
     showLoading(false);
@@ -4720,7 +4702,10 @@ window.executeCancel = async function(id) {
       isMonthDataLoaded = false;
       isFullDataLoaded = false;
 
-      logKasirToSupabase(id, "Cancel Order", "Transaksi telah dibatalkan");
+     const saldoTerbaru = result.balances;
+      if (saldoTerbaru) updateSaldoUI(saldoTerbaru);
+
+      logKasirToSupabase(id, "Cancel Order", "Transaksi telah dibatalkan", saldoTerbaru);
       
       // 2. Update langsung data di memori lokal agar seketika berubah
       if (typeof allTransactions !== 'undefined') {
@@ -4731,14 +4716,9 @@ window.executeCancel = async function(id) {
           }
       }
       
-      setTimeout(() => {
-        // 3. Refresh Saldo Kasir di atas
-        refreshData(); 
-        
-        // 4. Tarik ulang data Riwayat dari database
-        if (typeof fetchTransactions === 'function') {
-            fetchTransactions(currentFilter);
-        }
+      if (typeof fetchTransactions === 'function') {
+          fetchTransactions(currentFilter);
+      }
         
         // 5. Update UI menjadi sukses
         document.getElementById('cancel-paste-area').value = '';
@@ -4753,8 +4733,7 @@ window.executeCancel = async function(id) {
             
         showLoading(false);
         refreshIcons('cancel-result-container');
-      }, 1200);
-      
+           
     } else {
         throw new Error(result.error || "Gagal dibatalkan dari server");
     }
@@ -4800,14 +4779,14 @@ window.executeDeleteTransaction = async function(id, alasan) {
       isMonthDataLoaded = false;
       isFullDataLoaded = false;
       
-      logKasirToSupabase(id, "Hapus Transaksi", "Transaksi Dihapus: " + alasan);
-      // Beri waktu Sheet untuk sinkronisasi
-      setTimeout(() => {
-        refreshData();
-        fetchTransactions(currentFilter); // Reload list sesuai filter yg aktif
-        showLoading(false);
-        alert(`Transaksi ${id} berhasil dihapus.`);
-      }, 1000);
+     const saldoTerbaru = result.balances;
+      if (saldoTerbaru) updateSaldoUI(saldoTerbaru);
+
+      logKasirToSupabase(id, "Hapus Transaksi", "Transaksi Dihapus: " + alasan, saldoTerbaru);
+      fetchTransactions(currentFilter);
+      showLoading(false);
+      alert(`Transaksi ${id} berhasil dihapus.`);
+      
     } else {
       throw new Error(result.error || "Gagal dihapus");
     }
@@ -5885,6 +5864,38 @@ window.dismissSalinTooltip = function(tipe, event) {
         if (tooltipM) tooltipM.classList.add('hidden');
     }
 };
+
+// Fungsi khusus untuk merubah angka di layar (Bisa dipanggil dari mana saja)
+function updateSaldoUI(data) {
+  if (!data) return;
+  
+  const muflihVal = Number(data.cashMuflih) || 0;
+  const viVal = Number(data.cashVi) || 0;
+  const bankVal = Number(data.bank) || 0;
+  const bndhraVal = Number(data.bendahara) || 0;
+  const kasirTotal = muflihVal + viVal + bankVal;
+
+  document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
+  document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
+  document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
+  document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
+  document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
+}
+
+// Fungsi fetch hanya untuk saat pertama kali aplikasi dibuka atau fallback
+async function refreshData() {
+  showBalanceLoading(true);
+  try {
+    const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
+    const data = await res.json();
+    
+    updateSaldoUI(data); // Panggil UI perbarui layar
+    showBalanceLoading(false);
+  } catch (e) {
+    console.error("Gagal refresh data:", e);
+    showBalanceLoading(false);
+  }
+}
 
   </script>
   
