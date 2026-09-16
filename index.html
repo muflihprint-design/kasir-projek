@@ -384,18 +384,59 @@ let localUpdatedTransactions = new Set();
 let activeTab = 'penjualan'; 
 let pendingRiwayatUpdate = false; // Tambahkan variabel ini
 
+
+// --- VARIABEL GLOBAL SALDO ---
+let currentBalances = {
+  cashMuflih: 0,
+  cashVi: 0,
+  bank: 0,
+  bendahara: 0
+};
+
+// Fungsi terpusat untuk memperbarui tampilan saldo di UI dan menyimpan state lokal
+function updateBalancesUI(muflihVal, viVal, bankVal, bndhraVal) {
+  currentBalances = {
+    cashMuflih: Number(muflihVal) || 0,
+    cashVi: Number(viVal) || 0,
+    bank: Number(bankVal) || 0,
+    bendahara: Number(bndhraVal) || 0
+  };
+
+  const kasirTotal = currentBalances.cashMuflih + currentBalances.cashVi + currentBalances.bank;
+
+  const elTotal = document.getElementById('saldo-kasir-total');
+  const elBndhra = document.getElementById('saldo-bendahara');
+  const elMuflih = document.getElementById('saldo-cash-muflih');
+  const elVi = document.getElementById('saldo-cash-vi');
+  const elBank = document.getElementById('saldo-rekening');
+
+  if (elTotal) elTotal.innerText = formatRupiah(kasirTotal);
+  if (elBndhra) elBndhra.innerText = formatRupiah(currentBalances.bendahara);
+  if (elMuflih) elMuflih.innerText = currentBalances.cashMuflih.toLocaleString('id-ID');
+  if (elVi) elVi.innerText = currentBalances.cashVi.toLocaleString('id-ID');
+  if (elBank) elBank.innerText = currentBalances.bank.toLocaleString('id-ID');
+}
+
 // Fungsi untuk mengirim log ke Supabase setiap terjadi transaksi
-function logKasirToSupabase(trxId, jobName, msg) {
+function logKasirToSupabase(trxId, jobName, msg, customBalances = null) {
   if (!trxId || trxId === "-") return;
   localUpdatedTransactions.add(trxId);
   
-  supabaseClient.from('log_notifikasi_telegram').insert([{
+  const balancesToSend = customBalances || currentBalances;
+  
+  const insertPayload = {
      keterangan_event: "TRANSAKSI KASIR",
      nomor_pesanan: trxId,
      nama_pekerjaan: jobName || "-",
-     isi_pesan: msg || "Aktivitas via Aplikasi Kasir"
-  }]).then(() => {
-     console.log("Log transaksi kasir terkirim ke Supabase.");
+     isi_pesan: `${msg || "Aktivitas via Aplikasi Kasir"} | SALDO:${JSON.stringify(balancesToSend)}`,
+     saldo_muflih: balancesToSend.cashMuflih,
+     saldo_vi: balancesToSend.cashVi,
+     saldo_bank: balancesToSend.bank,
+     saldo_bendahara: balancesToSend.bendahara
+  };
+  
+  supabaseClient.from('log_notifikasi_telegram').insert([insertPayload]).then(() => {
+     console.log("Log transaksi kasir terkirim ke Supabase beserta data saldo terbaru.");
   }).catch(err => {
      console.error("Gagal mengirim log ke Supabase:", err);
   });
@@ -409,32 +450,56 @@ function setupSupabaseRealtime() {
       { event: 'INSERT', schema: 'public', table: 'log_notifikasi_telegram' },
       (payload) => {
         // --- 1. FILTER APLIKASI ---
-        // Cek apakah event ini benar-benar dari aplikasi kasir
         if (payload.new.keterangan_event !== "TRANSAKSI KASIR") {
-          return; // Abaikan dan hentikan proses jika ini dari OrderFlow/Aplikasi lain
+          return; 
         }
 
         const trxId = payload.new.nomor_pesanan;
 
         // --- 2. FILTER PERANGKAT ---
-        // Abaikan pembaruan jika transaksi berasal dari perangkat (browser) kita sendiri
+        // Abaikan jika transaksi berasal dari perangkat kita sendiri
         if (localUpdatedTransactions.has(trxId)) {
           localUpdatedTransactions.delete(trxId);
           return;
         }
 
-        // --- 3. EKSEKUSI PEMBARUAN ---
-        // FITUR BARU: Selalu perbarui saldo di header secara realtime apa pun tab yang sedang aktif
-        refreshData(); 
+        // --- 3. BACA DATA SALDO DARI SUPABASE (TANPA TUNGGU GOOGLE SHEETS) ---
+        let newBalances = null;
 
-        // Logika pembaruan riwayat berdasarkan tab yang aktif
+        // Opsi A: Ambil dari kolom terpisah (jika ada di tabel Supabase)
+        if (payload.new.saldo_muflih !== undefined && payload.new.saldo_muflih !== null) {
+          newBalances = {
+            cashMuflih: payload.new.saldo_muflih,
+            cashVi: payload.new.saldo_vi,
+            bank: payload.new.saldo_bank,
+            bendahara: payload.new.saldo_bendahara
+          };
+        } 
+        // Opsi B: Parse JSON dari string isi_pesan (Fallback aman)
+        else if (payload.new.isi_pesan && payload.new.isi_pesan.includes('| SALDO:')) {
+          try {
+            const jsonStr = payload.new.isi_pesan.split('| SALDO:')[1];
+            newBalances = JSON.parse(jsonStr);
+          } catch(e) {
+            console.error("Gagal parse data saldo dari pesan Realtime Supabase:", e);
+          }
+        }
+
+        // --- 4. EKSEKUSI PEMBARUAN SALDO DI LAYAR ---
+        if (newBalances) {
+          updateBalancesUI(newBalances.cashMuflih, newBalances.cashVi, newBalances.bank, newBalances.bendahara);
+          console.log("Saldo perangkat diperbarui secara instan via Supabase Realtime.");
+        } else {
+          // Fallback darurat jika payload saldo tidak ditemukan
+          refreshData(); 
+        }
+
+        // Logika pembaruan riwayat transaksi
         if (activeTab === 'riwayat') {
-          console.log('Perubahan Kasir terdeteksi via Supabase. Memuat ulang riwayat & saldo...');
+          console.log('Memuat ulang tabel riwayat...');
           fetchTransactions(currentFilter);
         } else {
-          // Jika sedang di tab lain, tandai bahwa ada pembaruan riwayat yang belum dimuat
           pendingRiwayatUpdate = true;
-          console.log('Ada transaksi kasir baru. Saldo diperbarui, menunggu pindah ke tab riwayat...');
         }
       }
     )
@@ -801,18 +866,7 @@ async function refreshData() {
       if (versionEl) versionEl.innerText = data.version;
     }
 
-    const muflihVal = Number(data.cashMuflih) || 0;
-    const viVal = Number(data.cashVi) || 0;
-    const bankVal = Number(data.bank) || 0;
-    const bndhraVal = Number(data.bendahara) || 0;
-    const kasirTotal = muflihVal + viVal + bankVal;
-
-    document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
-    document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
-    // Kita hapus tulisan "Rp" agar muat di layar HP, misal: "M: 1.500.000"
-    document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
-    document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
-    document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
+    updateBalancesUI(data.cashMuflih, data.cashVi, data.bank, data.bendahara);
 
   } catch (e) {
     console.error("Gagal refresh data:", e);
@@ -3487,43 +3541,37 @@ window.selectProduct = selectProduct;
 
     const result = await response.json();
 
-    if (result.status === 'success') {
-      let newTrxId = "-";
-      let newTrxName = "-";
+    // Di dalam fungsi runScript:
+if (result.status === 'success') {
+  let newTrxId = "-";
+  let newTrxName = "-";
 
-      if (result.data && typeof allTransactions !== 'undefined') {
-        if (Array.isArray(result.data)) {
-          result.data.reverse().forEach(d => allTransactions.unshift(d));
-          newTrxId = result.data[0].id || "-";
-          newTrxName = "Operasional Multi";
-        } else {
-          allTransactions.unshift(result.data);
-          newTrxId = result.data.id || "-";
-          newTrxName = result.data.ket || "-";
-        }
-      }
-
-      // MODIFIKASI: Kirim trigger Supabase
-      logKasirToSupabase(newTrxId, newTrxName, "Transaksi / Update Baru");
-      
-      // ... Lanjutan kode runScript bawaan Anda
-
-      // Reset flag agar fetch selanjutnya mengambil data terbaru
-      isTodayDataLoaded = false;
-isMonthDataLoaded = false;
-isFullDataLoaded = false;
-
-      // Berikan feedback instan tanpa menunggu 1.2 detik penuh
-      showLoading(false);
-      if (btn) btn.disabled = false;
-      
-      // Pindah ke tab riwayat agar user melihat datanya sudah masuk
-      changeTab('riwayat');
-      
-      // Refresh background data
-      refreshData();
-      fetchMasterStock();
+  if (result.data && typeof allTransactions !== 'undefined') {
+    if (Array.isArray(result.data)) {
+      result.data.reverse().forEach(d => allTransactions.unshift(d));
+      newTrxId = result.data[0].id || "-";
+      newTrxName = "Operasional Multi";
     } else {
+      allTransactions.unshift(result.data);
+      newTrxId = result.data.id || "-";
+      newTrxName = result.data.ket || "-";
+    }
+  }
+
+  // Jika backend mengembalikan saldo terbaru di result.balances:
+  if (result.balances) {
+    updateBalancesUI(result.balances.cashMuflih, result.balances.cashVi, result.balances.bank, result.balances.bendahara);
+  }
+
+  // Kirim trigger log Supabase beserta data saldo perangkat transaksi
+  logKasirToSupabase(newTrxId, newTrxName, "Transaksi / Update Baru", currentBalances);
+  
+  showLoading(false);
+  if (btn) btn.disabled = false;
+  
+  changeTab('riwayat');
+  fetchMasterStock();
+} else {
       throw new Error(result.message || "Gagal menyimpan");
     }
 
