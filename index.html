@@ -3449,11 +3449,104 @@ window.selectProduct = selectProduct;
   });
   return itemsData;
 }
+
+// --- FITUR BARU: Kalkulasi Saldo Cepat di Perangkat ---
+function optimisticBalanceUpdate(payload) {
+    if (!payload) return;
+    
+    let masuk = 0;
+    let keluar = 0;
+    let metodeMasuk = "";
+    let metodeKeluar = "";
+
+    const tipe = payload.type;
+    
+    // 1. Penjualan
+    if (tipe === 'PENJUALAN') {
+        masuk = Number(payload.dp) || 0;
+        metodeMasuk = payload.metode;
+    } 
+    // 2. Pembelian
+    else if (tipe === 'PEMBELIAN') {
+        keluar = Number(payload.dp) || 0;
+        metodeKeluar = payload.metode;
+    } 
+    // 3. Operasional / Refund
+    else if (payload.action === 'saveOperasional' || tipe === 'OPERASIONAL' || tipe === 'OPERASIONAL_MULTI' || tipe === 'PENGEMBALIAN_DANA') {
+        if (payload.isRefund === true || tipe === 'PENGEMBALIAN_DANA') {
+            masuk = Number(payload.nominal) || 0;
+            metodeMasuk = payload.metode;
+        } else {
+            if (payload.isBayarNanti !== true) { // Abaikan jika ini utang biaya operasional
+                keluar = payload.nominal ? Number(payload.nominal) : 
+                        (payload.items ? payload.items.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0) : 0);
+                metodeKeluar = payload.metode;
+            }
+        }
+    } 
+    // 4. Bayar Piutang
+    else if (tipe === 'BAYAR_PIUTANG' || tipe === 'BAYAR_PIUTANG_MULTI') {
+        masuk = payload.nominal ? Number(payload.nominal) : 
+                (payload.items ? payload.items.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0) : 0);
+        if (payload.metode !== "Shopee") {
+            metodeMasuk = payload.metode; // Shopee tidak langsung masuk ke dompet kasir fisik
+        } else {
+            masuk = 0;
+        }
+    } 
+    // 5. Bayar Utang
+    else if (tipe === 'BAYAR_UTANG' || tipe === 'BAYAR_UTANG_MULTI') {
+        keluar = payload.nominal ? Number(payload.nominal) : 
+                 (payload.items ? payload.items.reduce((sum, item) => sum + (Number(item.nominal) || 0), 0) : 0);
+        metodeKeluar = payload.metode;
+    } 
+    // 6. Transfer Kas
+    else if (tipe === 'TRANSFER') {
+        const nominal = Number(payload.nominal) || 0;
+        metodeKeluar = payload.dari;
+        keluar = nominal;
+        metodeMasuk = payload.ke;
+        masuk = nominal;
+    }
+    // 7. Penghapusan Transaksi (Membatalkan/memutar balik kas)
+    else if (payload.action === 'deleteTransaction') {
+        const trx = (typeof allTransactions !== 'undefined' ? allTransactions : []).find(t => t.id === payload.trxId);
+        if (trx) {
+            masuk = Number(trx.keluar) || 0; 
+            metodeMasuk = trx.metode;
+            keluar = Number(trx.masuk) || 0; 
+            metodeKeluar = trx.metode;
+        }
+    }
+
+    // Eksekutor Penyesuaian Saldo di Memori
+    const ubahSaldo = (metode, nominal, isMasuk) => {
+        if (!metode || nominal <= 0) return;
+        const nilai = isMasuk ? nominal : -nominal;
+        
+        if (metode === "Cash Muflih Print" || metode === "Cash MUFLIH PRINT" || metode === "Cash") {
+            window.localBalances.cashMuflih += nilai;
+        } else if (metode === "Cash Vi Printing" || metode === "Cash VI PRINTING") {
+            window.localBalances.cashVi += nilai;
+        } else if (metode === "Rekening") {
+            window.localBalances.bank += nilai;
+        } else if (metode === "Kas Bendahara") {
+            window.localBalances.bendahara += nilai;
+        }
+    };
+
+    ubahSaldo(metodeMasuk, masuk, true);
+    ubahSaldo(metodeKeluar, keluar, false);
+
+    // Perbarui layar seketika dengan angka terbaru!
+    updateSaldoUI(window.localBalances);
+}
     
    async function runScript(actionName, payload, stayInTab) {
   const btn = document.querySelector('button[onclick*="save"]');
   if (btn) btn.disabled = true;
   showLoading(true);
+  optimisticBalanceUpdate(payload);
 
   try {
     // HAPUS mode: "no-cors" agar bisa membaca respon JSON
@@ -4764,6 +4857,7 @@ window.executeDeleteTransaction = async function(id, alasan) {
   
   closeModal(); // Tutup detail modal
   showLoading(true);
+  optimisticBalanceUpdate(payload);
   
   try {
     const response = await fetch(WEB_APP_URL, { 
@@ -5865,21 +5959,41 @@ window.dismissSalinTooltip = function(tipe, event) {
     }
 };
 
+// Deklarasikan variabel global penyimpan state saldo saat ini
+window.localBalances = { cashMuflih: 0, cashVi: 0, bank: 0, bendahara: 0 };
+
 // Fungsi khusus untuk merubah angka di layar (Bisa dipanggil dari mana saja)
 function updateSaldoUI(data) {
   if (!data) return;
   
-  const muflihVal = Number(data.cashMuflih) || 0;
-  const viVal = Number(data.cashVi) || 0;
-  const bankVal = Number(data.bank) || 0;
-  const bndhraVal = Number(data.bendahara) || 0;
+  // 1. Sinkronkan data memori lokal dengan kiriman dari Server (Jika Ada)
+  if (data.cashMuflih !== undefined) window.localBalances.cashMuflih = Number(data.cashMuflih) || 0;
+  if (data.cashVi !== undefined) window.localBalances.cashVi = Number(data.cashVi) || 0;
+  if (data.bank !== undefined) window.localBalances.bank = Number(data.bank) || 0;
+  if (data.bendahara !== undefined) window.localBalances.bendahara = Number(data.bendahara) || 0;
+  
+  // 2. Ambil nilai langsung dari memori lokal
+  const muflihVal = window.localBalances.cashMuflih;
+  const viVal = window.localBalances.cashVi;
+  const bankVal = window.localBalances.bank;
+  const bndhraVal = window.localBalances.bendahara;
   const kasirTotal = muflihVal + viVal + bankVal;
 
-  document.getElementById('saldo-kasir-total').innerText = formatRupiah(kasirTotal);
-  document.getElementById('saldo-bendahara').innerText = formatRupiah(bndhraVal);
-  document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
-  document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
-  document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
+  // 3. Render ke antarmuka pengguna
+  const totalEl = document.getElementById('saldo-kasir-total');
+  if (totalEl) totalEl.innerText = formatRupiah(kasirTotal);
+  
+  const bendaharaEl = document.getElementById('saldo-bendahara');
+  if (bendaharaEl) bendaharaEl.innerText = formatRupiah(bndhraVal);
+  
+  const muflihEl = document.getElementById('saldo-cash-muflih');
+  if (muflihEl) muflihEl.innerText = muflihVal.toLocaleString('id-ID');
+  
+  const viEl = document.getElementById('saldo-cash-vi');
+  if (viEl) viEl.innerText = viVal.toLocaleString('id-ID');
+  
+  const rekEl = document.getElementById('saldo-rekening');
+  if (rekEl) rekEl.innerText = bankVal.toLocaleString('id-ID');
 }
 
 // Fungsi fetch hanya untuk saat pertama kali aplikasi dibuka atau fallback
