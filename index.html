@@ -384,51 +384,94 @@ let localUpdatedTransactions = new Set();
 let activeTab = 'penjualan'; 
 let pendingRiwayatUpdate = false; // Tambahkan variabel ini
 
-async function logKasirToSupabase(trxDataOrId, keteranganEvent, namaPekerjaan, isiPesan) {
-  if (!trxDataOrId || trxDataOrId === "-") return;
+async function logKasirToSupabase(trxData, keteranganEvent, namaPekerjaan, isiPesan) {
+  if (!trxData || trxData === "-") return;
 
-  // Tentukan apakah parameter pertama adalah objek (Transaksi Baru) atau string ID (Batal/Hapus)
-  const isObject = typeof trxDataOrId === 'object' && trxDataOrId !== null;
-  const trxId = isObject ? trxDataOrId.id : trxDataOrId;
-
-  // Tandai agar perangkat sendiri tidak memproses ulang data ini
-  localUpdatedTransactions.add(trxId);
-  
   try {
-    // 1. Ambil saldo terbaru dari Google Apps Script
+    // 1. Ambil saldo terbaru SATU KALI SAJA (sangat hemat server)
     const res = await fetch(`${WEB_APP_URL}?action=getBalances&_=${Date.now()}`);
     const bal = await res.json();
 
-    // 2. Siapkan data baris yang akan dikirim
-    const rowData = {
-      keterangan_event: keteranganEvent,
-      nomor_pesanan: trxId,
-      nama_pekerjaan: namaPekerjaan || "-",
-      isi_pesan: isiPesan || "Aktivitas via Aplikasi Kasir",
-      
-      // Jika isObject true (Transaksi Baru), masukkan rincian. Jika false, kosongkan.
-      waktu: isObject ? (trxDataOrId.waktu || '') : '',
-      tipe: isObject ? (trxDataOrId.tipe || '') : '',
-      kat: isObject ? (trxDataOrId.kat || '') : '',
-      sub: isObject ? (trxDataOrId.sub || '') : '',
-      detail: isObject ? (typeof trxDataOrId.detail === 'string' ? trxDataOrId.detail : JSON.stringify(trxDataOrId.detail || [])) : '',
-      masuk: isObject ? (Number(trxDataOrId.masuk) || 0) : 0,
-      keluar: isObject ? (Number(trxDataOrId.keluar) || 0) : 0,
-      diskon: isObject ? (Number(trxDataOrId.diskon) || 0) : 0,
-      metode: isObject ? (trxDataOrId.metode || '') : '',
-      revisi: isObject ? (trxDataOrId.revisi || '') : '',
-      ket_selesai: isObject ? (trxDataOrId.ketSelesai || '') : '',
+    // 2. Siapkan wadah untuk data yang akan dikirim
+    let rowsToInsert = [];
 
-      // Saldo Terkini
-      saldo_muflih: Number(bal.cashMuflih) || 0,
-      saldo_vi: Number(bal.cashVi) || 0,
-      saldo_bank: Number(bal.bank) || 0,
-      saldo_bendahara: Number(bal.bendahara) || 0
-    };
+    // KONDISI A: Jika data berupa Array (Banyak transaksi sekaligus, contoh: Operasional Multi)
+    if (Array.isArray(trxData)) {
+        trxData.forEach(item => {
+            localUpdatedTransactions.add(item.id);
+            rowsToInsert.push({
+                keterangan_event: keteranganEvent,
+                nomor_pesanan: item.id,
+                nama_pekerjaan: item.ket || "-", // Menggunakan nama biaya asli (misal: Beli Galon)
+                isi_pesan: isiPesan || "Aktivitas via Aplikasi Kasir",
+                
+                waktu: item.waktu || '',
+                tipe: item.tipe || '',
+                kat: item.kat || '',
+                sub: item.sub || '',
+                detail: typeof item.detail === 'string' ? item.detail : JSON.stringify(item.detail || []),
+                masuk: Number(item.masuk) || 0,
+                keluar: Number(item.keluar) || 0,
+                diskon: Number(item.diskon) || 0,
+                metode: item.metode || '',
+                revisi: item.revisi || '',
+                ket_selesai: item.ketSelesai || '',
 
-    // 3. Tembakkan ke tabel tunggal Supabase
-    await supabaseClient.from('log_sinkronisasi_kasir').insert([rowData]);
-    console.log(`Log ${keteranganEvent} berhasil dikirim ke Supabase.`);
+                saldo_muflih: Number(bal.cashMuflih) || 0,
+                saldo_vi: Number(bal.cashVi) || 0,
+                saldo_bank: Number(bal.bank) || 0,
+                saldo_bendahara: Number(bal.bendahara) || 0
+            });
+        });
+    } 
+    // KONDISI B: Jika data berupa Objek Tunggal (Transaksi Jual/Beli Normal)
+    else if (typeof trxData === 'object' && trxData !== null) {
+        localUpdatedTransactions.add(trxData.id);
+        rowsToInsert.push({
+            keterangan_event: keteranganEvent,
+            nomor_pesanan: trxData.id,
+            nama_pekerjaan: trxData.ket || namaPekerjaan || "-",
+            isi_pesan: isiPesan || "Aktivitas via Aplikasi Kasir",
+            
+            waktu: trxData.waktu || '',
+            tipe: trxData.tipe || '',
+            kat: trxData.kat || '',
+            sub: trxData.sub || '',
+            detail: typeof trxData.detail === 'string' ? trxData.detail : JSON.stringify(trxData.detail || []),
+            masuk: Number(trxData.masuk) || 0,
+            keluar: Number(trxData.keluar) || 0,
+            diskon: Number(trxData.diskon) || 0,
+            metode: trxData.metode || '',
+            revisi: trxData.revisi || '',
+            ket_selesai: trxData.ketSelesai || '',
+
+            saldo_muflih: Number(bal.cashMuflih) || 0,
+            saldo_vi: Number(bal.cashVi) || 0,
+            saldo_bank: Number(bal.bank) || 0,
+            saldo_bendahara: Number(bal.bendahara) || 0
+        });
+    }
+    // KONDISI C: Jika data berupa ID String saja (Untuk Hapus/Batal)
+    else {
+        localUpdatedTransactions.add(trxData);
+        rowsToInsert.push({
+            keterangan_event: keteranganEvent,
+            nomor_pesanan: trxData,
+            nama_pekerjaan: namaPekerjaan || "-",
+            isi_pesan: isiPesan || "Aktivitas via Aplikasi Kasir",
+            
+            waktu: '', tipe: '', kat: '', sub: '', detail: '', masuk: 0, keluar: 0, diskon: 0, metode: '', revisi: '', ket_selesai: '',
+            
+            saldo_muflih: Number(bal.cashMuflih) || 0,
+            saldo_vi: Number(bal.cashVi) || 0,
+            saldo_bank: Number(bal.bank) || 0,
+            saldo_bendahara: Number(bal.bendahara) || 0
+        });
+    }
+
+    // 3. Tembakkan ke Supabase dalam satu tembakan!
+    await supabaseClient.from('log_sinkronisasi_kasir').insert(rowsToInsert);
+    console.log(`Log ${keteranganEvent} berhasil dikirim ke Supabase (${rowsToInsert.length} baris).`);
 
   } catch (err) {
     console.error("Gagal mengirim log & sinkronisasi: ", err);
@@ -534,10 +577,23 @@ function setupSupabaseRealtime() {
                     ketSelesai: data.ket_selesai
                 };
 
-                // Injeksi instan
-                allTransactions.unshift(objToInject);
-                if (activeTab === 'riwayat') renderTransactions(); 
-                else pendingRiwayatUpdate = false; 
+                // Injeksi instan ke memori lokal
+    allTransactions.unshift(objToInject);
+    
+    if (activeTab === 'riwayat') {
+        // Trik Debounce (Pintu Lift): 
+        // Hapus antrean render sebelumnya jika ada data baru yang masuk dengan sangat cepat
+        clearTimeout(window.realtimeRenderTimer);
+        
+        // Tunggu 100 milidetik. Jika tidak ada data ke-6 yang masuk, baru gambar layarnya!
+        window.realtimeRenderTimer = setTimeout(() => {
+            renderTransactions();
+            console.log("Layar digambar ulang (Rendered) sekaligus!");
+        }, 100); 
+    } 
+    else {
+        pendingRiwayatUpdate = false; 
+    } 
             }
         } 
         else {
@@ -3596,46 +3652,38 @@ async function runScript(actionName, payload, stayInTab) {
     const result = await response.json();
 
     if (result.status === 'success') {
-      let newTrxId = "-";
-      let newTrxName = "-";
-
       if (result.data && typeof allTransactions !== 'undefined') {
+        // Cek apakah data array (Operasional Multi)
         if (Array.isArray(result.data)) {
+          // Masukkan ke memori lokal
           result.data.reverse().forEach(d => allTransactions.unshift(d));
-          newTrxId = result.data[0].id || "-";
-          newTrxName = "Operasional Multi";
           
-          // Kirim data lengkap ke tabel gabungan (Objek pertama dari array)
-          logKasirToSupabase(result.data[0], "TRANSAKSI BARU", newTrxName, "Transaksi / Update Baru");
+          // Kirim SELURUH array ke Supabase!
+          logKasirToSupabase(result.data, "TRANSAKSI BARU", "Operasional Multi", "Transaksi / Update Baru");
         } else {
+          // Masukkan ke memori lokal
           allTransactions.unshift(result.data);
-          newTrxId = result.data.id || "-";
-          newTrxName = result.data.ket || "-";
           
-          // Kirim data lengkap ke tabel gabungan (Objek tunggal)
-          logKasirToSupabase(result.data, "TRANSAKSI BARU", newTrxName, "Transaksi / Update Baru");
+          // Kirim satu objek ke Supabase!
+          logKasirToSupabase(result.data, "TRANSAKSI BARU", result.data.ket || "-", "Transaksi / Update Baru");
         }
       }
 
-      // Reset flag agar fetch selanjutnya dari server bisa mengambil data terbaru
+      // Reset flag agar fetch selanjutnya mengambil data terbaru
       isTodayDataLoaded = false;
       isMonthDataLoaded = false;
       isFullDataLoaded = false;
 
-      // MATIKAN LOADING DAN KEMBALIKAN TOMBOL
       showLoading(false);
       if (btn) btn.disabled = false;
       
-      // Pindah ke tab riwayat agar user melihat datanya sudah masuk
       changeTab('riwayat');
-      
-      // Refresh background data untuk saldo dan stok
       refreshData();
       fetchMasterStock();
       
     } else {
       throw new Error(result.message || "Gagal menyimpan");
-    }
+    } 
 
   } catch (err) {
     showLoading(false);
