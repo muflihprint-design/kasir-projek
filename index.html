@@ -1028,10 +1028,9 @@ async function fetchInitialData() {
     console.error("Gagal load data awal:", e);
     showBalanceLoading(false);
   } finally {
-    // ---> TAMBAHKAN KODE INI DI SINI <---
-    // Setelah semua proses tarik data selesai (berhasil/gagal), baru panggil fitur pop-up
-    if (typeof checkPromoSummaryFeature === 'function') {
-      checkPromoSummaryFeature();
+    // ---> PANGGIL POP-UP TIPS KASIR <---
+    if (typeof checkTipsMultiPiutangFeature === 'function') {
+      checkTipsMultiPiutangFeature();
     }
   }
 }
@@ -1167,7 +1166,7 @@ function checkAndResetTooltips() {
   // Jika belum pernah diatur, atau sudah lewat dari 2 hari
   if (!lastReset || (now - parseInt(lastReset)) > twoDaysInMs) {
     // Hapus semua memori tooltip agar muncul kembali
-    localStorage.removeItem('promo_summary_seen');
+    localStorage.removeItem('tips_multi_piutang_seen');
     localStorage.removeItem('category_tooltip_seen');
     localStorage.removeItem('multipay_tooltip_seen');
     localStorage.removeItem('salin_tooltip_utang_v2');
@@ -1233,62 +1232,99 @@ window.clearSearch = function() {
   }
 };
 
-// --- FITUR POP-UP INFO RINGKASAN (Tampil 3 Hari) ---
-window.checkPromoSummaryFeature = function() {
-    // Cek apakah user sudah pernah melihat dan menutupnya agar tidak muncul terus
-    if (localStorage.getItem('promo_summary_seen')) return;
+// --- FITUR POP-UP PEMECAHAN MASALAH (TIPS KASIR & GUIDED TOUR) ---
+window.checkTipsMultiPiutangFeature = function() {
+    // Cek apakah user sudah pernah melihatnya agar tidak muncul terus
+    if (localStorage.getItem('tips_multi_piutang_seen')) return;
 
-    const now = new Date();
-    // Atur tanggal: Senin, 14 September 2026 s/d Rabu, 16 September 2026
-    const startPromo = new Date(2026, 8, 11, 0, 0, 0); // Bulan JS dimulai dari 0 (8 = September)
-    const endPromo = new Date(2026, 8, 16, 23, 59, 59);
-
-    if (now >= startPromo && now <= endPromo) {
-        // Tampilkan modal sambutan global
-        const modal = document.getElementById('general-modal');
-        const content = document.getElementById('modalContent');
-        
-        content.innerHTML = `
-            <div class="flex flex-col items-center text-center py-6 px-4">
-                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4 relative">
-                    <i data-lucide="pie-chart" class="w-8 h-8"></i>
-                    <span class="absolute -top-1 -right-1 flex h-4 w-4">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-white"></span>
-                    </span>
-                </div>
-                <h2 class="text-xl font-black text-slate-800 mb-2">Fitur Ringkasan Baru!</h2>
-                <p class="text-xs text-slate-500 leading-relaxed mb-6">Sekarang Anda dapat melihat ringkasan omset bersih dan rincian per kategori dengan mudah. Fitur ini dapat diakses pada menu <b class="text-blue-600">Riwayat</b>.</p>
-                
-                <button onclick="goToRiwayatAndShowArrow()" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2">
-                    Mengerti & Coba Sekarang <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                </button>
-                <button onclick="dismissPromoSummary()" class="mt-4 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors">Nanti Saja</button>
-            </div>
-        `;
-        modal.classList.remove('hidden');
-        modal.style.display = 'flex';
-        if (typeof lucide !== 'undefined') lucide.createIcons({ root: content });
-    }
-};
-
-window.goToRiwayatAndShowArrow = function() {
-    localStorage.setItem('promo_summary_seen', 'true'); // Tandai bahwa user sudah melihat
-    closeModal();
-    changeTab('riwayat'); // Arahkan ke tab riwayat
+    const modal = document.getElementById('general-modal');
+    const content = document.getElementById('modalContent');
     
-    // Beri jeda agar halaman riwayat selesai dimuat, lalu munculkan tooltip panah
-    setTimeout(() => {
-        const tooltip = document.getElementById('summary-tooltip');
-        if (tooltip) {
-            tooltip.classList.remove('hidden');
-        }
-    }, 600);
+    content.innerHTML = `
+        <div class="flex flex-col items-center text-center py-6 px-4">
+            <div class="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-5 relative shadow-inner border border-purple-200">
+                <i data-lucide="lightbulb" class="w-8 h-8"></i>
+                <span class="absolute -top-1 -right-1 flex h-4 w-4">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-4 w-4 bg-amber-500 border-2 border-white"></span>
+                </span>
+            </div>
+            
+            <h2 class="text-[17px] font-black text-slate-800 mb-3 leading-tight">Pelanggan Ingin Bayar Nota Baru + Piutang Lama?</h2>
+            
+            <div class="bg-slate-50 border border-slate-200 p-4 rounded-xl text-left mb-6 w-full shadow-sm">
+                <p class="text-[11px] text-slate-500 mb-3 font-medium">Jangan bingung! Masukkan transaksi baru sebagai piutang (DP Rp 0), lalu lunasi sekaligus menggunakan fitur <b>Terima Sekaligus</b>.</p>
+            </div>
+            
+            <div class="w-full space-y-2.5">
+                <!-- Tombol Aksi Langsung (Guided Tour) -->
+                <button onclick="bukaDanTunjukkanPiutang()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    Buka Piutang & Tunjukkan Caranya <i data-lucide="external-link" class="w-4 h-4"></i>
+                </button>
+                
+                <!-- Tombol Tutup Biasa -->
+                <button onclick="dismissTipsMultiPiutang()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl active:scale-95 transition-all flex items-center justify-center gap-2 text-[12px]">
+                    Nanti Saja, Tutup Info Ini
+                </button>
+            </div>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: content });
 };
 
-window.dismissPromoSummary = function() {
-    localStorage.setItem('promo_summary_seen', 'true');
+window.dismissTipsMultiPiutang = function() {
+    localStorage.setItem('tips_multi_piutang_seen', 'true');
     closeModal();
+};
+
+// --- FUNGSI UNTUK MEMBUKA TAB PIUTANG & MENYOROT TOMBOL ---
+window.bukaDanTunjukkanPiutang = function() {
+    // 1. Tutup pop-up & tandai sudah dibaca
+    dismissTipsMultiPiutang();
+
+    // 2. Buka Tab "Lainnya" (Karena menu Piutang ada di dalamnya)
+    if (typeof changeTab === 'function') {
+        changeTab('lainnya');
+    }
+
+    // Beri jeda 100ms agar halaman "Lainnya" dirender
+    setTimeout(() => {
+        // 3. Buka menu Piutang
+        const btnPiutang = Array.from(document.querySelectorAll('.action-btn')).find(b => b.textContent.toUpperCase().includes('PIUTANG'));
+        if (typeof showMenuAction === 'function') {
+            showMenuAction('PIUTANG', btnPiutang || null);
+        }
+
+        // 4. SISTEM PELACAK CERDAS: Tunggu data selesai diload
+        let cekInterval = setInterval(() => {
+            const targetBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.toLowerCase().includes('terima sekaligus'));
+            
+            // Jika tombol "Terima Sekaligus" sudah muncul
+            if (targetBtn) {
+                clearInterval(cekInterval); // Hentikan pelacakan
+                
+                // Arahkan layar tepat ke tombol tersebut
+                targetBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Tambahkan HIGHLIGHT (Hanya saat instruksi ini dijalankan)
+                // Ditambahkan efek scale-105 agar tombol tampak membesar sejenak menarik perhatian
+                targetBtn.classList.add('ring-4', 'ring-amber-500', 'animate-pulse', 'scale-105', 'relative', 'z-50');
+                
+                // Kembalikan tombol ke bentuk normal setelah 5 detik
+                setTimeout(() => {
+                    targetBtn.classList.remove('ring-4', 'ring-amber-500', 'animate-pulse', 'scale-105', 'relative', 'z-50');
+                }, 5000);
+            }
+        }, 500); // Mengecek setiap 0.5 detik
+
+        // Batas waktu tunggu maksimal (10 detik)
+        setTimeout(() => {
+            clearInterval(cekInterval);
+        }, 10000);
+
+    }, 100);
 };
 
     /** HALAMAN RIWAYAT **/
