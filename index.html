@@ -352,7 +352,8 @@ display: block !important;
 
   <script>
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwM4l861pKjYx1_hFabIHZfwCR1rj9hP0t0gZsgJDuSLq8cZB2rr2zUy3jZwja0kli_/exec";
-
+// UBAH NOMOR INI SETIAP KALI ANDA MELAKUKAN PEMBARUAN KODE
+const CURRENT_APP_VERSION = "2026.09.19-v1";
    let allTransactions = [];
    let currentFetchId = 0;
 // --- VARIABEL STATUS PEMUATAN BARU ---
@@ -544,6 +545,25 @@ function setupSupabaseRealtime() {
             document.getElementById('saldo-cash-muflih').innerText = muflihVal.toLocaleString('id-ID');
             document.getElementById('saldo-cash-vi').innerText = viVal.toLocaleString('id-ID');
             document.getElementById('saldo-rekening').innerText = bankVal.toLocaleString('id-ID');
+        }
+
+        // KODE BARU: Deteksi Perintah Update Aplikasi
+        if (data.keterangan_event === "UPDATE APLIKASI") {
+            // Tampilkan pesan melayang agar kasir tidak kaget
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-blue-900/90 z-[99999] flex flex-col items-center justify-center text-white';
+            overlay.innerHTML = `
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+                <h2 class="text-xl font-bold">Pembaruan Sistem!</h2>
+                <p class="text-sm mt-2 opacity-80">Menyegarkan aplikasi ke versi terbaru...</p>
+            `;
+            document.body.appendChild(overlay);
+
+            // Beri jeda 2 detik agar notifikasi terbaca, lalu paksa reload
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 2000);
+            return; // Hentikan proses realtime lainnya
         }
 
         // --- 2. ROUTING LOGIKA BERDASARKAN EVENT ---
@@ -1229,6 +1249,7 @@ function checkAndResetTooltips() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  checkAppVersionOnWake();
   // 0. Jalankan pengecekan reset tooltip otomatis
   checkAndResetTooltips();
 
@@ -3234,6 +3255,14 @@ else if (tab === 'operasional') {
            <button onclick="location.reload()" class="w-full p-4 bg-slate-100 text-slate-600 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.98] transition-all mb-3">
              <i data-lucide="refresh-cw" class="w-4 h-4"></i> Muat Ulang Aplikasi
            </button>
+
+           <!-- TAMBAHAN KODE: TOMBOL PAKSA UPDATE (HANYA UNTUK ADMIN) -->
+           ${currentShop.nama === 'ADMINISTRATOR' ? `
+           <button onclick="paksaUpdateSemuaPerangkat()" class="w-full p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-[0.98] transition-all mb-3 shadow-sm">
+             <i data-lucide="monitor-up" class="w-4 h-4"></i> Paksa Update Semua Perangkat
+           </button>
+           ` : ''}
+           <!-- AKHIR TAMBAHAN KODE -->
            
           <!-- KOTAK INFO PEMBUAT -->
            <div class="flex flex-col justify-center items-center gap-2 opacity-70 mt-2">
@@ -6247,7 +6276,10 @@ window.dismissSalinTooltip = function(tipe, event) {
 // Mendeteksi saat pengguna kembali membuka/melihat tab browser
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible') {
-    console.log("Aplikasi kembali aktif! Menyegarkan data...");
+    console.log("Aplikasi kembali aktif! Memeriksa pembaruan...");
+    
+    // 1. Cek apakah ada versi kode baru
+    checkAppVersionOnWake();
     
     // 1. Selalu segarkan saldo utama
     if (typeof refreshData === 'function') refreshData();
@@ -6265,6 +6297,46 @@ document.addEventListener('visibilitychange', function() {
     }
   }
 });
+
+async function paksaUpdateSemuaPerangkat() {
+    const konfirmasi = confirm("Peringatan: Ini akan me-refresh paksa seluruh aplikasi kasir (Muflih Print, Vi Printing, dll) yang sedang aktif secara bersamaan. Lanjutkan?");
+    
+    if (konfirmasi) {
+        try {
+            // Tembak perintah khusus ke Supabase
+            await supabaseClient.from('log_sinkronisasi_kasir').insert([{
+                keterangan_event: "UPDATE APLIKASI",
+                nama_pekerjaan: "Sistem",
+                nomor_pesanan: "SYS-UPDATE-" + Date.now(), // ID acak
+                // Isi field wajib lainnya dengan default agar tabel Supabase tidak error
+                waktu: '', tipe: '', kat: '', sub: '', ket_selesai: '', revisi: '', metode: '',
+                masuk: 0, keluar: 0, diskon: 0,
+                saldo_muflih: 0, saldo_vi: 0, saldo_bank: 0, saldo_bendahara: 0
+            }]);
+            
+            alert("Perintah Update berhasil disiarkan! Semua layar kasir yang aktif akan memuat ulang dalam 2 detik.");
+        } catch (err) {
+            console.error("Gagal menyiarkan perintah update:", err);
+            alert("Gagal menyiarkan update.");
+        }
+    }
+}
+
+function checkAppVersionOnWake() {
+    const savedVersion = localStorage.getItem('app_version');
+    
+    if (!savedVersion) {
+        // Jika belum ada di memori, simpan versi saat ini
+        localStorage.setItem('app_version', CURRENT_APP_VERSION);
+    } else if (savedVersion !== CURRENT_APP_VERSION) {
+        // JIKA BERBEDA (Artinya Anda baru saja memperbarui file HTML/JS)
+        console.log("Pembaruan aplikasi terdeteksi! Memuat ulang...");
+        localStorage.setItem('app_version', CURRENT_APP_VERSION);
+        
+        // Muat ulang halaman secara paksa untuk mengambil kode terbaru
+        window.location.reload(true);
+    }
+}
 
   </script>
   
