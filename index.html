@@ -6247,13 +6247,21 @@ window.dismissSalinTooltip = function(tipe, event) {
 // Mendeteksi saat pengguna kembali membuka/melihat tab browser
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible') {
-    console.log("Tab kembali aktif! Menyegarkan data...");
-    // 1. Segarkan saldo otomatis
+    console.log("Aplikasi kembali aktif! Menyegarkan data...");
+    
+    // 1. Selalu segarkan saldo utama
     if (typeof refreshData === 'function') refreshData();
     
-    // 2. Jika sedang di tab Riwayat, tarik ulang data transaksi
-    if (typeof activeTab !== 'undefined' && activeTab === 'riwayat') {
-      if (typeof fetchTransactions === 'function') fetchTransactions(currentFilter);
+    // 2. Cegah riwayat usang (stale data) di HP
+    if (typeof activeTab !== 'undefined') {
+      if (activeTab === 'riwayat') {
+        // Jika sedang buka riwayat, langsung tarik data dari server
+        if (typeof fetchTransactions === 'function') fetchTransactions(currentFilter);
+      } else {
+        // Jika di tab lain, paksa flag ini menyala! 
+        // Sehingga saat tab Riwayat nanti diklik, sistem tahu harus tarik data baru.
+        pendingRiwayatUpdate = true;
+      }
     }
   }
 });
