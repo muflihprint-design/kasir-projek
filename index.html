@@ -381,9 +381,13 @@ const SUPABASE_URL = "https://zqxeoveanevsvynptckm.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxeGVvdmVhbmV2c3Z5bnB0Y2ttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNzUzODEsImV4cCI6MjA4OTg1MTM4MX0.eeIaytpW1wtWPJc2FbhufkDkhONUt9yypTZU4dTVmsM";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// VARIABEL BARU UNTUK MELACAK KONEKSI SUPABASE
+let isSupabaseConnected = false;
+let wasSupabaseDisconnected = false;
+
 let localUpdatedTransactions = new Set();
 let activeTab = 'penjualan'; 
-let pendingRiwayatUpdate = false; // Tambahkan variabel ini
+let pendingRiwayatUpdate = false;
 
 async function logKasirToSupabase(trxData, keteranganEvent, namaPekerjaan, isiPesan) {
   if (!trxData || trxData === "-") return;
@@ -623,13 +627,25 @@ function setupSupabaseRealtime() {
             else pendingRiwayatUpdate = true;
         }
     })
-    .subscribe();
+    .subscribe((status) => {
+        // DETEKSI STATUS KONEKSI
+        if (status === 'SUBSCRIBED') {
+            isSupabaseConnected = true;
+            
+            // Jika sebelumnya terputus dan sekarang nyambung lagi, baru kita refresh datanya!
+            if (wasSupabaseDisconnected) {
+                console.log("Supabase terhubung kembali, menyinkronkan data yang terlewat...");
+                syncDataAfterDisconnect();
+                wasSupabaseDisconnected = false;
+            }
+        } else {
+            // Jika statusnya CLOSED, CHANNEL_ERROR, atau TIMED_OUT
+            isSupabaseConnected = false;
+            wasSupabaseDisconnected = true;
+            console.log("Koneksi realtime Supabase terputus. Status:", status);
+        }
+    });
 }
-
-// Panggil fungsi ini saat halaman selesai dimuat (bisa disisipkan di DOMContentLoaded)
-window.addEventListener('DOMContentLoaded', () => {
-  setupSupabaseRealtime();
-});
 
 window.salinKeClipboard = function(teks) {
   // 1. Fungsi internal untuk memunculkan Toast
@@ -1249,6 +1265,7 @@ function checkAndResetTooltips() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  setupSupabaseRealtime();
   checkAppVersionOnWake();
   // 0. Jalankan pengecekan reset tooltip otomatis
   checkAndResetTooltips();
@@ -6273,28 +6290,29 @@ window.dismissSalinTooltip = function(tipe, event) {
     }
 };
 
+// Fungsi khusus untuk menarik data HANYA jika koneksi sebelumnya terputus
+window.syncDataAfterDisconnect = function() {
+    if (typeof refreshData === 'function') refreshData();
+    if (typeof activeTab !== 'undefined') {
+        if (activeTab === 'riwayat') {
+            if (typeof fetchTransactions === 'function') fetchTransactions(currentFilter);
+        } else {
+            pendingRiwayatUpdate = true;
+        }
+    }
+};
+
 // Mendeteksi saat pengguna kembali membuka/melihat tab browser
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible') {
-    console.log("Aplikasi kembali aktif! Memeriksa pembaruan...");
+    console.log("Aplikasi kembali aktif! Memeriksa pembaruan versi...");
     
-    // 1. Cek apakah ada versi kode baru
+    // Tetap jalankan pengecekan versi aplikasi (tidak membebani UI)
     checkAppVersionOnWake();
     
-    // 1. Selalu segarkan saldo utama
-    if (typeof refreshData === 'function') refreshData();
-    
-    // 2. Cegah riwayat usang (stale data) di HP
-    if (typeof activeTab !== 'undefined') {
-      if (activeTab === 'riwayat') {
-        // Jika sedang buka riwayat, langsung tarik data dari server
-        if (typeof fetchTransactions === 'function') fetchTransactions(currentFilter);
-      } else {
-        // Jika di tab lain, paksa flag ini menyala! 
-        // Sehingga saat tab Riwayat nanti diklik, sistem tahu harus tarik data baru.
-        pendingRiwayatUpdate = true;
-      }
-    }
+    // CATATAN: Logika refresh data otomatis (refreshData & fetchTransactions) 
+    // telah dihapus dari sini. Aplikasi sekarang hanya akan memuat ulang data 
+    // jika Supabase melaporkan bahwa koneksi sempat terputus.
   }
 });
 
