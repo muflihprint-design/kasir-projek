@@ -28,33 +28,41 @@
     input, select, textarea { font-size: 16px !important; }
     .accounting { text-align: right; font-family: monospace; }
 
-
-/* Tambahan untuk dukungan Landscape & Tablet */
+/* Penyesuaian batas aman (notch kamera) untuk semua perangkat */
     body {
-      /* Mencegah konten tertutup poni/notch kamera saat mode landscape */
       padding-left: env(safe-area-inset-left);
       padding-right: env(safe-area-inset-right);
     }
 
-    /* Membatasi lebar maksimal konten di Tablet agar tidak terlalu memanjang */
-    #main-content {
-      max-width: 800px;
-      margin: 0 auto;
-    }
+    /* Aturan KHUSUS untuk Handphone Mode Landscape (Tinggi layar kurang dari 600px) */
+    @media (orientation: landscape) and (max-height: 600px) {
+      /* 1. Melebarkan area utama khusus di HP (mengurangi margin & padding) */
+      #main-content {
+        max-width: 100% !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+      }
 
-    @media (orientation: landscape) {
-      /* Menyesuaikan modal agar tetap bisa di-scroll saat layar landscape (pendek) */
+      /* 2. Memaksa baris tombol filter agar meregang sejajar penuh */
+      #riwayat-container .md\:w-auto {
+        width: 100% !important;
+      }
+      #riwayat-container .md\:flex-none {
+        flex: 1 1 0% !important;
+      }
+
+      /* 3. Menyesuaikan modal agar tetap rapi saat landscape */
       .modal-content {
-        max-height: 90vh;
+        max-height: 85vh;
         margin-top: 10px;
       }
       
-      /* Opsional: Membuat navigasi bawah lebih ramping di landscape */
       nav {
         padding-bottom: env(safe-area-inset-bottom);
       }
     }
-    
+
+
 /* Pastikan container saldo memiliki tinggi minimum yang konsisten */
 #balance-container {
   min-height: 40px; /* Mengizinkan wadah membesar jika konten lebih dari 40px */
@@ -380,7 +388,7 @@ display: block !important;
   <script>
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwM4l861pKjYx1_hFabIHZfwCR1rj9hP0t0gZsgJDuSLq8cZB2rr2zUy3jZwja0kli_/exec";
 // UBAH NOMOR INI SETIAP KALI ANDA MELAKUKAN PEMBARUAN KODE
-const CURRENT_APP_VERSION = "2026.09.19-v1";
+const CURRENT_APP_VERSION = "2026.09.21-v2";
    let allTransactions = [];
    let currentFetchId = 0;
 // --- VARIABEL STATUS PEMUATAN BARU ---
