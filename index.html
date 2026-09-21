@@ -28,6 +28,33 @@
     input, select, textarea { font-size: 16px !important; }
     .accounting { text-align: right; font-family: monospace; }
 
+
+/* Tambahan untuk dukungan Landscape & Tablet */
+    body {
+      /* Mencegah konten tertutup poni/notch kamera saat mode landscape */
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    /* Membatasi lebar maksimal konten di Tablet agar tidak terlalu memanjang */
+    #main-content {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    @media (orientation: landscape) {
+      /* Menyesuaikan modal agar tetap bisa di-scroll saat layar landscape (pendek) */
+      .modal-content {
+        max-height: 90vh;
+        margin-top: 10px;
+      }
+      
+      /* Opsional: Membuat navigasi bawah lebih ramping di landscape */
+      nav {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+    }
+    
 /* Pastikan container saldo memiliki tinggi minimum yang konsisten */
 #balance-container {
   min-height: 40px; /* Mengizinkan wadah membesar jika konten lebih dari 40px */
