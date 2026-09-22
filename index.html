@@ -1764,6 +1764,17 @@ function initRiwayatStructure() {
                 </button>
             </div>
                   </div>
+
+                  <!-- BARIS AKSI KHUSUS TAMPILAN REKAPAN (TETAP DI ATAS/FIXED) -->
+          <div id="rekapan-action-bar" class="hidden items-center justify-between px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+              <div class="flex items-center gap-1.5">
+                  <i data-lucide="bar-chart-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+                  <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Mode Rekapan</span>
+              </div>
+              <button onclick="promptUpdatePelangganRekapan()" class="text-[10px] font-black text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1.5 rounded-lg flex items-center active:scale-95 transition-all shadow-sm">
+                  <i data-lucide="clipboard-list" class="w-3.5 h-3.5 mr-1.5"></i> Rekap Penjualan
+              </button>
+          </div>
       </div>
 
       <div id="listContainer" class="bg-slate-50/20 divide-y divide-slate-50 max-h-[550px] overflow-y-auto custom-scrollbar flex-1"></div>
@@ -2184,7 +2195,7 @@ window.promptUpdatePelangganRekapan = async function() {
             });
         }
     });
-    
+
     try {
         const payload = { action: 'updateSubjekMulti', updates: updates, items: itemsForRekapan };
         fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) }).catch(e => console.log("Fetch:", e));
@@ -2340,6 +2351,17 @@ window.promptUpdatePelangganRekapan = async function() {
   });
 
   window.currentFilteredTransactions = filtered;
+  // Logika Menampilkan/Menyembunyikan Baris Tombol Rekap Penjualan
+  const rekapanBar = document.getElementById('rekapan-action-bar');
+  if (rekapanBar) {
+      if (window.isRekapanBarangView) {
+          rekapanBar.classList.remove('hidden');
+          rekapanBar.classList.add('flex');
+      } else {
+          rekapanBar.classList.add('hidden');
+          rekapanBar.classList.remove('flex');
+      }
+  }
 
 // --- TAMPILAN RINCIAN LENGKAP (DAFTAR SELURUH BARANG) ---
   if (window.isRincianLengkapView) {
@@ -2461,12 +2483,6 @@ window.promptUpdatePelangganRekapan = async function() {
        // Desain Container List Rapat
         let summaryHtml = `
             <div class="pb-6 pt-3 px-3">
-                <!-- Tombol Rekap Harian Hanya Muncul Di Sini -->
-                <div class="flex justify-end mb-3">
-                    <button onclick="promptUpdatePelangganRekapan()" class="text-[11px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-100/50 px-3 py-2 rounded-xl flex items-center active:scale-95 transition-all border border-emerald-200 shadow-sm" title="Rekap Seluruh Penjualan Saat Ini">
-                        <i data-lucide="clipboard-list" class="w-4 h-4 mr-1.5"></i> Rekap Penjualan
-                    </button>
-                </div>
                 <div class="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100 overflow-hidden">
         `;
         
