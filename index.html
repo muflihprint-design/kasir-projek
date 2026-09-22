@@ -1757,11 +1757,8 @@ function initRiwayatStructure() {
               <span id="active-filter-text" class="text-[10px] font-bold text-blue-700 truncate"></span>
             </div>
             
-            <!-- Tombol Rekap dan Reset Dibungkus Berdampingan -->
+            <!-- Tombol Reset Filter -->
             <div class="flex items-center gap-1.5 shrink-0 ml-2">
-                <button onclick="promptUpdatePelangganRekapan()" class="text-[9px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-100/50 px-2 py-1 rounded-md flex items-center active:scale-95 transition-all" title="Rekap Seluruh Penjualan">
-                  <i data-lucide="clipboard-list" class="w-3 h-3 mr-1"></i> Rekap
-                </button>
                 <button id="btn-reset-active-filter" onclick="clearAdvancedFilters()" class="text-[9px] font-black text-blue-500 hover:text-blue-700 uppercase tracking-widest bg-blue-100/50 px-2 py-1 rounded-md flex items-center active:scale-95 transition-all">
                   Reset
                 </button>
@@ -2144,12 +2141,17 @@ window.promptUpdatePelangganRekapan = async function() {
         const groupKey = `${t.tglFormatted}_${pelanggan}_${namaBrg}_${data.hargaSatuan}`;
         
         if (firstOccurrences[groupKey] !== undefined) {
-            // JIKA SAMA: Hanya tambahkan Qty dan Total ke baris yang sudah ada, JANGAN buat baris baru
+            // JIKA SAMA: Tambah Qty, Total, dan Gabungkan ID Transaksi
             let firstIdx = firstOccurrences[groupKey];
             itemsForRekapan[firstIdx].jumlah += qty;
             itemsForRekapan[firstIdx].total += rowTotal;
+            
+            // Cek agar ID tidak ditulis berulang jika merekap dari ID yang sama
+            if (!itemsForRekapan[firstIdx].idTransaksi.includes(t.id)) {
+                itemsForRekapan[firstIdx].idTransaksi += `, ${t.id}`;
+            }
         } else {
-            // JIKA BELUM ADA: Buat baris baru secara utuh
+            // JIKA BELUM ADA: Buat baris baru
             let omsetTampil = "";
             if (!tanggalSudahDitulis[t.tglFormatted]) {
                 omsetTampil = omsetPerTanggal[t.tglFormatted];
@@ -2178,7 +2180,7 @@ window.promptUpdatePelangganRekapan = async function() {
                 ket: data.statusBayar, 
                 followUp: pelanggan,                 
                 invoice: "", 
-                idTransaksi: "" // Kosongkan agar tidak tampil di sheet
+                idTransaksi: t.id // Tetap simpan ID awal di sini
             });
         }
     });
@@ -2456,9 +2458,15 @@ window.promptUpdatePelangganRekapan = async function() {
     if (summaryArray.length === 0) {
          container.innerHTML = `<div class="py-16 text-center text-slate-500"><div class="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3"><i data-lucide="bar-chart-2" class="w-8 h-8 text-slate-300"></i></div>Tidak ada data barang yang ditemukan.</div>`;
     } else {
-        // Desain Container List Rapat
+       // Desain Container List Rapat
         let summaryHtml = `
             <div class="pb-6 pt-3 px-3">
+                <!-- Tombol Rekap Harian Hanya Muncul Di Sini -->
+                <div class="flex justify-end mb-3">
+                    <button onclick="promptUpdatePelangganRekapan()" class="text-[11px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-100/50 px-3 py-2 rounded-xl flex items-center active:scale-95 transition-all border border-emerald-200 shadow-sm" title="Rekap Seluruh Penjualan Saat Ini">
+                        <i data-lucide="clipboard-list" class="w-4 h-4 mr-1.5"></i> Rekap Penjualan
+                    </button>
+                </div>
                 <div class="bg-white border border-slate-200 rounded-2xl shadow-sm divide-y divide-slate-100 overflow-hidden">
         `;
         
