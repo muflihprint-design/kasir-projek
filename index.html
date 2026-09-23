@@ -267,6 +267,16 @@ display: block !important;
         </div>
       </button>
 
+      <!-- TAMBAHAN: Tombol BLIMI -->
+      <button onclick="selectShop('BLIMI', 'Jl. Kumala No. 05, Makassar')" 
+              class="w-full p-5 bg-white/10 hover:bg-white/20 border border-white/10 rounded-3xl flex items-center gap-4 transition-all group active:scale-95 mt-2">
+        <div class="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center font-bold text-white text-xl">B</div>
+        <div class="text-left">
+          <p class="font-bold text-white group-hover:text-blue-400 transition">BLIMI</p>
+          <p class="text-xs text-slate-400">Jl. Kumala No. 05, Makassar</p>
+        </div>
+      </button>
+
       <!-- TAMBAHAN: Tombol Administrator -->
       <button onclick="loginAdmin()" 
               class="w-full p-5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-3xl flex items-center gap-4 transition-all group active:scale-95 mt-2">
@@ -1013,10 +1023,11 @@ function refreshIcons(containerId) {
     }
   }
 }
-// Fungsi pintar untuk mendeteksi Kasir Toko mana yang sedang mencatat
+
 function getActualCashMethod(selectedMethod) {
   if (selectedMethod === "Cash") {
     if (currentShop.nama === "VI PRINTING") return "Cash Vi Printing";
+    if (currentShop.nama === "BLIMI") return "Cash Blimi"; // <-- Tambahan untuk BLIMI
     return "Cash Muflih Print"; // Default untuk Muflih Print dan Admin
   }
   return selectedMethod; // Biarkan Rekening / Kas Bendahara
@@ -1043,6 +1054,9 @@ function updateIdentityUI() {
   } else if (shopName === 'VI PRINTING') {
     iconWrapper.className = baseClasses + "bg-purple-100 border-purple-200 text-purple-600";
     iconWrapper.innerHTML = '<span class="text-xs font-black">V</span>';
+  } else if (shopName === 'BLIMI') {
+    iconWrapper.className = baseClasses + "bg-blue-100 border-blue-200 text-blue-600";
+    iconWrapper.innerHTML = '<span class="text-xs font-black">B</span>';
   } else if (shopName === 'ADMINISTRATOR') {
     iconWrapper.className = baseClasses + "bg-slate-800 border-slate-700 text-white group-hover:text-red-600";
     iconWrapper.innerHTML = '<i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>';
@@ -1918,11 +1932,34 @@ function initRiwayatStructure() {
 let tempView = 'Semua';
 let tempCategory = 'SEMUA';
 
-// Fungsi untuk membuka Modal Filter Tambahan
 window.openAdvancedFilter = function() {
     tempView = currentView;
     tempCategory = currentCategory;
     
+    // --- LOGIKA BARU: Filter Kategori & Metode Khusus ---
+    let daftarKategori = ['SEMUA', 'MASUK', 'KELUAR', 'PENJUALAN', 'BLANGKO', 'UNDANGAN', 'LAIN-LAIN', 'OPERASIONAL', 'STOK', 'ALAT'];
+    let daftarMetode = [
+        { val: 'Semua', label: 'Semua Metode' },
+        { val: 'Cash', label: 'Semua Cash' },
+        { val: 'Cash Muflih Print', label: 'Cash Muflih' },
+        { val: 'Cash Vi Printing', label: 'Cash Vi' },
+        { val: 'Rekening', label: 'Rekening' },
+        { val: 'Kas Bendahara', label: 'Kas Bendahara' }
+    ];
+
+    if (currentShop.nama === 'BLIMI') {
+        // Hilangkan kategori yang tidak dipakai BLIMI
+        daftarKategori = ['SEMUA', 'MASUK', 'KELUAR', 'PENJUALAN', 'OPERASIONAL', 'STOK', 'ALAT'];
+        
+        // Hilangkan filter Cash Muflih, Cash Vi, dan Kas Bendahara
+        daftarMetode = [
+            { val: 'Semua', label: 'Semua Metode' },
+            { val: 'Cash', label: 'Cash' },
+            { val: 'Rekening', label: 'Rekening' }
+        ];
+    }
+    // ------------------------------------------------
+
     const modal = document.getElementById('general-modal');
     const content = document.getElementById('modalContent');
     
@@ -1950,7 +1987,7 @@ window.openAdvancedFilter = function() {
                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipe Transaksi</p>
                 </div>
               <div class="grid grid-cols-3 gap-2.5">
-    ${['SEMUA', 'MASUK', 'KELUAR', 'PENJUALAN', 'BLANGKO', 'UNDANGAN', 'LAIN-LAIN', 'OPERASIONAL', 'STOK', 'ALAT'].map(cat => `
+   ${daftarKategori.map(cat => `
         <button onclick="selectTempCategory('${cat}')" id="btn-temp-cat-${cat.replace(/\s+/g, '-')}" 
           class="temp-cat-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[9px] font-bold border-2 transition-all duration-200 
           ${tempCategory === cat 
@@ -1968,14 +2005,7 @@ window.openAdvancedFilter = function() {
                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Metode Pembayaran</p>
                 </div>
                 <div class="grid grid-cols-2 gap-2.5">
-                    ${[
-                        { val: 'Semua', label: 'Semua Metode' },
-                        { val: 'Cash', label: 'Semua Cash' },
-                        { val: 'Cash Muflih Print', label: 'Cash Muflih' },
-                        { val: 'Cash Vi Printing', label: 'Cash Vi' },
-                        { val: 'Rekening', label: 'Rekening' },
-                        { val: 'Kas Bendahara', label: 'Kas Bendahara' }
-                    ].map(item => `
+                    ${daftarMetode.map(item => `
                         <button onclick="selectTempView('${item.val}')" id="btn-temp-view-${item.val.replace(/\s+/g, '-')}" 
                           class="temp-view-btn py-2.5 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold border-2 transition-all duration-200 
                           ${tempView === item.val 
@@ -2607,7 +2637,7 @@ if ((item.isRekap && item.isRekap !== false && item.isRekap !== "false" && item.
     return;
   }
 
- // --- TAMPILAN REKAPAN PENJUALAN ---
+  // --- TAMPILAN REKAPAN PENJUALAN ---
   if (window.isRekapanPenjualanView) {
     let salesHtml = '';
     let totalOmsetSemua = 0;
@@ -2649,8 +2679,9 @@ if ((item.isRekap && item.isRekap !== false && item.isRekap !== "false" && item.
                 const qty = parseFloat(item.qty) || 0;
                 const subtotal = harga * qty;
                 const invoiceText = item.invoice || ''; 
-
-                const itemKey = `${namaBarang}_${harga}_${invoiceText}_${isSudah}`;
+                
+                // Menambahkan item.isLocked ke dalam key agar item terkunci terpisah secara aman
+                const itemKey = `${namaBarang}_${harga}_${invoiceText}_${isSudah}_${item.isLocked}`;
 
                 if (!groupedData[customerKey].items[itemKey]) {
                     const newChkId = `chk-rekap-langsung-${chkIndex++}`;
@@ -2661,6 +2692,7 @@ if ((item.isRekap && item.isRekap !== false && item.isRekap !== "false" && item.
                         subtotal_barang: 0,
                         invoice: invoiceText,
                         isSudah: isSudah,
+                        isLocked: item.isLocked === true, // <--- Tangkap status Terkunci dari Backend
                         chkId: newChkId,
                         refs: []
                     };
@@ -2711,22 +2743,20 @@ if ((item.isRekap && item.isRekap !== false && item.isRekap !== "false" && item.
             let itemsHtmlMobile = '';
             
             daftarBarang.forEach(barang => {
-                // Modifikasi agar marginnya pas dan menampilkan strip (-) jika tidak ada invoice
                 const invoiceBadgeMobile = barang.invoice ? `<span class="inline-block mb-1 bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-bold"><i data-lucide="tag" class="w-2.5 h-2.5 inline mr-0.5"></i> ${barang.invoice}</span>` : '<span class="inline-block mb-1 text-[9px] text-slate-400 italic">-</span>';
-                // Jika sudah terkunci (masuk rekap harian), checkbox didisable secara permanen
-const isLocked = barang.isLocked === true;
-const chkDisabled = isLocked ? 'disabled checked' : '';
-const chkClass = isLocked ? 'accent-slate-400 cursor-not-allowed opacity-50' : 'accent-indigo-600 cursor-pointer';
-const lockIcon = isLocked ? '<i data-lucide="lock" class="w-3 h-3 text-red-500 inline ml-1" title="Terkunci (Sudah di Rekap Harian)"></i>' : '';
+                
+                // LOGIKA PENGHILANGAN CENTANG (Diganti Ikon Gembok jika Terkunci)
+                const chkElementMobile = barang.isLocked
+                    ? `<div class="w-4 h-4 rounded mt-0.5 shrink-0 flex items-center justify-center bg-slate-100 border border-slate-200" title="Terkunci (Sudah Masuk Rekap Harian)"><i data-lucide="lock" class="w-3 h-3 text-slate-400"></i></div>`
+                    : `<input type="checkbox" id="mobile-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded mt-0.5 shrink-0 accent-indigo-600 cursor-pointer" onchange="syncCheckboxes('${barang.chkId}', this.checked)">`;
 
                 itemsHtmlMobile += `
                     <div class="flex justify-between items-start text-xs border-b border-slate-100 pb-2 mb-2 last:border-0 last:pb-0 last:mb-0">
                         <div class="flex items-start gap-2 flex-1 pr-2">
-                            <input type="checkbox" id="mobile-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded mt-0.5 shrink-0 ${chkClass}" ${chkDisabled} onchange="syncCheckboxes('${barang.chkId}', this.checked, ${barang.isSudah ? 'true' : 'false'})">
+                            ${chkElementMobile}
                             <div>
-                                <!-- Memindahkan posisi invoice agar selalu tampil sebelum barang -->
                                 ${invoiceBadgeMobile}
-                                <label for="mobile-${barang.chkId}" class="font-bold text-slate-700 cursor-pointer m-0 block">${barang.nama_barang}</label>
+                                <label for="mobile-${barang.chkId}" class="font-bold text-slate-700 ${barang.isLocked ? 'cursor-default' : 'cursor-pointer'} m-0 block">${barang.nama_barang}</label>
                                 <p class="text-[10px] text-slate-500 mt-0.5">
                                     ${barang.qty} <span class="mx-1 text-slate-300">x</span> ${formatRupiah(barang.harga)}
                                 </p>
@@ -2786,11 +2816,11 @@ const lockIcon = isLocked ? '<i data-lucide="lock" class="w-3 h-3 text-red-500 i
                 const rowClass = isFirstRow ? 'border-t-2 border-indigo-200 bg-slate-50' : 'border-t border-slate-100 border-dashed bg-white';
                 
                 const invoiceBadgeDesktop = barang.invoice ? `<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold shadow-sm"><i data-lucide="tag" class="w-2.5 h-2.5 inline mr-0.5"></i>${barang.invoice}</span>` : '-';
-                // Jika sudah terkunci (masuk rekap harian), checkbox didisable secara permanen
-const isLocked = barang.isLocked === true;
-const chkDisabled = isLocked ? 'disabled checked' : '';
-const chkClass = isLocked ? 'accent-slate-400 cursor-not-allowed opacity-50' : 'accent-indigo-600 cursor-pointer';
-const lockIcon = isLocked ? '<i data-lucide="lock" class="w-3 h-3 text-red-500 inline ml-1" title="Terkunci (Sudah di Rekap Harian)"></i>' : '';
+                
+                // LOGIKA PENGHILANGAN CENTANG DESKTOP (Diganti Ikon Gembok jika Terkunci)
+                const chkElementDesktop = barang.isLocked
+                    ? `<div class="w-4 h-4 rounded shrink-0 flex items-center justify-center bg-slate-100 border border-slate-200" title="Terkunci (Sudah Masuk Rekap Harian)"><i data-lucide="lock" class="w-3 h-3 text-slate-400"></i></div>`
+                    : `<input type="checkbox" id="desktop-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded accent-indigo-600 cursor-pointer" onchange="syncCheckboxes('${barang.chkId}', this.checked)">`;
 
                 salesHtml += `
                     <tr class="${rowClass} hover:bg-indigo-50/50 transition-colors">
@@ -2798,8 +2828,8 @@ const lockIcon = isLocked ? '<i data-lucide="lock" class="w-3 h-3 text-red-500 i
                         <td class="p-3 font-bold text-slate-800">${isFirstRow ? group.pelanggan : ''}</td>
                         <td class="p-3 text-slate-600 text-center">${invoiceBadgeDesktop}</td>
                         <td class="p-3 text-slate-600 flex items-center gap-2">
-                            <input type="checkbox" id="desktop-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded ${chkClass}" ${chkDisabled} onchange="syncCheckboxes('${barang.chkId}', this.checked, ${barang.isSudah ? 'true' : 'false'})">
-                            <label for="desktop-${barang.chkId}" class="text-slate-800 font-medium cursor-pointer m-0">${barang.nama_barang}</label>
+                            ${chkElementDesktop}
+                            <label for="desktop-${barang.chkId}" class="text-slate-800 font-medium m-0 ${barang.isLocked ? 'cursor-default' : 'cursor-pointer'}">${barang.nama_barang}</label>
                         </td>
                         <td class="p-3 text-slate-500 text-right">${formatRupiah(barang.harga)}</td>
                         <td class="p-3 text-center font-black text-blue-600">${barang.qty}</td>
@@ -3426,51 +3456,61 @@ window.applyDateModal = function() {
 window.simpanSemuaTampilKeRekapHarian = async function() {
     const refs = window.rekapItemRefsLangsung || [];
     
-    let adaYangDiproses = false;
-    const dataToProcess = [];
+    let adaYangBaru = false;
+    const tanggalTerdampak = new Set();
 
+    // --- LANGKAH 1: Cari tanggal mana saja yang memiliki transaksi baru (belum di-lock) ---
     refs.forEach(groupItem => {
-        // Jangan proses jika item ini sudah dikunci (sudah pernah masuk rekap harian)
-        if (groupItem.isLocked) return;
-
         groupItem.refs.forEach(ref => {
-            const t = ref.trxData;
-            const item = ref.itemData;
-            
-            // Validasi tambahan agar item individual yang sudah isLocked = true tidak ikut diproses
-            if (item.isLocked) return;
-            
-            adaYangDiproses = true;
-            
-            // Ambil tanggal transaksi (format YYYY-MM-DD)
-            const tanggal = t.waktu.split(' ')[0]; 
-            const harga = parseFloat(item.harga) || 0;
-            const qty = parseFloat(item.qty) || 0;
-            
-            // Struktur data yang dikirimkan ke backend (Google Apps Script)
-            dataToProcess.push({
-                tanggal: tanggal,
-                id_transaksi: t.id,
-                barang: item.nama,
-                kategori: "",
-                pelanggan: t.sub || 'UMUM',
-                qty: qty,
-                harga_jual: harga,
-                subtotal: harga * qty,
-                invoice: item.invoice || '',
-                originalTrx: t // Kirim metadata transaksi untuk perhitungan omset di backend
-            });
+            // Cek jika item belum dikunci
+            if (!ref.itemData.isLocked) {
+                adaYangBaru = true;
+                const tanggal = ref.trxData.waktu.split(' ')[0];
+                tanggalTerdampak.add(tanggal);
+            }
         });
     });
 
-    if (!adaYangDiproses || dataToProcess.length === 0) {
+    if (!adaYangBaru) {
         return alert("Tidak ada data baru yang bisa direkap. Data yang tampil di layar mungkin sudah pernah direkap (terkunci).");
     }
+
+    // --- LANGKAH 2: Kumpulkan SEMUA transaksi pada tanggal yang terdampak ---
+    // Karena backend melakukan "Sapu Bersih" per tanggal, kita harus mengirim kembali
+    // transaksi lama (yang isLocked = true) berdampingan dengan transaksi baru.
+    const dataToProcess = [];
+
+    refs.forEach(groupItem => {
+        groupItem.refs.forEach(ref => {
+            const t = ref.trxData;
+            const item = ref.itemData;
+            const tanggal = t.waktu.split(' ')[0]; 
+            
+            // Masukkan ke payload HANYA JIKA tanggalnya termasuk dalam tanggal yang ada transaksi barunya
+            if (tanggalTerdampak.has(tanggal)) {
+                const harga = parseFloat(item.harga) || 0;
+                const qty = parseFloat(item.qty) || 0;
+                
+                dataToProcess.push({
+                    tanggal: tanggal,
+                    id_transaksi: t.id,
+                    barang: item.nama,
+                    kategori: "",
+                    pelanggan: t.sub || 'UMUM',
+                    qty: qty,
+                    harga_jual: harga,
+                    subtotal: harga * qty,
+                    invoice: item.invoice || '',
+                    originalTrx: t // Kirim metadata transaksi untuk perhitungan omset di backend
+                });
+            }
+        });
+    });
 
     showLoading(true);
 
     const payload = {
-        action: 'simpan_rekapan_harian_v2', // Gunakan action fungsi backend yang baru
+        action: 'simpan_rekapan_harian_v2', // Pastikan action ini sesuai dengan di backend
         items: dataToProcess
     };
 
@@ -3485,11 +3525,14 @@ window.simpanSemuaTampilKeRekapHarian = async function() {
         if (result.status === 'success' || result.success) {
             alert("Data berhasil disimpan ke sheet Rekapan Harian!");
             
-            // Kunci item di frontend agar tidak bisa dicentang atau diproses berulang
+            // Kunci semua item di frontend yang ada di tanggal terdampak agar tidak bisa diproses berulang
             refs.forEach(groupItem => {
-                groupItem.isLocked = true;
                 groupItem.refs.forEach(ref => {
-                    ref.itemData.isLocked = true;
+                    const tanggal = ref.trxData.waktu.split(' ')[0];
+                    if (tanggalTerdampak.has(tanggal)) {
+                        groupItem.isLocked = true;
+                        ref.itemData.isLocked = true;
+                    }
                 });
             });
             
@@ -4103,29 +4146,31 @@ window.handleNavLainnya = function() {
          onclick="openModalPelanggan()" readonly>
 </div>
 
+        ${currentShop.nama === 'BLIMI' ? '' : `
         <div class="mt-3">
-  <label class="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-2 block">Jenis Orderan</label>
-  <div class="grid grid-cols-3 gap-2">
-    <label class="cursor-pointer group">
-      <input type="radio" name="p_ket_opt" value="BLANGKO" class="hidden peer">
-      <div class="flex items-center justify-center p-2.5 rounded-xl border-2 border-slate-100 bg-white transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
-        <span class="text-[10px] font-bold text-slate-600 peer-checked:text-blue-700 uppercase">Blangko</span>
-      </div>
-    </label>
-    <label class="cursor-pointer group">
-      <input type="radio" name="p_ket_opt" value="UNDANGAN" class="hidden peer">
-      <div class="flex items-center justify-center p-2.5 rounded-xl border-2 border-slate-100 bg-white transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
-        <span class="text-[10px] font-bold text-slate-600 peer-checked:text-blue-700 uppercase text-center">Undangan</span>
-      </div>
-    </label>
-    <label class="cursor-pointer group">
-      <input type="radio" name="p_ket_opt" value="LAIN-LAIN" class="hidden peer">
-      <div class="flex items-center justify-center p-2.5 rounded-xl border-2 border-slate-100 bg-white transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
-        <span class="text-[10px] font-bold text-slate-600 peer-checked:text-blue-700 uppercase">Lain-lain</span>
-      </div>
-    </label>
-  </div>
-</div>
+          <label class="text-[10px] font-bold text-gray-400 uppercase ml-1 mb-2 block">Jenis Orderan</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="cursor-pointer group">
+              <input type="radio" name="p_ket_opt" value="BLANGKO" class="hidden peer">
+              <div class="flex items-center justify-center p-2.5 rounded-xl border-2 border-slate-100 bg-white transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
+                <span class="text-[10px] font-bold text-slate-600 peer-checked:text-blue-700 uppercase">Blangko</span>
+              </div>
+            </label>
+            <label class="cursor-pointer group">
+              <input type="radio" name="p_ket_opt" value="UNDANGAN" class="hidden peer">
+              <div class="flex items-center justify-center p-2.5 rounded-xl border-2 border-slate-100 bg-white transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
+                <span class="text-[10px] font-bold text-slate-600 peer-checked:text-blue-700 uppercase text-center">Undangan</span>
+              </div>
+            </label>
+            <label class="cursor-pointer group">
+              <input type="radio" name="p_ket_opt" value="LAIN-LAIN" class="hidden peer">
+              <div class="flex items-center justify-center p-2.5 rounded-xl border-2 border-slate-100 bg-white transition-all peer-checked:border-blue-500 peer-checked:bg-blue-50 group-active:scale-95">
+                <span class="text-[10px] font-bold text-slate-600 peer-checked:text-blue-700 uppercase">Lain-lain</span>
+              </div>
+            </label>
+          </div>
+        </div>
+        `}
 
         <div class="py-2"> 
           <div class="border-t border-b border-slate-200 py-3">
@@ -5027,7 +5072,8 @@ function savePenjualan() {
   const shopInitial = currentShop.nama ? currentShop.nama.charAt(0).toUpperCase() : '?';
   const inputPelanggan = (document.getElementById('inputPelangganUtama').value || 'UMUM').toUpperCase();
   
-  let pelangganFormatted = `${inputPelanggan} (${shopInitial})`;
+  // LOGIKA BARU: Jika nama toko adalah BLIMI, maka gunakan nama pelanggan asli saja
+  let pelangganFormatted = currentShop.nama === 'BLIMI' ? inputPelanggan : `${inputPelanggan} (${shopInitial})`;
   let keteranganOtomatis = ketPilihan;
 
   const shopee1 = items.find(item => item.nama.toLowerCase() === "tarik dana shopee1");
@@ -6211,17 +6257,25 @@ function showTransferForm() {
   const container = document.getElementById('action-form-container');
   container.classList.remove('hidden');
 
-  // Deteksi kasir dinamis
-  const myCash = currentShop.nama === 'VI PRINTING' ? 'Cash Vi Printing' : 'Cash Muflih Print';
-  const otherCash = currentShop.nama === 'VI PRINTING' ? 'Cash Muflih Print' : 'Cash Vi Printing';
+  // Deteksi kasir dinamis dan opsi khusus untuk BLIMI
+  let optionsHTML = '';
+  
+  if (currentShop.nama === 'BLIMI') {
+    optionsHTML = `
+      <option value="Cash Blimi">Kas Cash</option>
+      <option value="Rekening">Rekening Bank</option>
+    `;
+  } else {
+    const myCash = currentShop.nama === 'VI PRINTING' ? 'Cash Vi Printing' : 'Cash Muflih Print';
+    const otherCash = currentShop.nama === 'VI PRINTING' ? 'Cash Muflih Print' : 'Cash Vi Printing';
 
-  // Teks "Toko Ini" dan "Toko Sebelah" Dihilangkan
-  const optionsHTML = `
-    <option value="${myCash}">Kas ${myCash.replace('Cash ', '')}</option>
-    <option value="${otherCash}">Kas ${otherCash.replace('Cash ', '')}</option>
-    <option value="Rekening">Rekening Bank</option>
-    <option value="Kas Bendahara">Kas Bendahara</option>
-  `;
+    optionsHTML = `
+      <option value="${myCash}">Kas ${myCash.replace('Cash ', '')}</option>
+      <option value="${otherCash}">Kas ${otherCash.replace('Cash ', '')}</option>
+      <option value="Rekening">Rekening Bank</option>
+      <option value="Kas Bendahara">Kas Bendahara</option>
+    `;
+  }
 
   container.innerHTML = `
     <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-4 page-transition">
@@ -6278,7 +6332,12 @@ function showTransferForm() {
   
   // Set default (Kasir Ini -> Rekening)
   document.getElementById('t_dari').selectedIndex = 0; 
-  document.getElementById('t_ke').selectedIndex = 2; 
+  if (currentShop.nama === 'BLIMI') {
+    // Karena BLIMI hanya punya 2 opsi, maka Rekening ada di urutan kedua (indeks 1)
+    document.getElementById('t_ke').selectedIndex = 1; 
+  } else {
+    document.getElementById('t_ke').selectedIndex = 2; 
+  }
   
   // Panggil validasi awal saat form dibuka
   validateTransfer();
