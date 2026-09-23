@@ -1879,19 +1879,30 @@ function initRiwayatStructure() {
             </div>
                   </div>
 
-              <!-- BARIS AKSI KHUSUS TAMPILAN REKAPAN (TETAP DI ATAS/FIXED) -->
-          <div id="rekapan-action-bar" class="hidden items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300 flex-wrap gap-2">
-              <div class="flex items-center gap-1.5">
-                  <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i>
-                  <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-widest hidden sm:inline">Rekapan</span>
-              </div>
-              <div class="flex items-center gap-2 flex-1 justify-end">
-                  <input type="text" id="global-invoice-input" placeholder="Teks Invoice Kolektif..." class="flex-1 max-w-[200px] text-[10px] p-1.5 rounded-md border border-indigo-200 outline-none focus:ring-1 focus:ring-indigo-500">
-                  <button onclick="prosesUpdateTerpilihLangsung()" class="text-[10px] font-black text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg flex items-center shrink-0 active:scale-95 transition-all shadow-sm">
-                      <i data-lucide="check-circle" class="w-3.5 h-3.5 mr-1"></i> Terapkan
-                  </button>
-              </div>
-          </div>
+<!-- BARIS AKSI KHUSUS TAMPILAN REKAPAN (TETAP DI ATAS/FIXED) -->
+<div id="rekapan-action-bar" class="hidden items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300 flex-wrap gap-2">
+    <div class="flex items-center gap-1.5 w-full sm:w-auto border-b border-indigo-100 sm:border-0 pb-2 sm:pb-0">
+        <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i>
+        <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">Aksi Rekapan</span>
+    </div>
+    
+    <div class="flex items-center gap-2 flex-1 justify-end flex-wrap sm:flex-nowrap">
+        
+        <!-- KOLOM INPUT TEKS INVOICE (Dipertahankan) -->
+        <input type="text" id="global-invoice-input" placeholder="Ketik teks invoice..." class="flex-1 min-w-[120px] text-[10px] p-1.5 rounded-md border border-indigo-200 outline-none focus:ring-1 focus:ring-indigo-500">
+        
+        <!-- TOMBOL 1: TERAPKAN TEKS CENTANG (Menjalankan setTeksInvoiceTerpilih) -->
+        <button onclick="prosesUpdateTerpilihLangsung()" title="Terapkan teks pada input ke item yang dicentang" class="text-[10px] font-black text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg flex items-center shrink-0 active:scale-95 transition-all shadow-sm">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5 sm:mr-1"></i> <span class="hidden sm:inline">Terapkan</span>
+        </button>
+
+        <!-- TOMBOL 2: SIMPAN KE REKAP HARIAN -->
+        <button onclick="simpanSemuaTampilKeRekapHarian()" title="Simpan Semua Tampil ke Rekap Harian" class="text-[10px] font-black text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1.5 rounded-lg flex items-center shrink-0 active:scale-95 transition-all shadow-sm">
+            <i data-lucide="save" class="w-3.5 h-3.5 sm:mr-1"></i> <span class="hidden sm:inline">Simpan Rekap</span>
+        </button>
+        
+    </div>
+</div>
 
       <div id="listContainer" class="bg-slate-50/20 divide-y divide-slate-50 max-h-[550px] overflow-y-auto custom-scrollbar flex-1"></div>
       
@@ -2182,7 +2193,6 @@ window.backToRekapan = function() {
 };
 
 window.syncCheckboxes = function(chkId, isChecked) {
-    // Sinkronisasi otomatis antara tampilan HP (Mobile) dan PC (Desktop)
     const desk = document.getElementById(`desktop-${chkId}`);
     const mob = document.getElementById(`mobile-${chkId}`);
     if (desk) desk.checked = isChecked;
@@ -2193,35 +2203,14 @@ window.prosesUpdateTerpilihLangsung = async function() {
     const globalInvoice = document.getElementById('global-invoice-input').value.trim();
     const refs = window.rekapItemRefsLangsung || [];
     let updatesMap = {}; 
-    let itemsForRekapan = [];
     let adaYangDiproses = false;
 
-    // Kalkulasi Total Omset Harian (konsisten)
-    const omsetPerTanggal = {};
-    window.currentFilteredTransactions.forEach(t => {
-        if ((t.kat || "").toUpperCase() !== 'PENJUALAN') return;
-        if (t.kat === 'BATAL' || t.kat === 'DIHAPUS' || t.kat === 'CANCEL ORDER') return;
-        const tglKey = t.waktu.split(' ')[0]; 
-        let totalTagihan = 0;
-        try {
-            let det = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail;
-            if(Array.isArray(det)) {
-                totalTagihan = det.reduce((sum, i) => sum + ((parseFloat(i.qty)||0) * (parseFloat(i.harga)||0)), 0);
-            }
-        } catch(e){}
-        totalTagihan -= (parseFloat(t.diskon) || 0);
-        if (!omsetPerTanggal[tglKey]) omsetPerTanggal[tglKey] = 0;
-        omsetPerTanggal[tglKey] += totalTagihan;
-    });
-
+    // 1. Kumpulkan data yang dicentang saja
     refs.forEach(groupItem => {
-        // HAPUS Pengecekan if (groupItem.isSudah) return; agar bisa diuncheck
-
         const deskChk = document.getElementById(`desktop-${groupItem.chkId}`);
         const mobChk = document.getElementById(`mobile-${groupItem.chkId}`);
         const isChecked = (deskChk && deskChk.checked) || (mobChk && mobChk.checked);
 
-        // Jika dicentang ATAU statusnya berubah (misal sebelumnya sudah direkap tapi sekarang dihilangkan centangnya)
         if (isChecked || groupItem.isSudah) {
             adaYangDiproses = true;
             
@@ -2236,49 +2225,8 @@ window.prosesUpdateTerpilihLangsung = async function() {
                 
                 if (isChecked) {
                     updatesMap[t.id].selectedItems.push(namaBrg);
-                    // Gunakan nilai input baru, atau gunakan yang lama, atau default 'SUDAH REKAP'
                     updatesMap[t.id].invoiceTexts[namaBrg] = globalInvoice || item.invoice || "SUDAH REKAP"; 
-
-                    const rawDate = t.waktu.split(' ')[0];
-                    const parts = rawDate.split('-');
-                    const tglFormatted = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : rawDate;
-                    const pelanggan = (t.sub || "UMUM").replace(/\s*\|.*$/, '');
-                    const nominalMasuk = parseFloat(t.masuk || t.keluar) || 0;
-                    
-                    let totalTagihanTrx = 0;
-                    try {
-                        let det = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail;
-                        if(Array.isArray(det)) {
-                            totalTagihanTrx = det.reduce((sum, i) => sum + ((parseFloat(i.qty)||0) * (parseFloat(i.harga)||0)), 0);
-                        }
-                    } catch(e){}
-                    totalTagihanTrx -= (parseFloat(t.diskon) || 0);
-                    
-                    const statusBayar = (nominalMasuk < totalTagihanTrx) ? "Belum Bayar" : "-";
-
-                    let hrgReseller = 0;
-                    if (typeof productMaster !== 'undefined') {
-                        const masterData = productMaster.find(p => p.nama === namaBrg);
-                        if (masterData) hrgReseller = masterData.harga_reseller || masterData.hargaReseller || 0;
-                    }
-
-                    itemsForRekapan.push({
-                        periode: tglFormatted,
-                        totalOmset: omsetPerTanggal[rawDate] || "", 
-                        barang: namaBrg,
-                        hargaReseller: hrgReseller,
-                        hargaJual: parseFloat(item.harga) || 0,
-                        jumlah: parseFloat(item.qty) || 0,
-                        total: (parseFloat(item.qty) || 0) * (parseFloat(item.harga) || 0),
-                        lot: item.kategori || "UMUM",
-                        ket: statusBayar,
-                        followUp: pelanggan,
-                        invoice: updatesMap[t.id].invoiceTexts[namaBrg],           
-                        idTransaksi: t.id,
-                        isUpdateExisting: groupItem.isSudah
-                    });
                 } else {
-                    // Jika centang dihilangkan
                     updatesMap[t.id].unselectedItems.push(namaBrg);
                 }
             });
@@ -2291,7 +2239,7 @@ window.prosesUpdateTerpilihLangsung = async function() {
     let updatesArray = Object.values(updatesMap);
 
     try {
-        // Update Memori Lokal agar centang terupdate di JSON "detail"
+        // 2. Update Memori Lokal agar UI seketika berubah
         updatesArray.forEach(u => {
            let target = allTransactions.find(x => x.id === u.id);
            if(target) { 
@@ -2302,27 +2250,38 @@ window.prosesUpdateTerpilihLangsung = async function() {
                    items.forEach(item => {
                        const nmBrg = (item.nama || "").toUpperCase();
                        if (u.selectedItems.includes(nmBrg)) {
-                           item.isRekap = u.invoiceTexts[nmBrg]; // Menyimpan teks invoice langsung di isrekap
-                           item.invoice = u.invoiceTexts[nmBrg]; 
+                           const teksKolektif = u.invoiceTexts[nmBrg];
+                           if (!teksKolektif || teksKolektif.trim() === "") {
+                               item.isRekap = false;
+                               item.invoice = "";
+                           } else {
+                               item.isRekap = teksKolektif;
+                               item.invoice = teksKolektif;
+                           }
                        } else if (u.unselectedItems.includes(nmBrg)) {
-                           item.isRekap = false; // Kembalikan ke false jika centang dilepas
+                           item.isRekap = false; 
                            item.invoice = "";
                        }
                    });
                    target.detail = items; 
-                   // Tambahkan detail JSON string baru ke payload agar diproses Google Script (jika disupport)
-                   u.newDetailString = JSON.stringify(items);
                }
            }
         });
 
-        const payload = { action: 'updateSubjekMulti', updates: updatesArray, items: itemsForRekapan };
+        // 3. PAYLOAD BARU: Hanya mengirim 'set_invoice' dan data 'updates'
+        // (parameter 'items' sengaja dihapus agar tidak masuk ke rekap harian)
+        const payload = { 
+            action: 'set_invoice', 
+            updates: updatesArray 
+        };
+        
+        // 4. Kirim ke Backend
         fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) }).catch(e => console.log("Fetch:", e));
         
         renderTransactions(); 
         document.getElementById('global-invoice-input').value = ''; 
         showLoading(false);
-        alert(`Berhasil memperbarui data rekapan.`);
+        alert(`Berhasil menerapkan teks invoice ke item yang dicentang.`);
     } catch (error) {
         showLoading(false);
         alert('Terjadi kesalahan saat memproses data ke server.');
@@ -2752,20 +2711,25 @@ if ((item.isRekap && item.isRekap !== false && item.isRekap !== "false" && item.
             let itemsHtmlMobile = '';
             
             daftarBarang.forEach(barang => {
-                const invoiceBadge = barang.invoice ? `<span class="inline-block mt-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-bold"><i data-lucide="tag" class="w-2.5 h-2.5 inline mr-0.5"></i> ${barang.invoice}</span>` : '';
-                const chkDisabled = barang.isSudah ? 'checked' : '';
-const chkClass = 'accent-indigo-600 cursor-pointer'; // Class dibuat normal
+                // Modifikasi agar marginnya pas dan menampilkan strip (-) jika tidak ada invoice
+                const invoiceBadgeMobile = barang.invoice ? `<span class="inline-block mb-1 bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-bold"><i data-lucide="tag" class="w-2.5 h-2.5 inline mr-0.5"></i> ${barang.invoice}</span>` : '<span class="inline-block mb-1 text-[9px] text-slate-400 italic">-</span>';
+                // Jika sudah terkunci (masuk rekap harian), checkbox didisable secara permanen
+const isLocked = barang.isLocked === true;
+const chkDisabled = isLocked ? 'disabled checked' : '';
+const chkClass = isLocked ? 'accent-slate-400 cursor-not-allowed opacity-50' : 'accent-indigo-600 cursor-pointer';
+const lockIcon = isLocked ? '<i data-lucide="lock" class="w-3 h-3 text-red-500 inline ml-1" title="Terkunci (Sudah di Rekap Harian)"></i>' : '';
 
-itemsHtmlMobile += `
-    <div class="flex justify-between items-start text-xs border-b border-slate-100 pb-2 mb-2 last:border-0 last:pb-0 last:mb-0">
-        <div class="flex items-start gap-2 flex-1 pr-2">
-            <input type="checkbox" id="mobile-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded mt-0.5 shrink-0 ${chkClass}" ${chkDisabled} onchange="syncCheckboxes('${barang.chkId}', this.checked)">
-            <div>
-                <label for="mobile-${barang.chkId}" class="font-bold text-slate-700 cursor-pointer m-0">${barang.nama_barang}</label>
+                itemsHtmlMobile += `
+                    <div class="flex justify-between items-start text-xs border-b border-slate-100 pb-2 mb-2 last:border-0 last:pb-0 last:mb-0">
+                        <div class="flex items-start gap-2 flex-1 pr-2">
+                            <input type="checkbox" id="mobile-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded mt-0.5 shrink-0 ${chkClass}" ${chkDisabled} onchange="syncCheckboxes('${barang.chkId}', this.checked, ${barang.isSudah ? 'true' : 'false'})">
+                            <div>
+                                <!-- Memindahkan posisi invoice agar selalu tampil sebelum barang -->
+                                ${invoiceBadgeMobile}
+                                <label for="mobile-${barang.chkId}" class="font-bold text-slate-700 cursor-pointer m-0 block">${barang.nama_barang}</label>
                                 <p class="text-[10px] text-slate-500 mt-0.5">
                                     ${barang.qty} <span class="mx-1 text-slate-300">x</span> ${formatRupiah(barang.harga)}
                                 </p>
-                                ${invoiceBadge}
                             </div>
                         </div>
                         <div class="font-black text-slate-800 text-right mt-0.5">
@@ -2804,7 +2768,8 @@ itemsHtmlMobile += `
                             <tr class="bg-indigo-100 text-indigo-800">
                                 <th class="p-3 border-b border-indigo-200 font-bold">Tanggal</th>
                                 <th class="p-3 border-b border-indigo-200 font-bold">Pelanggan</th>
-                                <th class="p-3 border-b border-indigo-200 font-bold">Barang & Invoice</th>
+                                <th class="p-3 border-b border-indigo-200 font-bold">Invoice</th>
+                                <th class="p-3 border-b border-indigo-200 font-bold">Barang</th>
                                 <th class="p-3 border-b border-indigo-200 font-bold text-right">Harga</th>
                                 <th class="p-3 border-b border-indigo-200 font-bold text-center">Qty</th>
                                 <th class="p-3 border-b border-indigo-200 font-bold text-right">Subtotal</th>
@@ -2820,17 +2785,21 @@ itemsHtmlMobile += `
                 const isFirstRow = index === 0;
                 const rowClass = isFirstRow ? 'border-t-2 border-indigo-200 bg-slate-50' : 'border-t border-slate-100 border-dashed bg-white';
                 
-                const invoiceBadge = barang.invoice ? `<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold ml-2 align-middle shadow-sm"><i data-lucide="tag" class="w-2.5 h-2.5 inline mr-0.5"></i>${barang.invoice}</span>` : '';
-                const chkDisabled = barang.isSudah ? 'checked' : '';
-const chkClass = 'accent-indigo-600 cursor-pointer';
+                const invoiceBadgeDesktop = barang.invoice ? `<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold shadow-sm"><i data-lucide="tag" class="w-2.5 h-2.5 inline mr-0.5"></i>${barang.invoice}</span>` : '-';
+                // Jika sudah terkunci (masuk rekap harian), checkbox didisable secara permanen
+const isLocked = barang.isLocked === true;
+const chkDisabled = isLocked ? 'disabled checked' : '';
+const chkClass = isLocked ? 'accent-slate-400 cursor-not-allowed opacity-50' : 'accent-indigo-600 cursor-pointer';
+const lockIcon = isLocked ? '<i data-lucide="lock" class="w-3 h-3 text-red-500 inline ml-1" title="Terkunci (Sudah di Rekap Harian)"></i>' : '';
 
-salesHtml += `
-    <tr class="${rowClass} hover:bg-indigo-50/50 transition-colors">
-        <td class="p-3 text-slate-500">${isFirstRow ? group.tanggal : ''}</td>
-        <td class="p-3 font-bold text-slate-800">${isFirstRow ? group.pelanggan : ''}</td>
-        <td class="p-3 text-slate-600 flex items-center gap-2">
-            <input type="checkbox" id="desktop-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded ${chkClass}" ${chkDisabled} onchange="syncCheckboxes('${barang.chkId}', this.checked)">
-            <label for="desktop-${barang.chkId}" class="text-slate-800 font-medium cursor-pointer m-0">${barang.nama_barang} ${invoiceBadge}</label>
+                salesHtml += `
+                    <tr class="${rowClass} hover:bg-indigo-50/50 transition-colors">
+                        <td class="p-3 text-slate-500">${isFirstRow ? group.tanggal : ''}</td>
+                        <td class="p-3 font-bold text-slate-800">${isFirstRow ? group.pelanggan : ''}</td>
+                        <td class="p-3 text-slate-600 text-center">${invoiceBadgeDesktop}</td>
+                        <td class="p-3 text-slate-600 flex items-center gap-2">
+                            <input type="checkbox" id="desktop-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded ${chkClass}" ${chkDisabled} onchange="syncCheckboxes('${barang.chkId}', this.checked, ${barang.isSudah ? 'true' : 'false'})">
+                            <label for="desktop-${barang.chkId}" class="text-slate-800 font-medium cursor-pointer m-0">${barang.nama_barang}</label>
                         </td>
                         <td class="p-3 text-slate-500 text-right">${formatRupiah(barang.harga)}</td>
                         <td class="p-3 text-center font-black text-blue-600">${barang.qty}</td>
@@ -3454,6 +3423,88 @@ window.applyDateModal = function() {
   setFilter('custom');   // Refresh data
 };
     
+window.simpanSemuaTampilKeRekapHarian = async function() {
+    const refs = window.rekapItemRefsLangsung || [];
+    
+    let adaYangDiproses = false;
+    const dataToProcess = [];
+
+    refs.forEach(groupItem => {
+        // Jangan proses jika item ini sudah dikunci (sudah pernah masuk rekap harian)
+        if (groupItem.isLocked) return;
+
+        groupItem.refs.forEach(ref => {
+            const t = ref.trxData;
+            const item = ref.itemData;
+            
+            // Validasi tambahan agar item individual yang sudah isLocked = true tidak ikut diproses
+            if (item.isLocked) return;
+            
+            adaYangDiproses = true;
+            
+            // Ambil tanggal transaksi (format YYYY-MM-DD)
+            const tanggal = t.waktu.split(' ')[0]; 
+            const harga = parseFloat(item.harga) || 0;
+            const qty = parseFloat(item.qty) || 0;
+            
+            // Struktur data yang dikirimkan ke backend (Google Apps Script)
+            dataToProcess.push({
+                tanggal: tanggal,
+                id_transaksi: t.id,
+                barang: item.nama,
+                kategori: "",
+                pelanggan: t.sub || 'UMUM',
+                qty: qty,
+                harga_jual: harga,
+                subtotal: harga * qty,
+                invoice: item.invoice || '',
+                originalTrx: t // Kirim metadata transaksi untuk perhitungan omset di backend
+            });
+        });
+    });
+
+    if (!adaYangDiproses || dataToProcess.length === 0) {
+        return alert("Tidak ada data baru yang bisa direkap. Data yang tampil di layar mungkin sudah pernah direkap (terkunci).");
+    }
+
+    showLoading(true);
+
+    const payload = {
+        action: 'simpan_rekapan_harian_v2', // Gunakan action fungsi backend yang baru
+        items: dataToProcess
+    };
+
+    try {
+        const response = await fetch(WEB_APP_URL, { 
+            method: 'POST', 
+            body: JSON.stringify(payload) 
+        });
+        const result = await response.json();
+        
+        showLoading(false);
+        if (result.status === 'success' || result.success) {
+            alert("Data berhasil disimpan ke sheet Rekapan Harian!");
+            
+            // Kunci item di frontend agar tidak bisa dicentang atau diproses berulang
+            refs.forEach(groupItem => {
+                groupItem.isLocked = true;
+                groupItem.refs.forEach(ref => {
+                    ref.itemData.isLocked = true;
+                });
+            });
+            
+            // Render ulang layar agar memunculkan logo Gembok (Terkunci) di UI
+            renderTransactions(); 
+        } else {
+            alert("Gagal menyimpan rekap: " + (result.message || "Unknown error"));
+        }
+    } catch (error) {
+        showLoading(false);
+        alert('Terjadi kesalahan saat berkomunikasi dengan server.');
+        console.error(error);
+    }
+};
+
 async function setFilter(f) {
   currentPage = 1;
   currentFilter = f;
