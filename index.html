@@ -1355,9 +1355,9 @@ window.isSummaryView = false;
 window.isOmsetView = false;
 window.isRincianLengkapView = false;
 window.isRekapanBarangView = false;
+window.isRekapanPenjualanView = false;
 window.viewModeState = 0; // Tetap dipertahankan untuk kompatibilitas kode lama
 
-// Fungsi untuk membuka modal pilihan tampilan
 window.openViewModeModal = function() {
     const modal = document.getElementById('general-modal');
     const content = document.getElementById('modalContent');
@@ -1377,11 +1377,12 @@ window.openViewModeModal = function() {
             </div>
             
             <div class="space-y-3 overflow-y-auto pr-1 pb-4 flex-1 custom-scrollbar px-1">
-                ${generateViewModeBtn('normal', 'Mode Normal', 'Tampilan standar daftar transaksi & kas', 'list', !window.isSummaryView && !window.isOmsetView && !window.isRincianLengkapView && !window.isRekapanBarangView)}
+                ${generateViewModeBtn('normal', 'Mode Normal', 'Tampilan standar daftar transaksi & kas', 'list', !window.isSummaryView && !window.isOmsetView && !window.isRincianLengkapView && !window.isRekapanBarangView && !window.isRekapanPenjualanView)}
                 ${generateViewModeBtn('ringkasan', 'Lihat Ringkasan', 'Ringkasan hitungan per kategori', 'pie-chart', window.isSummaryView)}
                 ${generateViewModeBtn('omset', 'Mode Omset', 'Tampilan berdasarkan total omset/tagihan', 'receipt', window.isOmsetView)}
                 ${generateViewModeBtn('rincian', 'Rincian Lengkap', 'Daftar rincian seluruh barang dari transaksi', 'shopping-bag', window.isRincianLengkapView)}
                 ${generateViewModeBtn('rekapan', 'Rekapan Jumlah Barang', 'Total kuantitas barang yang terjual', 'bar-chart-2', window.isRekapanBarangView)}
+                ${generateViewModeBtn('rekapan_penjualan', 'Rekapan Penjualan', 'Rekap omset tagihan per nota/pelanggan', 'file-spreadsheet', window.isRekapanPenjualanView)}
             </div>
         </div>
     `;
@@ -1390,6 +1391,113 @@ window.openViewModeModal = function() {
     modal.style.display = 'flex';
     if (typeof lucide !== 'undefined') lucide.createIcons({ root: content });
 };
+
+function kelompokkanPenjualan(rawData) {
+    const groupedData = {};
+
+    // --- PROSES PENGELOMPOKAN ---
+    rawData.forEach(trx => {
+        const tanggal = trx.tanggal || '-';
+        const pelanggan = trx.pelanggan || 'Umum';
+        const namaBarang = trx.nama_barang || trx.item || '-';
+        const harga = parseFloat(trx.harga) || 0;
+        const qty = parseInt(trx.qty) || 1;
+        const subtotal = parseFloat(trx.subtotal) || (harga * qty);
+
+        // Kunci Tingkat 1: Tanggal + Pelanggan
+        const customerKey = `${tanggal}_${pelanggan}`;
+
+        if (!groupedData[customerKey]) {
+            groupedData[customerKey] = {
+                tanggal: tanggal,
+                pelanggan: pelanggan,
+                total_omset_pelanggan: 0,
+                rincian_barang: {} // Objek untuk menyimpan barang unik
+            };
+        }
+
+        // Akumulasi total omset untuk pelanggan ini
+        groupedData[customerKey].total_omset_pelanggan += subtotal;
+
+        // Kunci Tingkat 2: Nama Barang + Harga (di dalam kelompok pelanggan)
+        const itemKey = `${namaBarang}_${harga}`;
+
+        if (!groupedData[customerKey].rincian_barang[itemKey]) {
+            // Jika barang ini belum ada untuk pelanggan ini, buat baru
+            groupedData[customerKey].rincian_barang[itemKey] = {
+                nama_barang: namaBarang,
+                harga: harga,
+                qty: 0,
+                subtotal_barang: 0
+            };
+        }
+
+        // Akumulasi Qty dan Subtotal untuk barang yang sama persis
+        groupedData[customerKey].rincian_barang[itemKey].qty += qty;
+        groupedData[customerKey].rincian_barang[itemKey].subtotal_barang += subtotal;
+    });
+
+    // --- PROSES PERATAAN (FLATTENING) UNTUK TABEL ---
+    // Kita ubah formatnya menjadi array (daftar) per BARIS (per barang)
+    const dataSiapRender = [];
+
+    // Looping per pelanggan
+    Object.values(groupedData).forEach(customerData => {
+        const daftarBarang = Object.values(customerData.rincian_barang);
+        
+        // Looping barang dari pelanggan tersebut
+        daftarBarang.forEach((barang, index) => {
+            dataSiapRender.push({
+                tanggal: customerData.tanggal,
+                pelanggan: customerData.pelanggan,
+                
+                // Rincian barang
+                nama_barang: barang.nama_barang,
+                harga: barang.harga,
+                qty: barang.qty,
+                subtotal_barang: barang.subtotal_barang,
+                
+                // Menentukan baris pertama dari pelanggan ini
+                isFirstRow: index === 0, 
+                total_omset: index === 0 ? customerData.total_omset_pelanggan : null
+            });
+        });
+    });
+
+    return dataSiapRender;
+}
+
+function renderTabel(dataSiapRender) {
+    const tbody = document.getElementById('bodyTabelPenjualan'); // Ganti ID sesuai tabel Anda
+    tbody.innerHTML = '';
+
+    dataSiapRender.forEach(row => {
+        const tr = document.createElement('tr');
+        
+        // Beri garis pembatas tegas setiap kali ada pelanggan baru
+        if (row.isFirstRow) {
+            tr.className = 'border-t-2 border-gray-400 bg-gray-50';
+        } else {
+            tr.className = 'border-t border-gray-200 border-dashed';
+        }
+
+        tr.innerHTML = `
+            <td class="p-2">${row.isFirstRow ? row.tanggal : ''}</td>
+            <td class="p-2 font-semibold">${row.isFirstRow ? row.pelanggan : ''}</td>
+            
+            <td class="p-2">${row.nama_barang}</td>
+            <td class="p-2">Rp ${row.harga.toLocaleString('id-ID')}</td>
+            <td class="p-2 text-center">${row.qty}</td>
+            <td class="p-2">Rp ${row.subtotal_barang.toLocaleString('id-ID')}</td>
+            
+            <td class="p-2 font-bold text-blue-600">
+                ${row.isFirstRow ? `Rp ${row.total_omset.toLocaleString('id-ID')}` : ''}
+            </td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
+}
 
 // Fungsi helper untuk cetak tombol modal
 function generateViewModeBtn(mode, title, desc, icon, isActive) {
@@ -1415,6 +1523,7 @@ window.applyViewMode = function(mode) {
     window.isOmsetView = false;
     window.isRincianLengkapView = false;
     window.isRekapanBarangView = false;
+    window.isRekapanPenjualanView = false;
     window.currentProductFilter = null;
 
     const btn = document.getElementById('btn-toggle-summary');
@@ -1445,6 +1554,11 @@ window.applyViewMode = function(mode) {
         btnClass = btnClass.replace('border-slate-200', 'border-emerald-300') + 'bg-emerald-50 text-emerald-600';
         icon = 'bar-chart-2';
         if (btn) btn.title = "Rekapan Barang";
+    } else if (mode === 'rekapan_penjualan') {
+        window.isRekapanPenjualanView = true;
+        btnClass = btnClass.replace('border-slate-200', 'border-indigo-300') + 'bg-indigo-50 text-indigo-600';
+        icon = 'file-spreadsheet';
+        if (btn) btn.title = "Rekapan Penjualan";
     }
 
     if (btn) {
@@ -1765,17 +1879,19 @@ function initRiwayatStructure() {
             </div>
                   </div>
 
-                  <!-- BARIS AKSI KHUSUS TAMPILAN REKAPAN (TETAP DI ATAS/FIXED) -->
-          <div id="rekapan-action-bar" class="hidden items-center justify-between px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+              <!-- BARIS AKSI KHUSUS TAMPILAN REKAPAN (TETAP DI ATAS/FIXED) -->
+          <div id="rekapan-action-bar" class="hidden items-center justify-between px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300 flex-wrap gap-2">
               <div class="flex items-center gap-1.5">
-                  <i data-lucide="bar-chart-2" class="w-3.5 h-3.5 text-emerald-600"></i>
-                  <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Mode Rekapan</span>
+                  <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-indigo-600"></i>
+                  <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-widest hidden sm:inline">Rekapan</span>
               </div>
-              <button onclick="promptUpdatePelangganRekapan()" class="text-[10px] font-black text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1.5 rounded-lg flex items-center active:scale-95 transition-all shadow-sm">
-                  <i data-lucide="clipboard-list" class="w-3.5 h-3.5 mr-1.5"></i> Rekap Penjualan
-              </button>
+              <div class="flex items-center gap-2 flex-1 justify-end">
+                  <input type="text" id="global-invoice-input" placeholder="Teks Invoice Kolektif..." class="flex-1 max-w-[200px] text-[10px] p-1.5 rounded-md border border-indigo-200 outline-none focus:ring-1 focus:ring-indigo-500">
+                  <button onclick="prosesUpdateTerpilihLangsung()" class="text-[10px] font-black text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg flex items-center shrink-0 active:scale-95 transition-all shadow-sm">
+                      <i data-lucide="check-circle" class="w-3.5 h-3.5 mr-1"></i> Terapkan
+                  </button>
+              </div>
           </div>
-      </div>
 
       <div id="listContainer" class="bg-slate-50/20 divide-y divide-slate-50 max-h-[550px] overflow-y-auto custom-scrollbar flex-1"></div>
       
@@ -2065,22 +2181,27 @@ window.backToRekapan = function() {
     renderTransactions();
 };
 
+window.syncCheckboxes = function(chkId, isChecked) {
+    // Sinkronisasi otomatis antara tampilan HP (Mobile) dan PC (Desktop)
+    const desk = document.getElementById(`desktop-${chkId}`);
+    const mob = document.getElementById(`mobile-${chkId}`);
+    if (desk) desk.checked = isChecked;
+    if (mob) mob.checked = isChecked;
+};
 
-window.promptUpdatePelangganRekapan = async function() {
-    const text = ""; // Fitur input teks dihilangkan, default kosong
-    
-    let trxsToUpdate = [];
-    const sourceData = window.currentFilteredTransactions || allTransactions;
+window.prosesUpdateTerpilihLangsung = async function() {
+    const globalInvoice = document.getElementById('global-invoice-input').value.trim();
+    const refs = window.rekapItemRefsLangsung || [];
+    let updatesMap = {}; 
+    let itemsForRekapan = [];
+    let adaYangDiproses = false;
+
+    // Kalkulasi Total Omset Harian (konsisten)
     const omsetPerTanggal = {};
-    
-    // KUMPULKAN SELURUH TRANSAKSI PENJUALAN DARI DAFTAR SAAT INI
-    sourceData.forEach(t => {
+    window.currentFilteredTransactions.forEach(t => {
         if ((t.kat || "").toUpperCase() !== 'PENJUALAN') return;
-        
-        const rawDate = t.waktu.split(' ')[0]; 
-        const parts = rawDate.split('-');
-        const tglKey = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : rawDate;
-        
+        if (t.kat === 'BATAL' || t.kat === 'DIHAPUS' || t.kat === 'CANCEL ORDER') return;
+        const tglKey = t.waktu.split(' ')[0]; 
         let totalTagihan = 0;
         try {
             let det = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail;
@@ -2089,141 +2210,122 @@ window.promptUpdatePelangganRekapan = async function() {
             }
         } catch(e){}
         totalTagihan -= (parseFloat(t.diskon) || 0);
-        
         if (!omsetPerTanggal[tglKey]) omsetPerTanggal[tglKey] = 0;
-        omsetPerTanggal[tglKey] += totalTagihan; 
-        
-        trxsToUpdate.push({ ...t, tglFormatted: tglKey, tagihanBersih: totalTagihan });
-    });
-    
-    if (trxsToUpdate.length === 0) return alert("Tidak ada transaksi Penjualan valid di daftar ini.");
-    if (!confirm(`Ditemukan ${trxsToUpdate.length} nota Penjualan. Proses ini akan merekap SELURUH transaksi di layar saat ini ke Rekapan Harian. Lanjutkan?`)) return;
-    
-    showLoading(true);
-    
-    let updates = [];
-    let itemsForRekapan = []; 
-    let tempItems = []; 
-    const tanggalSudahDitulis = {};
-    
-    trxsToUpdate.forEach(t => {
-        let cleanSub = (t.sub || "UMUM").replace(/\s*\|.*$/, '');
-        
-        let items = [];
-        try { if (t.detail) items = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail; } catch(e){}
-        
-        let allItemsInTrx = [];
-        
-        if (Array.isArray(items)) {
-            items.forEach(item => {
-                const namaBrg = (item.nama || "").toUpperCase();
-                allItemsInTrx.push(namaBrg); 
-                
-                let nominalMasuk = parseFloat(t.masuk || t.keluar) || 0;
-                let statusBayar = (nominalMasuk < t.tagihanBersih) ? "Belum Bayar" : "-";
-                
-                tempItems.push({
-                    trxInfo: t, itemInfo: item, namaBrg: namaBrg,
-                    qty: parseFloat(item.qty) || 0,
-                    hargaSatuan: parseFloat(item.harga) || 0,
-                    statusBayar: statusBayar, cleanSub: cleanSub
-                });
-            });
-        }
-        
-        updates.push({ id: t.id, selectedItems: allItemsInTrx });
+        omsetPerTanggal[tglKey] += totalTagihan;
     });
 
-    tempItems.sort((a, b) => {
-        if (a.trxInfo.tglFormatted !== b.trxInfo.tglFormatted) return a.trxInfo.tglFormatted.localeCompare(b.trxInfo.tglFormatted);
-        if (a.cleanSub !== b.cleanSub) return a.cleanSub.localeCompare(b.cleanSub);
-        return a.namaBrg.localeCompare(b.namaBrg);
-    });
-    
-    let firstOccurrences = {}; 
-    
-    tempItems.forEach(data => {
-        const t = data.trxInfo;
-        const namaBrg = data.namaBrg;
-        const pelanggan = data.cleanSub;
-        const qty = data.qty;
-        const rowTotal = qty * data.hargaSatuan;
-        
-        const groupKey = `${t.tglFormatted}_${pelanggan}_${namaBrg}_${data.hargaSatuan}`;
-        
-        if (firstOccurrences[groupKey] !== undefined) {
-            // JIKA SAMA: Tambah Qty, Total, dan Gabungkan ID Transaksi
-            let firstIdx = firstOccurrences[groupKey];
-            itemsForRekapan[firstIdx].jumlah += qty;
-            itemsForRekapan[firstIdx].total += rowTotal;
+    refs.forEach(groupItem => {
+        // HAPUS Pengecekan if (groupItem.isSudah) return; agar bisa diuncheck
+
+        const deskChk = document.getElementById(`desktop-${groupItem.chkId}`);
+        const mobChk = document.getElementById(`mobile-${groupItem.chkId}`);
+        const isChecked = (deskChk && deskChk.checked) || (mobChk && mobChk.checked);
+
+        // Jika dicentang ATAU statusnya berubah (misal sebelumnya sudah direkap tapi sekarang dihilangkan centangnya)
+        if (isChecked || groupItem.isSudah) {
+            adaYangDiproses = true;
             
-            // Cek agar ID tidak ditulis berulang jika merekap dari ID yang sama
-            if (!itemsForRekapan[firstIdx].idTransaksi.includes(t.id)) {
-                itemsForRekapan[firstIdx].idTransaksi += `, ${t.id}`;
-            }
-        } else {
-            // JIKA BELUM ADA: Buat baris baru
-            let omsetTampil = "";
-            if (!tanggalSudahDitulis[t.tglFormatted]) {
-                omsetTampil = omsetPerTanggal[t.tglFormatted];
-                tanggalSudahDitulis[t.tglFormatted] = true;
-            }
-            
-            firstOccurrences[groupKey] = itemsForRekapan.length;
-            
-            let hrgReseller = 0;
-            if (typeof productMaster !== 'undefined') {
-                const masterData = productMaster.find(p => p.nama === namaBrg);
-                if (masterData) {
-                    hrgReseller = masterData.harga_reseller || 0;
+            groupItem.refs.forEach(ref => {
+                const t = ref.trxData;
+                const item = ref.itemData;
+                const namaBrg = (item.nama || "").toUpperCase();
+
+                if (!updatesMap[t.id]) {
+                    updatesMap[t.id] = { id: t.id, selectedItems: [], unselectedItems: [], invoiceTexts: {} };
                 }
-            }
-            
-            itemsForRekapan.push({
-                periode: t.tglFormatted, 
-                totalOmset: omsetTampil,            
-                barang: namaBrg, 
-                hargaReseller: hrgReseller, 
-                hargaJual: data.hargaSatuan,
-                jumlah: qty, 
-                total: rowTotal,
-                lot: data.itemInfo.kategori || "UMUM",       
-                ket: data.statusBayar, 
-                followUp: pelanggan,                 
-                invoice: "", 
-                idTransaksi: t.id // Tetap simpan ID awal di sini
+                
+                if (isChecked) {
+                    updatesMap[t.id].selectedItems.push(namaBrg);
+                    // Gunakan nilai input baru, atau gunakan yang lama, atau default 'SUDAH REKAP'
+                    updatesMap[t.id].invoiceTexts[namaBrg] = globalInvoice || item.invoice || "SUDAH REKAP"; 
+
+                    const rawDate = t.waktu.split(' ')[0];
+                    const parts = rawDate.split('-');
+                    const tglFormatted = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : rawDate;
+                    const pelanggan = (t.sub || "UMUM").replace(/\s*\|.*$/, '');
+                    const nominalMasuk = parseFloat(t.masuk || t.keluar) || 0;
+                    
+                    let totalTagihanTrx = 0;
+                    try {
+                        let det = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail;
+                        if(Array.isArray(det)) {
+                            totalTagihanTrx = det.reduce((sum, i) => sum + ((parseFloat(i.qty)||0) * (parseFloat(i.harga)||0)), 0);
+                        }
+                    } catch(e){}
+                    totalTagihanTrx -= (parseFloat(t.diskon) || 0);
+                    
+                    const statusBayar = (nominalMasuk < totalTagihanTrx) ? "Belum Bayar" : "-";
+
+                    let hrgReseller = 0;
+                    if (typeof productMaster !== 'undefined') {
+                        const masterData = productMaster.find(p => p.nama === namaBrg);
+                        if (masterData) hrgReseller = masterData.harga_reseller || masterData.hargaReseller || 0;
+                    }
+
+                    itemsForRekapan.push({
+                        periode: tglFormatted,
+                        totalOmset: omsetPerTanggal[rawDate] || "", 
+                        barang: namaBrg,
+                        hargaReseller: hrgReseller,
+                        hargaJual: parseFloat(item.harga) || 0,
+                        jumlah: parseFloat(item.qty) || 0,
+                        total: (parseFloat(item.qty) || 0) * (parseFloat(item.harga) || 0),
+                        lot: item.kategori || "UMUM",
+                        ket: statusBayar,
+                        followUp: pelanggan,
+                        invoice: updatesMap[t.id].invoiceTexts[namaBrg],           
+                        idTransaksi: t.id,
+                        isUpdateExisting: groupItem.isSudah
+                    });
+                } else {
+                    // Jika centang dihilangkan
+                    updatesMap[t.id].unselectedItems.push(namaBrg);
+                }
             });
         }
     });
+
+    if (!adaYangDiproses) return alert("Silakan centang atau hilangkan centang minimal satu produk untuk diproses.");
+
+    showLoading(true);
+    let updatesArray = Object.values(updatesMap);
 
     try {
-        const payload = { action: 'updateSubjekMulti', updates: updates, items: itemsForRekapan };
-        fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) }).catch(e => console.log("Fetch:", e));
-        
-        updates.forEach(u => {
+        // Update Memori Lokal agar centang terupdate di JSON "detail"
+        updatesArray.forEach(u => {
            let target = allTransactions.find(x => x.id === u.id);
            if(target) { 
                let items = [];
-               try {
-                   items = typeof target.detail === 'string' ? JSON.parse(target.detail) : target.detail;
-               } catch(e) {}
+               try { items = typeof target.detail === 'string' ? JSON.parse(target.detail) : target.detail; } catch(e) {}
                
                if (Array.isArray(items)) {
                    items.forEach(item => {
-                       if (u.selectedItems.includes((item.nama || "").toUpperCase())) {
-                           item.isRekap = true;
+                       const nmBrg = (item.nama || "").toUpperCase();
+                       if (u.selectedItems.includes(nmBrg)) {
+                           item.isRekap = u.invoiceTexts[nmBrg]; // Menyimpan teks invoice langsung di isrekap
+                           item.invoice = u.invoiceTexts[nmBrg]; 
+                       } else if (u.unselectedItems.includes(nmBrg)) {
+                           item.isRekap = false; // Kembalikan ke false jika centang dilepas
+                           item.invoice = "";
                        }
                    });
-                   target.detail = items;
+                   target.detail = items; 
+                   // Tambahkan detail JSON string baru ke payload agar diproses Google Script (jika disupport)
+                   u.newDetailString = JSON.stringify(items);
                }
            }
         });
+
+        const payload = { action: 'updateSubjekMulti', updates: updatesArray, items: itemsForRekapan };
+        fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) }).catch(e => console.log("Fetch:", e));
         
-        renderTransactions();
+        renderTransactions(); 
+        document.getElementById('global-invoice-input').value = ''; 
         showLoading(false);
-        alert(`Sukses! ${trxsToUpdate.length} transaksi disalin secara utuh ke Rekapan Harian.`);
+        alert(`Berhasil memperbarui data rekapan.`);
     } catch (error) {
         showLoading(false);
+        alert('Terjadi kesalahan saat memproses data ke server.');
     }
 };
 
@@ -2354,7 +2456,7 @@ window.promptUpdatePelangganRekapan = async function() {
   // Logika Menampilkan/Menyembunyikan Baris Tombol Rekap Penjualan
   const rekapanBar = document.getElementById('rekapan-action-bar');
   if (rekapanBar) {
-      if (window.isRekapanBarangView) {
+      if (window.isRekapanPenjualanView) { // Diubah ke tampilan Rekapan Penjualan
           rekapanBar.classList.remove('hidden');
           rekapanBar.classList.add('flex');
       } else {
@@ -2459,8 +2561,8 @@ window.promptUpdatePelangganRekapan = async function() {
                     
                     itemSummary[name].count += 1;
                     
-                    // 2. Jika item memiliki flag isRekap, tandai sebagai diproses
-                    if (item.isRekap === true || item.isRekap === "true" || isProcessedOld) {
+                   // 2. Jika item memiliki flag isRekap, tandai sebagai diproses
+if ((item.isRekap && item.isRekap !== false && item.isRekap !== "false" && item.isRekap !== "") || isProcessedOld) {
                         itemSummary[name].processedCount += 1;
                     }
                 }
@@ -2546,6 +2648,216 @@ window.promptUpdatePelangganRekapan = async function() {
     return;
   }
 
+ // --- TAMPILAN REKAPAN PENJUALAN ---
+  if (window.isRekapanPenjualanView) {
+    let salesHtml = '';
+    let totalOmsetSemua = 0;
+    const uniqueTrxIds = new Set(); 
+    const groupedData = {};
+    window.rekapItemRefsLangsung = [];
+    let chkIndex = 0;
+
+    filtered.forEach(t => {
+        if (t.kat === 'BATAL' || t.kat === 'DIHAPUS' || t.kat === 'CANCEL ORDER') return;
+        if ((t.kat || '').toUpperCase() !== 'PENJUALAN') return;
+
+        const tgl = t.waktu.split(' ')[0];
+        const pelanggan = t.sub && t.sub !== '-' ? t.sub : 'UMUM';
+        const diskon = parseFloat(t.diskon) || 0;
+
+        uniqueTrxIds.add(t.id); 
+        const customerKey = `${tgl}_${pelanggan}`;
+
+        if (!groupedData[customerKey]) {
+            groupedData[customerKey] = {
+                tanggal: formatDateText(tgl),
+                pelanggan: pelanggan,
+                total_omset: 0,
+                items: {} 
+            };
+        }
+        
+        groupedData[customerKey].total_omset -= diskon;
+
+        let items = [];
+        try { items = typeof t.detail === 'string' ? JSON.parse(t.detail) : t.detail; } catch(e){}
+
+        if (Array.isArray(items)) {
+            items.forEach((item, originalItemIdx) => {
+                const isSudah = (item.isRekap && item.isRekap !== false && item.isRekap !== "false" && item.isRekap !== "") || (t.ket && t.ket.includes("|")) || (t.sub && t.sub.includes("|"));
+                const namaBarang = item.nama;
+                const harga = parseFloat(item.harga) || 0;
+                const qty = parseFloat(item.qty) || 0;
+                const subtotal = harga * qty;
+                const invoiceText = item.invoice || ''; 
+
+                const itemKey = `${namaBarang}_${harga}_${invoiceText}_${isSudah}`;
+
+                if (!groupedData[customerKey].items[itemKey]) {
+                    const newChkId = `chk-rekap-langsung-${chkIndex++}`;
+                    groupedData[customerKey].items[itemKey] = {
+                        nama_barang: namaBarang,
+                        harga: harga,
+                        qty: 0,
+                        subtotal_barang: 0,
+                        invoice: invoiceText,
+                        isSudah: isSudah,
+                        chkId: newChkId,
+                        refs: []
+                    };
+                    
+                    window.rekapItemRefsLangsung.push(groupedData[customerKey].items[itemKey]);
+                }
+
+                groupedData[customerKey].items[itemKey].qty += qty;
+                groupedData[customerKey].items[itemKey].subtotal_barang += subtotal;
+                groupedData[customerKey].total_omset += subtotal;
+                
+                groupedData[customerKey].items[itemKey].refs.push({
+                    trxId: t.id,
+                    itemData: item,
+                    trxData: t,
+                    originalItemIdx: originalItemIdx
+                });
+            });
+        }
+    });
+
+    const trxCount = uniqueTrxIds.size; 
+    const groupsArray = Object.values(groupedData);
+
+    if (groupsArray.length === 0) {
+        container.innerHTML = `<div class="py-16 text-center text-slate-500"><div class="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3"><i data-lucide="file-spreadsheet" class="w-8 h-8 text-slate-300"></i></div>Tidak ada data penjualan.</div>`;
+    } else {
+        groupsArray.forEach(g => { totalOmsetSemua += g.total_omset; });
+
+        salesHtml += `
+            <div class="px-4 py-3 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+                <div>
+                    <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total Rekapan Penjualan</p>
+                    <p class="text-xs font-bold text-indigo-700">${trxCount} Nota / Pelanggan</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-lg font-black text-indigo-600">${formatRupiah(totalOmsetSemua)}</p>
+                </div>
+            </div>
+            
+            <div class="p-4 pb-6">
+                <!-- ================== TAMPILAN MOBILE (HP) ================== -->
+                <div class="md:hidden space-y-4">
+        `;
+
+        groupsArray.forEach(group => {
+            const daftarBarang = Object.values(group.items);
+            let itemsHtmlMobile = '';
+            
+            daftarBarang.forEach(barang => {
+                const invoiceBadge = barang.invoice ? `<span class="inline-block mt-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-bold"><i data-lucide="tag" class="w-2.5 h-2.5 inline mr-0.5"></i> ${barang.invoice}</span>` : '';
+                const chkDisabled = barang.isSudah ? 'checked' : '';
+const chkClass = 'accent-indigo-600 cursor-pointer'; // Class dibuat normal
+
+itemsHtmlMobile += `
+    <div class="flex justify-between items-start text-xs border-b border-slate-100 pb-2 mb-2 last:border-0 last:pb-0 last:mb-0">
+        <div class="flex items-start gap-2 flex-1 pr-2">
+            <input type="checkbox" id="mobile-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded mt-0.5 shrink-0 ${chkClass}" ${chkDisabled} onchange="syncCheckboxes('${barang.chkId}', this.checked)">
+            <div>
+                <label for="mobile-${barang.chkId}" class="font-bold text-slate-700 cursor-pointer m-0">${barang.nama_barang}</label>
+                                <p class="text-[10px] text-slate-500 mt-0.5">
+                                    ${barang.qty} <span class="mx-1 text-slate-300">x</span> ${formatRupiah(barang.harga)}
+                                </p>
+                                ${invoiceBadge}
+                            </div>
+                        </div>
+                        <div class="font-black text-slate-800 text-right mt-0.5">
+                            ${formatRupiah(barang.subtotal_barang)}
+                        </div>
+                    </div>
+                `;
+            });
+
+            salesHtml += `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-indigo-50/50 p-3 border-b border-indigo-100 flex justify-between items-start">
+                        <div>
+                            <p class="text-[10px] text-slate-500 font-medium mb-0.5 flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> ${group.tanggal}</p>
+                            <p class="font-black text-slate-800 text-sm mt-1">${group.pelanggan}</p>
+                        </div>
+                        <div class="text-right bg-white px-2.5 py-1.5 rounded-lg border border-indigo-100 shadow-sm">
+                            <p class="text-[8px] font-bold text-indigo-400 uppercase tracking-widest mb-0.5">Total Omset</p>
+                            <p class="font-black text-indigo-600 text-[13px]">${formatRupiah(group.total_omset)}</p>
+                        </div>
+                    </div>
+                    <div class="p-3">
+                        ${itemsHtmlMobile}
+                    </div>
+                </div>
+            `;
+        });
+
+        salesHtml += `
+                </div>
+                
+                <!-- ================== TAMPILAN DESKTOP/TABLET ================== -->
+                <div class="hidden md:block overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs whitespace-nowrap bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <thead>
+                            <tr class="bg-indigo-100 text-indigo-800">
+                                <th class="p-3 border-b border-indigo-200 font-bold">Tanggal</th>
+                                <th class="p-3 border-b border-indigo-200 font-bold">Pelanggan</th>
+                                <th class="p-3 border-b border-indigo-200 font-bold">Barang & Invoice</th>
+                                <th class="p-3 border-b border-indigo-200 font-bold text-right">Harga</th>
+                                <th class="p-3 border-b border-indigo-200 font-bold text-center">Qty</th>
+                                <th class="p-3 border-b border-indigo-200 font-bold text-right">Subtotal</th>
+                                <th class="p-3 border-b border-indigo-200 font-bold text-right">Total Omset</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        groupsArray.forEach(group => {
+            const daftarBarang = Object.values(group.items);
+            daftarBarang.forEach((barang, index) => {
+                const isFirstRow = index === 0;
+                const rowClass = isFirstRow ? 'border-t-2 border-indigo-200 bg-slate-50' : 'border-t border-slate-100 border-dashed bg-white';
+                
+                const invoiceBadge = barang.invoice ? `<span class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold ml-2 align-middle shadow-sm"><i data-lucide="tag" class="w-2.5 h-2.5 inline mr-0.5"></i>${barang.invoice}</span>` : '';
+                const chkDisabled = barang.isSudah ? 'checked' : '';
+const chkClass = 'accent-indigo-600 cursor-pointer';
+
+salesHtml += `
+    <tr class="${rowClass} hover:bg-indigo-50/50 transition-colors">
+        <td class="p-3 text-slate-500">${isFirstRow ? group.tanggal : ''}</td>
+        <td class="p-3 font-bold text-slate-800">${isFirstRow ? group.pelanggan : ''}</td>
+        <td class="p-3 text-slate-600 flex items-center gap-2">
+            <input type="checkbox" id="desktop-${barang.chkId}" value="${barang.chkId}" class="chk-sync w-4 h-4 rounded ${chkClass}" ${chkDisabled} onchange="syncCheckboxes('${barang.chkId}', this.checked)">
+            <label for="desktop-${barang.chkId}" class="text-slate-800 font-medium cursor-pointer m-0">${barang.nama_barang} ${invoiceBadge}</label>
+                        </td>
+                        <td class="p-3 text-slate-500 text-right">${formatRupiah(barang.harga)}</td>
+                        <td class="p-3 text-center font-black text-blue-600">${barang.qty}</td>
+                        <td class="p-3 text-slate-600 text-right font-medium">${formatRupiah(barang.subtotal_barang)}</td>
+                        <td class="p-3 font-black text-indigo-600 text-right">
+                            ${isFirstRow ? formatRupiah(group.total_omset) : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+        });
+        
+        salesHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = salesHtml;
+    }
+    
+    document.getElementById('paginationContainer').innerHTML = '';
+    refreshIcons('listContainer');
+    return; 
+  }
+  
   // --- 2. LOGIKA TAMPILAN RINGKASAN (SUMMARY VIEW) ---
   if (window.isSummaryView) {
     if (filtered.length === 0) {
