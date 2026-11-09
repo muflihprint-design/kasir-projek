@@ -1978,7 +1978,9 @@ function updateIdentityUI() {
   const iconWrapper = document.getElementById('identity-icon-wrapper');
   
   const shopName = currentShop.nama || localStorage.getItem('shopName') || 'PILIH TOKO';
+  
   if (!nameEl || !iconWrapper) return;
+  
   nameEl.innerText = shopName;
 
   // --- LOGIKA MENYEMBUNYIKAN TAB UNTUK ADMIN ---
@@ -1987,12 +1989,12 @@ function updateIdentityUI() {
   const navBeli = document.getElementById('nav-pembelian');
   const navBiaya = document.getElementById('nav-operasional');
   const navStok = document.getElementById('nav-stok');
-  // Temukan fungsi updateIdentityUI() dan tambahkan baris berikut
-const navPelanggan = document.getElementById('nav-pelanggan');
-if (navPelanggan) {
-  navPelanggan.style.display = isAdmin ? 'flex' : 'none';
-  navPelanggan.classList.toggle('hidden', !isAdmin);
-}
+  const navPelanggan = document.getElementById('nav-pelanggan');
+  
+  if (navPelanggan) {
+    navPelanggan.style.display = isAdmin ? 'flex' : 'none';
+    navPelanggan.classList.toggle('hidden', !isAdmin);
+  }
 
   if (navJual) navJual.style.display = isAdmin ? 'none' : 'flex';
   if (navBeli) navBeli.style.display = isAdmin ? 'none' : 'flex';
@@ -2002,14 +2004,30 @@ if (navPelanggan) {
     navStok.classList.toggle('hidden', !isAdmin);
   }
 
-  // --- Style Identitas (Sama seperti sebelumnya) ---
+  // --- STYLE IDENTITAS (Menggunakan tampilan/warna pilihan Anda) ---
   const baseClasses = "w-7 h-7 flex items-center justify-center rounded-lg shadow-sm group-active:scale-90 transition-all border group-hover:bg-red-100 group-hover:border-red-200 group-hover:text-red-600 ";
-  if (shopName === 'ADMINISTRATOR') {
+  
+  if (shopName === 'MUFLIH PRINT') {
+    iconWrapper.className = baseClasses + "bg-orange-100 border-orange-200 text-orange-600";
+    iconWrapper.innerHTML = '<span class="text-xs font-black">M</span>';
+  } else if (shopName === 'VI PRINTING') {
+    iconWrapper.className = baseClasses + "bg-purple-100 border-purple-200 text-purple-600";
+    iconWrapper.innerHTML = '<span class="text-xs font-black">V</span>';
+  } else if (shopName === 'BLIMI') {
+    iconWrapper.className = baseClasses + "bg-blue-100 border-blue-200 text-blue-600";
+    iconWrapper.innerHTML = '<span class="text-xs font-black">B</span>';
+  } else if (shopName === 'ADMINISTRATOR') {
     iconWrapper.className = baseClasses + "bg-slate-800 border-slate-700 text-white group-hover:text-red-600";
     iconWrapper.innerHTML = '<i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>';
-  } // (lanjutkan else if Muflih, Vi, BLIMI seperti biasa)
+  } else {
+    iconWrapper.className = baseClasses + "bg-white border-slate-100 text-slate-400";
+    iconWrapper.innerHTML = '<i data-lucide="user" class="w-3.5 h-3.5"></i>';
+  }
   
-  if (typeof lucide !== 'undefined') refreshIcons('identity-icon-wrapper');
+  // Pengecekan aman agar tidak error jika library belum termuat
+  if (typeof lucide !== 'undefined') {
+    refreshIcons('identity-icon-wrapper');
+  }
 }
 
 // --- FUNGSI MODAL TAMBAH BARANG BARU ---
@@ -5446,9 +5464,17 @@ if (t.revisi && t.revisi.trim() !== '') {
             ` : ''}
         </div>
         ${currentShop.nama === 'ADMINISTRATOR' && t.kat !== 'DIHAPUS' ? `
-        <button onclick="confirmDeleteTransaction('${t.id}')" class="mt-3 w-full py-3 bg-red-50 text-red-600 border border-red-200 font-bold rounded-xl hover:bg-red-100 transition flex items-center justify-center gap-2 text-sm shadow-sm active:scale-95">
-            <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Transaksi (Admin)
-        </button>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+            <button onclick="ubahTanggalTransaksi('${t.id}', '${t.waktu}')" class="py-2.5 bg-blue-50 text-blue-600 border border-blue-200 font-bold rounded-xl hover:bg-blue-100 transition flex items-center justify-center gap-1.5 text-xs shadow-sm active:scale-95">
+                <i data-lucide="calendar-clock" class="w-3.5 h-3.5"></i> Ubah Waktu
+            </button>
+            <button onclick="ubahMetodePembayaran('${t.id}', '${t.metode}')" class="py-2.5 bg-amber-50 text-amber-600 border border-amber-200 font-bold rounded-xl hover:bg-amber-100 transition flex items-center justify-center gap-1.5 text-xs shadow-sm active:scale-95">
+                <i data-lucide="wallet" class="w-3.5 h-3.5"></i> Ubah Metode
+            </button>
+            <button onclick="confirmDeleteTransaction('${t.id}')" class="col-span-2 py-3 bg-red-50 text-red-600 border border-red-200 font-bold rounded-xl hover:bg-red-100 transition flex items-center justify-center gap-2 text-sm shadow-sm active:scale-95">
+                <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Data
+            </button>
+        </div>
         ` : ''}
         <!-- --------------------------------------- -->
     </div>
@@ -5519,6 +5545,167 @@ window.handleRevisiAction = async function(type, trxId, oldNote = '', event) {
         toggleModalButtons(true);
     }
 }
+
+// ==========================================
+// UBAH WAKTU TRANSAKSI (KHUSUS ADMIN)
+// ==========================================
+window.ubahTanggalTransaksi = async function(id, currentWaktu) {
+    // Sesuaikan format waktu lama untuk bisa dibaca oleh input type="datetime-local"
+    let defaultVal = "";
+    if (currentWaktu) {
+        // Mengubah spasi menjadi 'T' dan memotong detik (hanya butuh YYYY-MM-DDTHH:mm)
+        defaultVal = currentWaktu.replace(' ', 'T').substring(0, 16);
+    }
+
+    // Munculkan Pop-up kalender bawaan dari SweetAlert
+    const { value: newWaktu } = await Swal.fire({
+        title: 'Ubah Waktu Transaksi',
+        html: `
+            <div class="text-left mb-2 text-xs text-slate-500 font-medium">Pilih tanggal & jam yang baru:</div>
+            <input type="datetime-local" id="swal-input-waktu" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-blue-500 font-bold text-slate-700" value="${defaultVal}">
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: '<i data-lucide="save" class="w-4 h-4 mr-1 inline"></i> Simpan',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#2563eb',
+        didOpen: () => {
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        },
+        preConfirm: () => {
+            const val = document.getElementById('swal-input-waktu').value;
+            if (!val) {
+                Swal.showValidationMessage('Waktu tidak boleh kosong!');
+            }
+            return val;
+        }
+    });
+
+    if (newWaktu) {
+        // Kembalikan format 'T' menjadi spasi, dan tambahkan detik kembali
+        const formattedWaktu = newWaktu.replace('T', ' ') + ':00';
+
+        if (formattedWaktu === currentWaktu) return; // Jika tidak ada yang berubah
+
+        window.showLoading?.(true);
+        try {
+            // 1. Update ke Supabase
+            const { error } = await supabaseClient
+                .from('transaksi')
+                .update({ waktu: formattedWaktu })
+                .eq('id', id);
+
+            if (error) throw error;
+
+            // 2. Update Memori Lokal (tanpa harus reload dari server)
+            const trxIndex = allTransactions.findIndex(t => t.id === id);
+            if (trxIndex > -1) {
+                allTransactions[trxIndex].waktu = formattedWaktu;
+            }
+
+            // 3. Bersihkan cache & Render Ulang
+            if (typeof window.clearOtherPagesCache === 'function') window.clearOtherPagesCache();
+            if (typeof renderTransactions === 'function') renderTransactions();
+
+            // 4. Buka kembali modal detail dengan data yang sudah di-update
+            if (trxIndex > -1 && typeof showDetail === 'function') {
+                showDetail(allTransactions[trxIndex]);
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil',
+                text: 'Waktu transaksi berhasil diperbarui.',
+                timer: 2000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+
+        } catch (e) {
+            Swal.fire('Gagal!', 'Terjadi kesalahan sistem: ' + e.message, 'error');
+        } finally {
+            window.showLoading?.(false);
+        }
+    }
+};
+
+// ==========================================
+// UBAH METODE PEMBAYARAN (KHUSUS ADMIN)
+// ==========================================
+window.ubahMetodePembayaran = async function(id, currentMetode) {
+    // Daftar pilihan metode pembayaran yang tersedia
+    const inputOptions = {
+        'Cash Muflih Print': 'Cash Muflih Print',
+        'Cash Vi Printing': 'Cash Vi Printing',
+        'Rekening': 'Rekening',
+        'Kas Bendahara': 'Kas Bendahara'
+    };
+
+    const { value: newMetode } = await Swal.fire({
+        title: 'Ubah Metode Pembayaran',
+        text: 'Pilih dompet/metode pembayaran yang baru:',
+        icon: 'question',
+        input: 'select',
+        inputOptions: inputOptions,
+        inputValue: currentMetode,
+        showCancelButton: true,
+        confirmButtonText: '<i data-lucide="save" class="w-4 h-4 mr-1 inline"></i> Simpan',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#f59e0b', // Warna amber
+        didOpen: () => {
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+    });
+
+    if (newMetode && newMetode !== currentMetode) {
+        window.showLoading?.(true);
+        try {
+            // 1. Update ke Supabase
+            const { error } = await supabaseClient
+                .from('transaksi')
+                .update({ metode: newMetode })
+                .eq('id', id);
+
+            if (error) throw error;
+
+            // 2. Update Memori Lokal
+            const trxIndex = allTransactions.findIndex(t => t.id === id);
+            if (trxIndex > -1) {
+                allTransactions[trxIndex].metode = newMetode;
+            }
+
+            // 3. Tarik ulang saldo agar perubahan cash/rekening langsung sinkron
+            if (typeof fetchInitialData === 'function') {
+                fetchInitialData();
+            }
+
+            // 4. Bersihkan cache & Render Ulang
+            if (typeof window.clearOtherPagesCache === 'function') window.clearOtherPagesCache();
+            if (typeof renderTransactions === 'function') renderTransactions();
+
+            // 5. Buka kembali modal detail dengan data yang sudah di-update
+            if (trxIndex > -1 && typeof showDetail === 'function') {
+                showDetail(allTransactions[trxIndex]);
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil',
+                text: 'Metode pembayaran berhasil diperbarui.',
+                timer: 2000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+
+        } catch (e) {
+            Swal.fire('Gagal!', 'Terjadi kesalahan sistem: ' + e.message, 'error');
+        } finally {
+            window.showLoading?.(false);
+        }
+    }
+};
 
 // Mutasi State & Reactivity2
 function updateStateAndRenderUI(action, trxId, payload) {
@@ -10125,6 +10312,56 @@ document.addEventListener("visibilitychange", () => {
 // Deteksi saat ukuran layar berubah (keyboard dimunculkan ulang oleh sistem operasi)
 window.addEventListener("resize", () => {
   pastikanTombolPintasTerlihat();
+});
+
+// ==========================================
+// SINKRONISASI REAL-TIME ANTAR PERANGKAT
+// ==========================================
+window.setupRealtimeSubscription = function() {
+    if (!supabaseClient) {
+        console.warn("Supabase client belum siap untuk Realtime.");
+        return;
+    }
+
+    // Membuat channel untuk memantau perubahan pada tabel 'transaksi'
+    const channel = supabaseClient
+        .channel('sinkronisasi-transaksi')
+        .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'transaksi' },
+            (payload) => {
+                console.log('Perubahan terdeteksi dari perangkat lain:', payload);
+                
+                // --- PROSES UPDATE LAYAR ---
+                // Panggil fungsi tarik data Anda secara diam-diam (background update)
+                // Jika fetchInitialData Anda memicu loading layar penuh, 
+                // disarankan memanggil fungsi kalkulasi saldonya saja.
+                
+                if (typeof fetchInitialData === 'function') {
+                    // Coba jalankan tanpa memicu animasi loading jika memungkinkan
+                    // (Tergantung bagaimana Anda menyusun fungsi fetchInitialData sebelumnya)
+                    fetchInitialData(); 
+                } 
+                
+                // Bersihkan cache aplikasi agar data selalu baru
+                if (typeof window.clearOtherPagesCache === 'function') {
+                    window.clearOtherPagesCache();
+                }
+            }
+        )
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('Sistem Real-time AKTIF. Siap menerima update dari perangkat lain.');
+            }
+        });
+};
+
+// Pastikan fungsi ini dipanggil setelah halaman dan Supabase termuat
+document.addEventListener('DOMContentLoaded', () => {
+    // Beri sedikit jeda agar supabaseClient sudah benar-benar terinisialisasi
+    setTimeout(() => {
+        setupRealtimeSubscription();
+    }, 1500);
 });
 
 
