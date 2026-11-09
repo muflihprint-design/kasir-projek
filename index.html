@@ -10315,7 +10315,7 @@ window.addEventListener("resize", () => {
 });
 
 // ==========================================
-// SINKRONISASI REAL-TIME ANTAR PERANGKAT
+// SINKRONISASI REAL-TIME (SALDO & RIWAYAT)
 // ==========================================
 window.setupRealtimeSubscription = function() {
     if (!supabaseClient) {
@@ -10329,42 +10329,42 @@ window.setupRealtimeSubscription = function() {
         .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'transaksi' },
-            (payload) => {
+            async (payload) => { // Tambahkan 'async' agar bisa menunggu proses tarik data
                 console.log('Perubahan terdeteksi dari perangkat lain:', payload);
                 
-                // --- PROSES UPDATE LAYAR ---
-                // Panggil fungsi tarik data Anda secara diam-diam (background update)
-                // Jika fetchInitialData Anda memicu loading layar penuh, 
-                // disarankan memanggil fungsi kalkulasi saldonya saja.
-                
+                // 1. Tarik ulang data terbaru (Saldo dll) dan tunggu sampai selesai
                 if (typeof fetchInitialData === 'function') {
-                    // Coba jalankan tanpa memicu animasi loading jika memungkinkan
-                    // (Tergantung bagaimana Anda menyusun fungsi fetchInitialData sebelumnya)
-                    fetchInitialData(); 
+                    try {
+                        await fetchInitialData(); 
+                    } catch (error) {
+                        console.error("Gagal menarik data realtime:", error);
+                    }
                 } 
                 
-                // Bersihkan cache aplikasi agar data selalu baru
+                // 2. Bersihkan cache aplikasi agar tidak ada data nyangkut
                 if (typeof window.clearOtherPagesCache === 'function') {
                     window.clearOtherPagesCache();
+                }
+
+                // 3. Render ulang (Refresh) daftar riwayat transaksi di layar
+                if (typeof renderTransactions === 'function') {
+                    renderTransactions();
                 }
             }
         )
         .subscribe((status) => {
             if (status === 'SUBSCRIBED') {
-                console.log('Sistem Real-time AKTIF. Siap menerima update dari perangkat lain.');
+                console.log('Sistem Real-time AKTIF. Saldo & Riwayat akan update otomatis.');
             }
         });
 };
 
-// Pastikan fungsi ini dipanggil setelah halaman dan Supabase termuat
+// Pemicu agar fungsi dijalankan saat aplikasi pertama kali dimuat
 document.addEventListener('DOMContentLoaded', () => {
-    // Beri sedikit jeda agar supabaseClient sudah benar-benar terinisialisasi
     setTimeout(() => {
         setupRealtimeSubscription();
     }, 1500);
 });
-
-
 
   </script>
   
